@@ -1,3 +1,13 @@
+This is a new tanstack start project to implement a reddit like site. It's replacing a previous flask / jinja site that got unwheildly will all of the old school script include js, jinja templates with a lot of attributes, etc.
+
+Ideally I'd like to keep the db structure the same. For now don't bother with a database and we'll just use the json files in prototyping-data to get going.
+
+Documentation about the old site is in project_specs.
+
+The original tanstack readme follows.
+
+----
+
 Welcome to your new TanStack app! 
 
 # Getting Started
