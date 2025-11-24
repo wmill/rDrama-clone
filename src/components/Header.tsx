@@ -27,6 +27,7 @@ export default function Header() {
 					onClick={() => setIsOpen(true)}
 					className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
 					aria-label="Open menu"
+					type="button"
 				>
 					<Menu size={24} />
 				</button>
@@ -52,6 +53,7 @@ export default function Header() {
 						onClick={() => setIsOpen(false)}
 						className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
 						aria-label="Close menu"
+						type="button"
 					>
 						<X size={24} />
 					</button>
@@ -120,6 +122,8 @@ export default function Header() {
 									StartSSRDemo: !prev.StartSSRDemo,
 								}))
 							}
+							aria-label="Toggle SSR Demo Links"
+							type="button"
 						>
 							{groupedExpanded.StartSSRDemo ? (
 								<ChevronDown size={20} />
