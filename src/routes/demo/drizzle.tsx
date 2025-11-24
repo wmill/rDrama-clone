@@ -1,187 +1,237 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/react-start'
-import { db } from '@/db'
-import { desc } from 'drizzle-orm'
-import { todos } from '@/db/schema'
+import { createFileRoute } from "@tanstack/react-router"
+import { createServerFn } from "@tanstack/react-start"
+import { desc, sql } from "drizzle-orm"
 
-const getTodos = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return await db.query.todos.findMany({
-    orderBy: [desc(todos.createdAt)],
-  })
+import { db } from "@/db"
+import {
+	commentVotes,
+	comments,
+	submissions,
+	users,
+	votes,
+} from "@/db/schema"
+
+const getSnapshot = createServerFn({ method: "GET" }).handler(async () => {
+	const [submissionTotal] = await db
+		.select({ count: sql<number>`COUNT(*)` })
+		.from(submissions)
+
+	const [commentTotal] = await db
+		.select({ count: sql<number>`COUNT(*)` })
+		.from(comments)
+
+	const [userTotal] = await db.select({ count: sql<number>`COUNT(*)` }).from(users)
+
+	const [voteTotal] = await db.select({ count: sql<number>`COUNT(*)` }).from(votes)
+
+	const [commentVoteTotal] = await db
+		.select({ count: sql<number>`COUNT(*)` })
+		.from(commentVotes)
+
+	const latestSubmissions = await db
+		.select({
+			id: submissions.id,
+			title: submissions.title,
+			authorId: submissions.authorId,
+			createdUtc: submissions.createdUtc,
+			upvotes: submissions.upvotes,
+			downvotes: submissions.downvotes,
+			commentCount: submissions.commentCount,
+		})
+		.from(submissions)
+		.orderBy(desc(submissions.createdUtc))
+		.limit(5)
+
+	const latestComments = await db
+		.select({
+			id: comments.id,
+			body: comments.body,
+			authorId: comments.authorId,
+			parentSubmission: comments.parentSubmission,
+			createdUtc: comments.createdUtc,
+			upvotes: comments.upvotes,
+			downvotes: comments.downvotes,
+		})
+		.from(comments)
+		.orderBy(desc(comments.createdUtc))
+		.limit(5)
+
+	return {
+		totals: {
+			submissions: submissionTotal?.count ?? 0,
+			comments: commentTotal?.count ?? 0,
+			users: userTotal?.count ?? 0,
+			votes: voteTotal?.count ?? 0,
+			commentVotes: commentVoteTotal?.count ?? 0,
+		},
+		latestSubmissions,
+		latestComments,
+	}
 })
 
-const createTodo = createServerFn({
-  method: 'POST',
+export const Route = createFileRoute("/demo/drizzle")({
+	component: DemoDrizzle,
+	loader: async () => await getSnapshot(),
 })
-  .inputValidator((data: { title: string }) => data)
-  .handler(async ({ data }) => {
-    await db.insert(todos).values({ title: data.title })
-    return { success: true }
-  })
 
-export const Route = createFileRoute('/demo/drizzle')({
-  component: DemoDrizzle,
-  loader: async () => await getTodos(),
-})
+function formatUtcTimestamp(timestamp: number) {
+	return new Date(timestamp * 1000).toLocaleString(undefined, {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	})
+}
 
 function DemoDrizzle() {
-  const router = useRouter()
-  const todos = Route.useLoaderData()
+	const snapshot = Route.useLoaderData()
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.target as HTMLFormElement)
-    const title = formData.get('title') as string
+	return (
+		<div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 text-white">
+			<div className="w-full max-w-5xl space-y-6 rounded-2xl border border-white/10 bg-black/40 p-8 shadow-2xl backdrop-blur">
+				<div className="flex items-center justify-between gap-4">
+					<div>
+						<p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">
+							Drizzle ORM · Read only
+						</p>
+						<h1 className="text-3xl font-bold text-white">Database snapshot</h1>
+						<p className="text-sm text-slate-300">
+							Connected to your configured database; no writes performed.
+						</p>
+					</div>
+					<div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-cyan-100">
+						Live tables: users, submissions, comments, votes, commentvotes
+					</div>
+				</div>
 
-    if (!title) return
+				<div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+					{[
+						{ label: "Submissions", value: snapshot.totals.submissions },
+						{ label: "Comments", value: snapshot.totals.comments },
+						{ label: "Users", value: snapshot.totals.users },
+						{ label: "Votes", value: snapshot.totals.votes },
+						{ label: "Comment votes", value: snapshot.totals.commentVotes },
+					].map((item) => (
+						<div
+							key={item.label}
+							className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 shadow"
+						>
+							<p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+								{item.label}
+							</p>
+							<p className="text-2xl font-bold text-white">
+								{item.value.toLocaleString()}
+							</p>
+						</div>
+					))}
+				</div>
 
-    try {
-      await createTodo({ data: { title } })
-      router.invalidate()
-      ;(e.target as HTMLFormElement).reset()
-    } catch (error) {
-      console.error('Failed to create todo:', error)
-    }
-  }
+				<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+					<div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow">
+						<div className="mb-4 flex items-center justify-between">
+							<div>
+								<p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80">
+									Latest submissions
+								</p>
+								<h2 className="text-xl font-semibold text-white">
+									Most recent 5
+								</h2>
+							</div>
+						</div>
+						<ul className="space-y-3">
+							{snapshot.latestSubmissions.map((submission) => {
+								const score = (submission.upvotes ?? 0) - (submission.downvotes ?? 0)
+								return (
+									<li
+										key={submission.id}
+										className="rounded-xl border border-slate-800/70 bg-slate-950/80 p-4 shadow-sm"
+									>
+										<div className="flex items-start justify-between gap-3">
+											<div className="min-w-0">
+												<p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+													#{submission.id}
+												</p>
+												<h3 className="truncate text-lg font-semibold text-white">
+													{submission.title}
+												</h3>
+												<p className="text-sm text-slate-400">
+													Author #{submission.authorId} ·{" "}
+													{formatUtcTimestamp(submission.createdUtc)}
+												</p>
+											</div>
+											<div className="rounded-lg bg-slate-800 px-3 py-2 text-right">
+												<div className="text-xs uppercase tracking-wider text-slate-400">
+													Score
+												</div>
+												<div className="text-xl font-bold text-white">{score}</div>
+												<div className="text-[11px] text-slate-500">
+													{submission.upvotes}▲ · {submission.downvotes}▼
+												</div>
+											</div>
+										</div>
+										<p className="mt-2 text-sm text-slate-300">
+											{submission.commentCount} comments
+										</p>
+									</li>
+								)
+							})}
+						</ul>
+					</div>
 
-  return (
-    <div
-      className="flex items-center justify-center min-h-screen p-4 text-white"
-      style={{
-        background:
-          'linear-gradient(135deg, #0c1a2b 0%, #1a2332 50%, #16202e 100%)',
-      }}
-    >
-      <div
-        className="w-full max-w-2xl p-8 rounded-xl shadow-2xl border border-white/10"
-        style={{
-          background:
-            'linear-gradient(135deg, rgba(22, 32, 46, 0.95) 0%, rgba(12, 26, 43, 0.95) 100%)',
-          backdropFilter: 'blur(10px)',
-        }}
-      >
-        <div
-          className="flex items-center justify-center gap-4 mb-8 p-4 rounded-lg"
-          style={{
-            background:
-              'linear-gradient(90deg, rgba(93, 103, 227, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
-            border: '1px solid rgba(93, 103, 227, 0.2)',
-          }}
-        >
-          <div className="relative group">
-            <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-lg blur-lg opacity-60 group-hover:opacity-100 transition duration-500"></div>
-            <div className="relative bg-gradient-to-br from-indigo-600 to-purple-600 p-3 rounded-lg">
-              <img
-                src="/drizzle.svg"
-                alt="Drizzle Logo"
-                className="w-8 h-8 transform group-hover:scale-110 transition-transform duration-300"
-              />
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-indigo-300 text-transparent bg-clip-text">
-            Drizzle Database Demo
-          </h1>
-        </div>
+					<div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 shadow">
+						<div className="mb-4 flex items-center justify-between">
+							<div>
+								<p className="text-xs uppercase tracking-[0.2em] text-emerald-300/80">
+									Latest comments
+								</p>
+								<h2 className="text-xl font-semibold text-white">
+									Most recent 5
+								</h2>
+							</div>
+						</div>
+						<ul className="space-y-3">
+							{snapshot.latestComments.map((comment) => {
+								const score = (comment.upvotes ?? 0) - (comment.downvotes ?? 0)
+								return (
+									<li
+										key={comment.id}
+										className="rounded-xl border border-slate-800/70 bg-slate-950/80 p-4 shadow-sm"
+									>
+										<div className="flex items-start justify-between gap-3">
+											<div className="min-w-0">
+												<p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+													Comment #{comment.id} · Post #{comment.parentSubmission}
+												</p>
+												<p className="truncate text-sm text-slate-200">
+													{comment.body ?? "(no body text)"}
+												</p>
+												<p className="text-sm text-slate-400">
+													Author #{comment.authorId} ·{" "}
+													{formatUtcTimestamp(comment.createdUtc)}
+												</p>
+											</div>
+											<div className="rounded-lg bg-slate-800 px-3 py-2 text-right">
+												<div className="text-xs uppercase tracking-wider text-slate-400">
+													Score
+												</div>
+												<div className="text-xl font-bold text-white">{score}</div>
+												<div className="text-[11px] text-slate-500">
+													{comment.upvotes}▲ · {comment.downvotes}▼
+												</div>
+											</div>
+										</div>
+									</li>
+								)
+							})}
+						</ul>
+					</div>
+				</div>
 
-        <h2 className="text-2xl font-bold mb-4 text-indigo-200">Todos</h2>
-
-        <ul className="space-y-3 mb-6">
-          {todos.map((todo) => (
-            <li
-              key={todo.id}
-              className="rounded-lg p-4 shadow-md border transition-all hover:scale-[1.02] cursor-pointer group"
-              style={{
-                background:
-                  'linear-gradient(135deg, rgba(93, 103, 227, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
-                borderColor: 'rgba(93, 103, 227, 0.3)',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-medium text-white group-hover:text-indigo-200 transition-colors">
-                  {todo.title}
-                </span>
-                <span className="text-xs text-indigo-300/70">#{todo.id}</span>
-              </div>
-            </li>
-          ))}
-          {todos.length === 0 && (
-            <li className="text-center py-8 text-indigo-300/70">
-              No todos yet. Create one below!
-            </li>
-          )}
-        </ul>
-
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <input
-            type="text"
-            name="title"
-            placeholder="Add a new todo..."
-            className="flex-1 px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all text-white placeholder-indigo-300/50"
-            style={{
-              background: 'rgba(93, 103, 227, 0.1)',
-              borderColor: 'rgba(93, 103, 227, 0.3)',
-              focusRing: 'rgba(93, 103, 227, 0.5)',
-            }}
-          />
-          <button
-            type="submit"
-            className="px-6 py-3 font-semibold rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 whitespace-nowrap"
-            style={{
-              background: 'linear-gradient(135deg, #5d67e3 0%, #8b5cf6 100%)',
-              color: 'white',
-            }}
-          >
-            Add Todo
-          </button>
-        </form>
-
-        <div
-          className="mt-8 p-6 rounded-lg border"
-          style={{
-            background: 'rgba(93, 103, 227, 0.05)',
-            borderColor: 'rgba(93, 103, 227, 0.2)',
-          }}
-        >
-          <h3 className="text-lg font-semibold mb-2 text-indigo-200">
-            Powered by Drizzle ORM
-          </h3>
-          <p className="text-sm text-indigo-300/80 mb-4">
-            Next-generation ORM for Node.js & TypeScript with PostgreSQL
-          </p>
-          <div className="space-y-2 text-sm">
-            <p className="text-indigo-200 font-medium">Setup Instructions:</p>
-            <ol className="list-decimal list-inside space-y-2 text-indigo-300/80">
-              <li>
-                Configure your{' '}
-                <code className="px-2 py-1 rounded bg-black/30 text-purple-300">
-                  DATABASE_URL
-                </code>{' '}
-                in .env.local
-              </li>
-              <li>
-                Run:{' '}
-                <code className="px-2 py-1 rounded bg-black/30 text-purple-300">
-                  npx drizzle-kit generate
-                </code>
-              </li>
-              <li>
-                Run:{' '}
-                <code className="px-2 py-1 rounded bg-black/30 text-purple-300">
-                  npx drizzle-kit migrate
-                </code>
-              </li>
-              <li>
-                Optional:{' '}
-                <code className="px-2 py-1 rounded bg-black/30 text-purple-300">
-                  npx drizzle-kit studio
-                </code>
-              </li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+				<div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100">
+					Read-only safety: this page performs SELECTs only. No inserts, updates, or
+					migrations are triggered from the Drizzle demo.
+				</div>
+			</div>
+		</div>
+	)
 }

@@ -1,7 +1,225 @@
-import { pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
+import {
+	boolean,
+	doublePrecision,
+	integer,
+	pgEnum,
+	pgTable,
+	primaryKey,
+	serial,
+	text,
+	timestamp,
+	varchar,
+} from "drizzle-orm/pg-core"
 
-export const todos = pgTable('todos', {
-  id: serial('id').primaryKey(),
-  title: text('title').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
+export const stateModEnum = pgEnum("statemod", ["VISIBLE", "FILTERED", "REMOVED"])
+export const stateReportEnum = pgEnum("statereport", [
+	"UNREPORTED",
+	"RESOLVED",
+	"REPORTED",
+	"IGNORED",
+])
+export const filterBehaviorEnum = pgEnum("filterbehavior", [
+	"AUTOMATIC",
+	"UNFILTERED",
+	"FILTERED",
+])
+
+export const users = pgTable("users", {
+	id: serial("id").primaryKey(),
+	username: varchar("username", { length: 255 }).notNull(),
+	email: varchar("email", { length: 255 }),
+	passhash: varchar("passhash", { length: 255 }).notNull(),
+	createdUtc: integer("created_utc").notNull(),
+	adminLevel: integer("admin_level").notNull().default(0),
+	over18: boolean("over_18").notNull().default(false),
+	isActivated: boolean("is_activated").notNull().default(false),
+	bio: varchar("bio", { length: 1500 }),
+	bioHtml: varchar("bio_html", { length: 10000 }),
+	referredBy: integer("referred_by"),
+	isBanned: integer("is_banned").notNull().default(0),
+	banReason: varchar("ban_reason", { length: 256 }),
+	loginNonce: integer("login_nonce").notNull().default(0),
+	reserved: varchar("reserved", { length: 256 }),
+	mfaSecret: varchar("mfa_secret", { length: 32 }),
+	isPrivate: boolean("is_private").notNull().default(false),
+	unbanUtc: integer("unban_utc").notNull().default(0),
+	isNofollow: boolean("is_nofollow").notNull().default(false),
+	customFilterList: varchar("custom_filter_list", { length: 1000 })
+		.notNull()
+		.default(""),
+	storedSubscriberCount: integer("stored_subscriber_count").notNull().default(0),
+	banEvade: integer("ban_evade").notNull().default(0),
+	originalUsername: varchar("original_username", { length: 255 }),
+	customTitle: varchar("customtitle", { length: 1000 }),
+	defaultSorting: varchar("defaultsorting", { length: 15 }).notNull().default("new"),
+	defaultTime: varchar("defaulttime", { length: 5 }).notNull(),
+	nameColor: varchar("namecolor", { length: 6 }).notNull(),
+	titleColor: varchar("titlecolor", { length: 6 }).notNull(),
+	profileUrl: varchar("profileurl", { length: 65 }),
+	bannerUrl: varchar("bannerurl", { length: 65 }),
+	hideVotedOn: boolean("hidevotedon").notNull().default(false),
+	newTab: boolean("newtab").notNull().default(false),
+	flairChanged: integer("flairchanged"),
+	defaultSortingComments: varchar("defaultsortingcomments", { length: 15 })
+		.notNull()
+		.default("new"),
+	theme: varchar("theme", { length: 15 }).notNull(),
+	slurReplacer: boolean("slurreplacer").notNull().default(true),
+	shadowBanned: varchar("shadowbanned", { length: 25 }),
+	newTabExternal: boolean("newtabexternal").notNull().default(true),
+	customTitlePlain: varchar("customtitleplain", { length: 100 }),
+	themeColor: varchar("themecolor", { length: 6 }).notNull(),
+	changelogSub: boolean("changelogsub").notNull().default(false),
+	css: varchar("css", { length: 4000 }),
+	profileCss: varchar("profilecss", { length: 4000 }),
+	coins: integer("coins").notNull().default(0),
+	agendaPoster: integer("agendaposter").notNull().default(0),
+	postCount: integer("post_count").notNull().default(0),
+	commentCount: integer("comment_count").notNull().default(0),
+	highRes: varchar("highres", { length: 60 }),
+	patron: integer("patron").notNull().default(0),
+	controversial: boolean("controversial").notNull().default(false),
+	verified: varchar("verified", { length: 20 }),
+	cardView: boolean("cardview").notNull(),
+	receivedAwardCount: integer("received_award_count").notNull().default(0),
+	highlightComments: boolean("highlightcomments").notNull().default(true),
+	nitter: boolean("nitter"),
+	trueScore: integer("truescore").notNull().default(0),
+	frontSize: integer("frontsize").notNull().default(25),
+	coinsSpent: integer("coins_spent").notNull().default(0),
+	proCoins: integer("procoins").notNull().default(0),
+	verifiedColor: varchar("verifiedcolor", { length: 6 }),
+	friends: varchar("friends", { length: 500 }),
+	friendsHtml: varchar("friends_html", { length: 2000 }),
+	enemies: varchar("enemies", { length: 500 }),
+	enemiesHtml: varchar("enemies_html", { length: 2000 }),
+	fp: varchar("fp", { length: 21 }),
+	lootboxesBought: integer("lootboxes_bought").notNull().default(0),
+	winnings: integer("winnings").notNull().default(0),
+	patronUtc: integer("patron_utc").notNull().default(0),
+	house: varchar("house", { length: 16 }),
+	reddit: varchar("reddit", { length: 15 }).notNull(),
+	volunteerLastStartedUtc: timestamp("volunteer_last_started_utc", {
+		mode: "date",
+	}),
+	volunteerJanitorCorrectness: doublePrecision("volunteer_janitor_correctness").notNull(),
+	chatAuthorized: boolean("chat_authorized").notNull(),
+	chatLastSeen: timestamp("chat_lastseen", {
+		withTimezone: true,
+		mode: "date",
+	}).notNull(),
+	filterBehavior: filterBehaviorEnum("filter_behavior").notNull(),
 })
+
+export const submissions = pgTable("submissions", {
+	id: serial("id").primaryKey(),
+	authorId: integer("author_id").notNull().references(() => users.id),
+	createdUtc: integer("created_utc").notNull(),
+	over18: boolean("over_18").notNull().default(false),
+	distinguishLevel: integer("distinguish_level").notNull().default(0),
+	editedUtc: integer("edited_utc").notNull().default(0),
+	isPinned: boolean("is_pinned").notNull().default(false),
+	upvotes: integer("upvotes").notNull().default(1),
+	downvotes: integer("downvotes").notNull().default(0),
+	appId: integer("app_id"),
+	thumbUrl: varchar("thumburl", { length: 200 }),
+	private: boolean("private").notNull().default(false),
+	views: integer("views").notNull().default(0),
+	isBot: boolean("is_bot").notNull().default(false),
+	bannedFor: boolean("bannedfor"),
+	commentCount: integer("comment_count").notNull().default(0),
+	stickied: varchar("stickied", { length: 40 }),
+	title: varchar("title", { length: 500 }).notNull(),
+	url: varchar("url", { length: 2083 }),
+	body: text("body"),
+	bodyHtml: text("body_html"),
+	embedUrl: varchar("embed_url", { length: 1500 }),
+	titleHtml: varchar("title_html", { length: 1500 }).notNull(),
+	realUpvotes: integer("realupvotes"),
+	flair: varchar("flair", { length: 350 }),
+	stickiedUtc: integer("stickied_utc"),
+	ghost: boolean("ghost").notNull().default(false),
+	bumpUtc: integer("bump_utc"),
+	taskId: integer("task_id"),
+	stateUserDeletedUtc: timestamp("state_user_deleted_utc", {
+		withTimezone: true,
+		mode: "date",
+	}),
+	stateMod: stateModEnum("state_mod").notNull(),
+	stateModSetBy: varchar("state_mod_set_by"),
+	stateReport: stateReportEnum("state_report").notNull(),
+})
+
+export const comments = pgTable("comments", {
+	id: serial("id").primaryKey(),
+	authorId: integer("author_id").notNull().references(() => users.id),
+	createdUtc: integer("created_utc").notNull(),
+	parentSubmission: integer("parent_submission").references(() => submissions.id),
+	distinguishLevel: integer("distinguish_level").notNull().default(0),
+	editedUtc: integer("edited_utc").notNull().default(0),
+	level: integer("level").notNull().default(0),
+	parentCommentId: integer("parent_comment_id").references(() => comments.id),
+	over18: boolean("over_18").notNull().default(false),
+	upvotes: integer("upvotes").notNull().default(1),
+	downvotes: integer("downvotes").notNull().default(0),
+	isBot: boolean("is_bot").notNull().default(false),
+	appId: integer("app_id"),
+	sentTo: integer("sentto"),
+	bannedFor: boolean("bannedfor"),
+	isPinned: varchar("is_pinned", { length: 40 }),
+	body: text("body"),
+	bodyHtml: text("body_html").notNull(),
+	realUpvotes: integer("realupvotes").notNull().default(1),
+	topCommentId: integer("top_comment_id"),
+	isPinnedUtc: integer("is_pinned_utc"),
+	ghost: boolean("ghost").notNull().default(false),
+	descendantCount: integer("descendant_count").notNull().default(0),
+	volunteerJanitorBadness: doublePrecision("volunteer_janitor_badness").notNull(),
+	stateUserDeletedUtc: timestamp("state_user_deleted_utc", {
+		withTimezone: true,
+		mode: "date",
+	}),
+	stateMod: stateModEnum("state_mod").notNull(),
+	stateModSetBy: varchar("state_mod_set_by"),
+	stateReport: stateReportEnum("state_report").notNull(),
+})
+
+export const commentVotes = pgTable(
+	"commentvotes",
+	{
+		commentId: integer("comment_id")
+			.notNull()
+			.references(() => comments.id),
+		voteType: integer("vote_type").notNull(),
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		appId: integer("app_id"),
+		real: boolean("real").notNull().default(true),
+		createdDatetimez: timestamp("created_datetimez", {
+			withTimezone: true,
+			mode: "date",
+		}).notNull(),
+	},
+	(table) => primaryKey({ columns: [table.commentId, table.userId] }),
+)
+
+export const votes = pgTable(
+	"votes",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		submissionId: integer("submission_id")
+			.notNull()
+			.references(() => submissions.id),
+		voteType: integer("vote_type").notNull(),
+		appId: integer("app_id"),
+		real: boolean("real").notNull().default(true),
+		createdDatetimez: timestamp("created_datetimez", {
+			withTimezone: true,
+			mode: "date",
+		}).notNull(),
+	},
+	(table) => primaryKey({ columns: [table.submissionId, table.userId] }),
+)
