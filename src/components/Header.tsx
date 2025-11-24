@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { AuthButton } from "@/components/auth-button";
+
 export default function Header() {
 	const [isOpen, setIsOpen] = useState(false);
 	const [groupedExpanded, setGroupedExpanded] = useState<
@@ -40,6 +42,9 @@ export default function Header() {
 						/>
 					</Link>
 				</h1>
+				<div className="ml-auto">
+					<AuthButton />
+				</div>
 			</header>
 
 			<aside
