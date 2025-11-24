@@ -1,16 +1,16 @@
-import type { SubmissionSummary } from '@/lib/submissions.server'
+import type { SubmissionSummary } from "@/lib/submissions.server";
 
 type RecentSubmissionsProps = {
-	submissions: SubmissionSummary[]
-}
+	submissions: SubmissionSummary[];
+};
 
 function formatDateTime(date: Date) {
 	return date.toLocaleString(undefined, {
-		month: 'short',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit',
-	})
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
 }
 
 export function RecentSubmissions({ submissions }: RecentSubmissionsProps) {
@@ -19,10 +19,11 @@ export function RecentSubmissions({ submissions }: RecentSubmissionsProps) {
 			<div className="rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-6 text-slate-200 shadow-xl">
 				<p className="text-lg font-semibold">No submissions yet</p>
 				<p className="text-sm text-slate-400">
-					We&rsquo;ll show the newest 25 submissions here once data is available.
+					We&rsquo;ll show the newest 25 submissions here once data is
+					available.
 				</p>
 			</div>
-		)
+		);
 	}
 
 	return (
@@ -47,10 +48,10 @@ export function RecentSubmissions({ submissions }: RecentSubmissionsProps) {
 
 			<ul className="grid gap-4 md:grid-cols-2">
 				{submissions.map((submission) => {
-					const score = submission.upvotes - submission.downvotes
+					const score = submission.upvotes - submission.downvotes;
 					const formattedDate = formatDateTime(
 						new Date(submission.createdUtc * 1000),
-					)
+					);
 
 					return (
 						<li
@@ -62,7 +63,7 @@ export function RecentSubmissions({ submissions }: RecentSubmissionsProps) {
 								<div className="flex items-start justify-between gap-3">
 									<div className="min-w-0">
 										<div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
-											#{submission.id.toString().padStart(3, '0')}
+											#{submission.id.toString().padStart(3, "0")}
 										</div>
 										<h3 className="truncate text-lg font-semibold text-white">
 											{submission.url ? (
@@ -79,10 +80,10 @@ export function RecentSubmissions({ submissions }: RecentSubmissionsProps) {
 											)}
 										</h3>
 										<p className="text-sm text-slate-400">
-											by{' '}
+											by{" "}
 											<span className="font-semibold text-slate-200">
 												{submission.authorName}
-											</span>{' '}
+											</span>{" "}
 											on {formattedDate}
 										</p>
 									</div>
@@ -113,9 +114,9 @@ export function RecentSubmissions({ submissions }: RecentSubmissionsProps) {
 								</div>
 							</div>
 						</li>
-					)
+					);
 				})}
 			</ul>
 		</div>
-	)
+	);
 }

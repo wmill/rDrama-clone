@@ -1,5 +1,5 @@
-import { createServerFn } from '@tanstack/react-start'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import {
 	Route as RouteIcon,
 	Server,
@@ -7,61 +7,61 @@ import {
 	Sparkles,
 	Waves,
 	Zap,
-} from "lucide-react"
+} from "lucide-react";
 
-import { RecentSubmissions } from "@/components/recent-submissions"
-import { getRecentSubmissions } from "@/lib/submissions.server"
+import { RecentSubmissions } from "@/components/recent-submissions";
+import { getRecentSubmissions } from "@/lib/submissions.server";
 
-const loadRecentSubmissions = createServerFn({ method: 'GET' }).handler(
+const loadRecentSubmissions = createServerFn({ method: "GET" }).handler(
 	async () => await getRecentSubmissions(25),
-)
+);
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute("/")({
 	component: App,
 	loader: async () => await loadRecentSubmissions(),
-})
+});
 
 function App() {
 	const features = [
 		{
 			icon: <Zap className="h-12 w-12 text-cyan-400" />,
-			title: 'Powerful Server Functions',
+			title: "Powerful Server Functions",
 			description:
-				'Write server-side code that seamlessly integrates with your client components. Type-safe, secure, and simple.',
+				"Write server-side code that seamlessly integrates with your client components. Type-safe, secure, and simple.",
 		},
 		{
 			icon: <Server className="h-12 w-12 text-cyan-400" />,
-			title: 'Flexible Server Side Rendering',
+			title: "Flexible Server Side Rendering",
 			description:
-				'Full-document SSR, streaming, and progressive enhancement out of the box. Control exactly what renders where.',
+				"Full-document SSR, streaming, and progressive enhancement out of the box. Control exactly what renders where.",
 		},
 		{
 			icon: <RouteIcon className="h-12 w-12 text-cyan-400" />,
-			title: 'API Routes',
+			title: "API Routes",
 			description:
-				'Build type-safe API endpoints alongside your application. No separate backend needed.',
+				"Build type-safe API endpoints alongside your application. No separate backend needed.",
 		},
 		{
 			icon: <Shield className="h-12 w-12 text-cyan-400" />,
-			title: 'Strongly Typed Everything',
+			title: "Strongly Typed Everything",
 			description:
-				'End-to-end type safety from server to client. Catch errors before they reach production.',
+				"End-to-end type safety from server to client. Catch errors before they reach production.",
 		},
 		{
 			icon: <Waves className="h-12 w-12 text-cyan-400" />,
-			title: 'Full Streaming Support',
+			title: "Full Streaming Support",
 			description:
-				'Stream data from server to client progressively. Perfect for AI applications and real-time updates.',
+				"Stream data from server to client progressively. Perfect for AI applications and real-time updates.",
 		},
 		{
 			icon: <Sparkles className="h-12 w-12 text-cyan-400" />,
-			title: 'Next Generation Ready',
+			title: "Next Generation Ready",
 			description:
-				'Built from the ground up for modern web applications. Deploy anywhere JavaScript runs.',
+				"Built from the ground up for modern web applications. Deploy anywhere JavaScript runs.",
 		},
-	]
+	];
 
-	const submissions = Route.useLoaderData<typeof Route>()
+	const submissions = Route.useLoaderData<typeof Route>();
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
@@ -75,7 +75,7 @@ function App() {
 							className="h-24 w-24 md:h-32 md:w-32"
 						/>
 						<h1 className="text-6xl font-black text-white [letter-spacing:-0.08em] md:text-7xl">
-							<span className="text-gray-300">TANSTACK</span>{' '}
+							<span className="text-gray-300">TANSTACK</span>{" "}
 							<span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
 								START
 							</span>
@@ -99,7 +99,7 @@ function App() {
 							Documentation
 						</a>
 						<p className="mt-2 text-sm text-gray-400">
-							Begin your TanStack Start journey by editing{' '}
+							Begin your TanStack Start journey by editing{" "}
 							<code className="rounded bg-slate-700 px-2 py-1 text-cyan-400">
 								/src/routes/index.tsx
 							</code>
@@ -140,5 +140,5 @@ function App() {
 				<RecentSubmissions submissions={submissions} />
 			</section>
 		</div>
-	)
+	);
 }

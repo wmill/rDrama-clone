@@ -1,32 +1,30 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
-import { desc, sql } from "drizzle-orm"
+import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { desc, sql } from "drizzle-orm";
 
-import { db } from "@/db"
-import {
-	commentVotes,
-	comments,
-	submissions,
-	users,
-	votes,
-} from "@/db/schema"
+import { db } from "@/db";
+import { comments, commentVotes, submissions, users, votes } from "@/db/schema";
 
 const getSnapshot = createServerFn({ method: "GET" }).handler(async () => {
 	const [submissionTotal] = await db
 		.select({ count: sql<number>`COUNT(*)` })
-		.from(submissions)
+		.from(submissions);
 
 	const [commentTotal] = await db
 		.select({ count: sql<number>`COUNT(*)` })
-		.from(comments)
+		.from(comments);
 
-	const [userTotal] = await db.select({ count: sql<number>`COUNT(*)` }).from(users)
+	const [userTotal] = await db
+		.select({ count: sql<number>`COUNT(*)` })
+		.from(users);
 
-	const [voteTotal] = await db.select({ count: sql<number>`COUNT(*)` }).from(votes)
+	const [voteTotal] = await db
+		.select({ count: sql<number>`COUNT(*)` })
+		.from(votes);
 
 	const [commentVoteTotal] = await db
 		.select({ count: sql<number>`COUNT(*)` })
-		.from(commentVotes)
+		.from(commentVotes);
 
 	const latestSubmissions = await db
 		.select({
@@ -40,7 +38,7 @@ const getSnapshot = createServerFn({ method: "GET" }).handler(async () => {
 		})
 		.from(submissions)
 		.orderBy(desc(submissions.createdUtc))
-		.limit(5)
+		.limit(5);
 
 	const latestComments = await db
 		.select({
@@ -54,7 +52,7 @@ const getSnapshot = createServerFn({ method: "GET" }).handler(async () => {
 		})
 		.from(comments)
 		.orderBy(desc(comments.createdUtc))
-		.limit(5)
+		.limit(5);
 
 	return {
 		totals: {
@@ -66,13 +64,13 @@ const getSnapshot = createServerFn({ method: "GET" }).handler(async () => {
 		},
 		latestSubmissions,
 		latestComments,
-	}
-})
+	};
+});
 
 export const Route = createFileRoute("/demo/drizzle")({
 	component: DemoDrizzle,
 	loader: async () => await getSnapshot(),
-})
+});
 
 function formatUtcTimestamp(timestamp: number) {
 	return new Date(timestamp * 1000).toLocaleString(undefined, {
@@ -80,11 +78,11 @@ function formatUtcTimestamp(timestamp: number) {
 		day: "numeric",
 		hour: "2-digit",
 		minute: "2-digit",
-	})
+	});
 }
 
 function DemoDrizzle() {
-	const snapshot = Route.useLoaderData()
+	const snapshot = Route.useLoaderData();
 
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 text-white">
@@ -140,7 +138,8 @@ function DemoDrizzle() {
 						</div>
 						<ul className="space-y-3">
 							{snapshot.latestSubmissions.map((submission) => {
-								const score = (submission.upvotes ?? 0) - (submission.downvotes ?? 0)
+								const score =
+									(submission.upvotes ?? 0) - (submission.downvotes ?? 0);
 								return (
 									<li
 										key={submission.id}
@@ -163,7 +162,9 @@ function DemoDrizzle() {
 												<div className="text-xs uppercase tracking-wider text-slate-400">
 													Score
 												</div>
-												<div className="text-xl font-bold text-white">{score}</div>
+												<div className="text-xl font-bold text-white">
+													{score}
+												</div>
 												<div className="text-[11px] text-slate-500">
 													{submission.upvotes}▲ · {submission.downvotes}▼
 												</div>
@@ -173,7 +174,7 @@ function DemoDrizzle() {
 											{submission.commentCount} comments
 										</p>
 									</li>
-								)
+								);
 							})}
 						</ul>
 					</div>
@@ -191,7 +192,7 @@ function DemoDrizzle() {
 						</div>
 						<ul className="space-y-3">
 							{snapshot.latestComments.map((comment) => {
-								const score = (comment.upvotes ?? 0) - (comment.downvotes ?? 0)
+								const score = (comment.upvotes ?? 0) - (comment.downvotes ?? 0);
 								return (
 									<li
 										key={comment.id}
@@ -200,7 +201,8 @@ function DemoDrizzle() {
 										<div className="flex items-start justify-between gap-3">
 											<div className="min-w-0">
 												<p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-													Comment #{comment.id} · Post #{comment.parentSubmission}
+													Comment #{comment.id} · Post #
+													{comment.parentSubmission}
 												</p>
 												<p className="truncate text-sm text-slate-200">
 													{comment.body ?? "(no body text)"}
@@ -214,24 +216,26 @@ function DemoDrizzle() {
 												<div className="text-xs uppercase tracking-wider text-slate-400">
 													Score
 												</div>
-												<div className="text-xl font-bold text-white">{score}</div>
+												<div className="text-xl font-bold text-white">
+													{score}
+												</div>
 												<div className="text-[11px] text-slate-500">
 													{comment.upvotes}▲ · {comment.downvotes}▼
 												</div>
 											</div>
 										</div>
 									</li>
-								)
+								);
 							})}
 						</ul>
 					</div>
 				</div>
 
 				<div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100">
-					Read-only safety: this page performs SELECTs only. No inserts, updates, or
-					migrations are triggered from the Drizzle demo.
+					Read-only safety: this page performs SELECTs only. No inserts,
+					updates, or migrations are triggered from the Drizzle demo.
 				</div>
 			</div>
 		</div>
-	)
+	);
 }

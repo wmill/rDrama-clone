@@ -9,20 +9,24 @@ import {
 	text,
 	timestamp,
 	varchar,
-} from "drizzle-orm/pg-core"
+} from "drizzle-orm/pg-core";
 
-export const stateModEnum = pgEnum("statemod", ["VISIBLE", "FILTERED", "REMOVED"])
+export const stateModEnum = pgEnum("statemod", [
+	"VISIBLE",
+	"FILTERED",
+	"REMOVED",
+]);
 export const stateReportEnum = pgEnum("statereport", [
 	"UNREPORTED",
 	"RESOLVED",
 	"REPORTED",
 	"IGNORED",
-])
+]);
 export const filterBehaviorEnum = pgEnum("filterbehavior", [
 	"AUTOMATIC",
 	"UNFILTERED",
 	"FILTERED",
-])
+]);
 
 export const users = pgTable("users", {
 	id: serial("id").primaryKey(),
@@ -47,11 +51,15 @@ export const users = pgTable("users", {
 	customFilterList: varchar("custom_filter_list", { length: 1000 })
 		.notNull()
 		.default(""),
-	storedSubscriberCount: integer("stored_subscriber_count").notNull().default(0),
+	storedSubscriberCount: integer("stored_subscriber_count")
+		.notNull()
+		.default(0),
 	banEvade: integer("ban_evade").notNull().default(0),
 	originalUsername: varchar("original_username", { length: 255 }),
 	customTitle: varchar("customtitle", { length: 1000 }),
-	defaultSorting: varchar("defaultsorting", { length: 15 }).notNull().default("new"),
+	defaultSorting: varchar("defaultsorting", { length: 15 })
+		.notNull()
+		.default("new"),
 	defaultTime: varchar("defaulttime", { length: 5 }).notNull(),
 	nameColor: varchar("namecolor", { length: 6 }).notNull(),
 	titleColor: varchar("titlecolor", { length: 6 }).notNull(),
@@ -102,18 +110,22 @@ export const users = pgTable("users", {
 	volunteerLastStartedUtc: timestamp("volunteer_last_started_utc", {
 		mode: "date",
 	}),
-	volunteerJanitorCorrectness: doublePrecision("volunteer_janitor_correctness").notNull(),
+	volunteerJanitorCorrectness: doublePrecision(
+		"volunteer_janitor_correctness",
+	).notNull(),
 	chatAuthorized: boolean("chat_authorized").notNull(),
 	chatLastSeen: timestamp("chat_lastseen", {
 		withTimezone: true,
 		mode: "date",
 	}).notNull(),
 	filterBehavior: filterBehaviorEnum("filter_behavior").notNull(),
-})
+});
 
 export const submissions = pgTable("submissions", {
 	id: serial("id").primaryKey(),
-	authorId: integer("author_id").notNull().references(() => users.id),
+	authorId: integer("author_id")
+		.notNull()
+		.references(() => users.id),
 	createdUtc: integer("created_utc").notNull(),
 	over18: boolean("over_18").notNull().default(false),
 	distinguishLevel: integer("distinguish_level").notNull().default(0),
@@ -148,13 +160,17 @@ export const submissions = pgTable("submissions", {
 	stateMod: stateModEnum("state_mod").notNull(),
 	stateModSetBy: varchar("state_mod_set_by"),
 	stateReport: stateReportEnum("state_report").notNull(),
-})
+});
 
 export const comments = pgTable("comments", {
 	id: serial("id").primaryKey(),
-	authorId: integer("author_id").notNull().references(() => users.id),
+	authorId: integer("author_id")
+		.notNull()
+		.references(() => users.id),
 	createdUtc: integer("created_utc").notNull(),
-	parentSubmission: integer("parent_submission").references(() => submissions.id),
+	parentSubmission: integer("parent_submission").references(
+		() => submissions.id,
+	),
 	distinguishLevel: integer("distinguish_level").notNull().default(0),
 	editedUtc: integer("edited_utc").notNull().default(0),
 	level: integer("level").notNull().default(0),
@@ -174,7 +190,9 @@ export const comments = pgTable("comments", {
 	isPinnedUtc: integer("is_pinned_utc"),
 	ghost: boolean("ghost").notNull().default(false),
 	descendantCount: integer("descendant_count").notNull().default(0),
-	volunteerJanitorBadness: doublePrecision("volunteer_janitor_badness").notNull(),
+	volunteerJanitorBadness: doublePrecision(
+		"volunteer_janitor_badness",
+	).notNull(),
 	stateUserDeletedUtc: timestamp("state_user_deleted_utc", {
 		withTimezone: true,
 		mode: "date",
@@ -182,7 +200,7 @@ export const comments = pgTable("comments", {
 	stateMod: stateModEnum("state_mod").notNull(),
 	stateModSetBy: varchar("state_mod_set_by"),
 	stateReport: stateReportEnum("state_report").notNull(),
-})
+});
 
 export const commentVotes = pgTable(
 	"commentvotes",
@@ -202,7 +220,7 @@ export const commentVotes = pgTable(
 		}).notNull(),
 	},
 	(table) => primaryKey({ columns: [table.commentId, table.userId] }),
-)
+);
 
 export const votes = pgTable(
 	"votes",
@@ -222,4 +240,4 @@ export const votes = pgTable(
 		}).notNull(),
 	},
 	(table) => primaryKey({ columns: [table.submissionId, table.userId] }),
-)
+);
