@@ -241,3 +241,22 @@ export const votes = pgTable(
 	},
 	(table) => primaryKey({ columns: [table.submissionId, table.userId] }),
 );
+
+export const sessions = pgTable("sessions", {
+	id: varchar("id", { length: 64 }).primaryKey(),
+	userId: integer("user_id")
+		.notNull()
+		.references(() => users.id, { onDelete: "cascade" }),
+	expiresAt: timestamp("expires_at", {
+		withTimezone: true,
+		mode: "date",
+	}).notNull(),
+	createdAt: timestamp("created_at", {
+		withTimezone: true,
+		mode: "date",
+	})
+		.notNull()
+		.defaultNow(),
+	userAgent: varchar("user_agent", { length: 512 }),
+	ipAddress: varchar("ip_address", { length: 45 }),
+});

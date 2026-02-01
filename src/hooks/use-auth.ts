@@ -1,47 +1,43 @@
-import { create } from "zustand"
-import { createJSONStorage, persist } from "zustand/middleware"
+import { createServerFn } from "@tanstack/react-start";
+import { useCallback, useEffect, useState } from "react";
 
-export type AuthUser = {
-	id: number
-	username: string
-}
+import type { SafeUser } from "@/lib/auth.server";
+import { getCurrentUser } from "@/lib/sessions.server";
+
+export type AuthUser = SafeUser;
 
 type AuthState = {
-	user: AuthUser | null
-	ready: boolean
-	login: (user: AuthUser) => void
-	logout: () => void
-	setReady: () => void
-}
+	user: AuthUser | null;
+	ready: boolean;
+	refresh: () => Promise<void>;
+};
 
-export const useAuthStore = create<AuthState>()(
-	persist(
-		(set) => ({
-			user: null,
-			ready: typeof window === "undefined",
-			login: (user) => set({ user, ready: true }),
-			logout: () => set({ user: null, ready: true }),
-			setReady: () => set({ ready: true }),
-		}),
-		{
-			name: "rdrama-demo-auth",
-			storage: createJSONStorage(() => {
-				if (typeof window === "undefined") {
-					return {
-						getItem: () => null,
-						setItem: () => undefined,
-						removeItem: () => undefined,
-					}
-				}
-				return window.localStorage
-			}),
-			onRehydrateStorage: () => (state) => {
-				state?.setReady()
-			},
-		},
-	),
-)
+const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
+	return getCurrentUser();
+});
 
-export function useAuth() {
-	return useAuthStore()
+export function useAuth(): AuthState {
+	const [user, setUser] = useState<AuthUser | null>(null);
+	const [ready, setReady] = useState(false);
+
+	const refresh = useCallback(async () => {
+		try {
+			const currentUser = await getCurrentUserFn();
+			setUser(currentUser);
+		} catch {
+			setUser(null);
+		} finally {
+			setReady(true);
+		}
+	}, []);
+
+	useEffect(() => {
+		refresh();
+	}, [refresh]);
+
+	return {
+		user,
+		ready,
+		refresh,
+	};
 }
