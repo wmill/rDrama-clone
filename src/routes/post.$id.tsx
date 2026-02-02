@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound, useRouter, useRouterState } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { Clock, ExternalLink, Eye, Loader2, MessageSquare, Share2 } from "lucide-react";
+import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
 
 import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 	getSubmissionVote,
 	type VoteType,
 } from "@/lib/votes.server";
+import { useMemo } from "react";
 
 const getPostFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { id: number; commentSort?: CommentSortType }) => data)
@@ -165,7 +166,8 @@ function PostPage() {
 		select: (s) => s.isLoading,
 	});
 
-	const commentVotes = new Map<number, VoteType>(commentVotesArray);
+	const commentVotes = useMemo(() => new Map<number, VoteType>(commentVotesArray), [commentVotesArray]);
+	const memoSubmissionVote = useMemo(() => submissionVote, [submissionVote]);
 
 	const handleSortChange = async (newSort: CommentSortType) => {
 		await router.navigate({
@@ -181,7 +183,7 @@ function PostPage() {
 				<PostContent
 					post={post}
 					currentUserId={user?.id}
-					userVote={submissionVote}
+					userVote={memoSubmissionVote}
 				/>
 
 				<div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">

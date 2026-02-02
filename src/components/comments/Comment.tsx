@@ -9,7 +9,7 @@ import {
 	Reply,
 	Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -195,6 +195,10 @@ export function Comment({
 
 	const borderColor = depthColors[depth % depthColors.length];
 
+	const createdTime = useMemo(() => formatRelativeTime(comment.createdUtc), [comment.createdUtc]);
+	const editedTime = useMemo(() => formatRelativeTime(comment.editedUtc), [comment.editedUtc]);
+
+
 	return (
 		<div className={`${depth > 0 ? `ml-4 border-l-2 ${borderColor} pl-3` : ""}`}>
 			<div className="group py-2">
@@ -224,12 +228,12 @@ export function Comment({
 
 					<span className="flex items-center gap-1">
 						<Clock className="h-3 w-3" />
-						{formatRelativeTime(comment.createdUtc)}
+						{createdTime}
 					</span>
 
 					{comment.editedUtc > 0 && (
 						<span className="text-slate-500">
-							(edited {formatRelativeTime(comment.editedUtc)})
+							(edited {editedTime})
 						</span>
 					)}
 

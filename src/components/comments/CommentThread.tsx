@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,7 +55,7 @@ type CommentThreadProps = {
 	comments: CommentWithReplies[];
 	commentCount: number;
 	currentUserId?: number;
-	userVotes?: Map<number, VoteType>;
+	userVotes: Map<number, VoteType>;
 	sort?: CommentSortType;
 	isLoading?: boolean;
 	onSortChange?: (sort: CommentSortType) => void;
@@ -66,7 +66,7 @@ export function CommentThread({
 	comments,
 	commentCount,
 	currentUserId,
-	userVotes = new Map(),
+	userVotes,
 	sort = "top",
 	onSortChange,
 	isLoading
@@ -108,9 +108,9 @@ export function CommentThread({
 		}
 	};
 
-	const handleReplyAdded = () => {
+	const handleReplyAdded = useCallback(() => {
 		router.invalidate();
-	};
+	}, [router]);
 
 	return (
 		<div className="space-y-4">
@@ -191,7 +191,7 @@ type ActualCommentsProps = {
 	comments: CommentWithReplies[];
 	submissionId: number;
 	currentUserId?: number;
-	userVotes?: Map<number, VoteType>;
+	userVotes: Map<number, VoteType>;
 	onReplyAdded: () => void;
 	isLoading?: boolean;
 }
