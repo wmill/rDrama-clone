@@ -175,7 +175,7 @@ export function CommentThread({
 
 
 			{/* Comments list */}
-			<ActucalComments 
+			<ActualComments 
 				submissionId={submissionId}
 				currentUserId={currentUserId}
 				userVotes={userVotes}
@@ -183,29 +183,6 @@ export function CommentThread({
 				isLoading={isLoading}
 				comments={comments}
 			/>
-
-			{/* Comments list */}
-			{/* {comments.length > 0 ? (
-				<div className="space-y-1">
-					{comments.map((comment) => (
-						<Comment
-							key={comment.id}
-							devKey={String(comment.id)}
-							comment={comment}
-							submissionId={submissionId}
-							currentUserId={currentUserId}
-							userVotes={userVotes}
-							onReplyAdded={handleReplyAdded}
-						/>
-					))}
-				</div>
-			) : (
-				<div className="rounded-lg border border-dashed border-slate-700 p-8 text-center">
-					<p className="text-slate-500">
-						No comments yet. Be the first to share your thoughts!
-					</p>
-				</div>
-			)} */}
 		</div>
 	);
 }
@@ -219,7 +196,7 @@ type ActualCommentsProps = {
 	isLoading?: boolean;
 }
 
-function ActucalComments({comments, submissionId, currentUserId, userVotes, onReplyAdded, isLoading}: ActualCommentsProps) {
+function ActualComments({comments, submissionId, currentUserId, userVotes, onReplyAdded, isLoading}: ActualCommentsProps) {
 	if (comments.length === 0) {
 		return (
 			<div className="rounded-lg border border-dashed border-slate-700 p-8 text-center">
@@ -230,10 +207,13 @@ function ActucalComments({comments, submissionId, currentUserId, userVotes, onRe
 		);
 	}
 
-	if (isLoading) {
-		return (<Loader2 className="h-8 w-8 animate-spin text-cyan-500" />);
-	}
-	return (<div className="space-y-1">
+	return (<div className="relative space-y-1">
+		{isLoading && (
+			<div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
+				<Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+			</div>
+		)}
+		
 		{comments.map((comment) => (
 			<Comment
 				key={comment.id}
