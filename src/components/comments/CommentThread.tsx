@@ -156,18 +156,11 @@ export function CommentThread({
 					<span className="text-sm text-slate-400">Sort by:</span>
 					<div className="flex gap-1 rounded-lg bg-slate-800 p-1">
 						{sortOptions.map((option) => (
-							<button
-								key={option.value}
-								type="button"
-								onClick={() => onSortChange?.(option.value)}
-								className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-									sort === option.value
-										? "bg-cyan-500 text-white"
-										: "text-slate-400 hover:text-white"
-								}`}
-							>
-								{option.label}
-							</button>
+							<SortButton 
+								option={option}
+								onSortChange={onSortChange}
+								sort={sort}
+							/>
 						))}
 					</div>
 				</div>
@@ -226,4 +219,49 @@ function ActualComments({comments, submissionId, currentUserId, userVotes, onRep
 			/>
 		))}
 	</div>)
+}
+
+type SortButtonProps = {
+	option: { value: CommentSortType; label: string };
+	onSortChange?: (sort: CommentSortType) => void;
+	sort?: CommentSortType;
+}
+function SortButton({option, onSortChange, sort}: SortButtonProps){
+	const [loading, setLoading] = useState(false);
+
+	if (loading) {
+		return (
+			<button
+				key={option.value}
+				type="button"
+				className={`rounded-md px-3 py-1 text-sm font-medium transition-colors scale-110 ${
+					sort === option.value
+						? "bg-cyan-500 text-white"
+						: "text-slate-400 hover:text-white"
+				}`}
+			>
+				{option.label}
+			</button>
+		)
+	} else {
+		return (
+			<button
+				key={option.value}
+				type="button"
+				onClick={() => {
+					setLoading(true);
+					setTimeout(() => {
+						Promise.resolve().then(() => onSortChange?.(option.value)).finally(() => setLoading(false))
+					});
+				}}
+				className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+					sort === option.value
+						? "bg-cyan-500 text-white"
+						: "text-slate-400 hover:text-white"
+				}`}
+			>
+				{option.label}
+			</button>
+		)
+	}
 }
