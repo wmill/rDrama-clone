@@ -15,10 +15,12 @@ import { Route as Random_postRouteImport } from './routes/random_post'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as CommentsRouteImport } from './routes/comments'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PostIdRouteImport } from './routes/post.$id'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
+import { Route as CommentIdRouteImport } from './routes/comment.$id'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
 import { Route as DemoSentryTestingRouteImport } from './routes/demo/sentry.testing'
@@ -61,6 +63,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommentsRoute = CommentsRouteImport.update({
+  id: '/comments',
+  path: '/comments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -79,6 +86,11 @@ const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
 const DemoDrizzleRoute = DemoDrizzleRouteImport.update({
   id: '/demo/drizzle',
   path: '/demo/drizzle',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommentIdRoute = CommentIdRouteImport.update({
+  id: '/comment/$id',
+  path: '/comment/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
@@ -139,12 +151,14 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/comment/$id': typeof CommentIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/post/$id': typeof PostIdRoute
@@ -162,12 +176,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/comment/$id': typeof CommentIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/post/$id': typeof PostIdRoute
@@ -186,12 +202,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/comment/$id': typeof CommentIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/post/$id': typeof PostIdRoute
@@ -211,12 +229,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/comments'
     | '/login'
     | '/logout'
     | '/me'
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/comment/$id'
     | '/demo/drizzle'
     | '/demo/tanstack-query'
     | '/post/$id'
@@ -234,12 +254,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/comments'
     | '/login'
     | '/logout'
     | '/me'
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/comment/$id'
     | '/demo/drizzle'
     | '/demo/tanstack-query'
     | '/post/$id'
@@ -257,12 +279,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/comments'
     | '/login'
     | '/logout'
     | '/me'
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/comment/$id'
     | '/demo/drizzle'
     | '/demo/tanstack-query'
     | '/post/$id'
@@ -281,12 +305,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CommentsRoute: typeof CommentsRoute
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
   MeRoute: typeof MeRoute
   Random_postRoute: typeof Random_postRoute
   SignupRoute: typeof SignupRoute
   SubmitRoute: typeof SubmitRoute
+  CommentIdRoute: typeof CommentIdRoute
   DemoDrizzleRoute: typeof DemoDrizzleRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   PostIdRoute: typeof PostIdRoute
@@ -347,6 +373,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/comments': {
+      id: '/comments'
+      path: '/comments'
+      fullPath: '/comments'
+      preLoaderRoute: typeof CommentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -373,6 +406,13 @@ declare module '@tanstack/react-router' {
       path: '/demo/drizzle'
       fullPath: '/demo/drizzle'
       preLoaderRoute: typeof DemoDrizzleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/comment/$id': {
+      id: '/comment/$id'
+      path: '/comment/$id'
+      fullPath: '/comment/$id'
+      preLoaderRoute: typeof CommentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo/start/server-funcs': {
@@ -457,12 +497,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CommentsRoute: CommentsRoute,
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
   MeRoute: MeRoute,
   Random_postRoute: Random_postRoute,
   SignupRoute: SignupRoute,
   SubmitRoute: SubmitRoute,
+  CommentIdRoute: CommentIdRoute,
   DemoDrizzleRoute: DemoDrizzleRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   PostIdRoute: PostIdRoute,

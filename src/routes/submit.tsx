@@ -268,7 +268,7 @@ function SubmitPage() {
 								{isLoading ? "Submitting..." : "Submit Post"}
 							</Button>
 							<Button type="button" variant="outline" asChild>
-								<Link to="/">Cancel</Link>
+								<Link to="/" search={{ sort: "hot", t: "all" }}>Cancel</Link>
 							</Button>
 						</div>
 					</form>

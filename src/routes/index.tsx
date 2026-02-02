@@ -17,11 +17,16 @@ const loadSubmissions = createServerFn({ method: "GET" })
 		async ({
 			data,
 		}: { data: { sort?: SortType; time?: TimeFilter; limit?: number } }) => {
-			return getSubmissions({
-				sort: data.sort ?? "hot",
-				time: data.time ?? "all",
-				limit: data.limit ?? 25,
-			});
+			try {
+				return await getSubmissions({
+					sort: data.sort ?? "hot",
+					time: data.time ?? "all",
+					limit: data.limit ?? 25,
+				});
+			} catch (error) {
+				console.error("[loadSubmissions Error]", error);
+				throw error;
+			}
 		},
 	);
 

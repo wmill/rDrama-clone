@@ -34,7 +34,7 @@ export default function Header() {
 					<Menu size={24} />
 				</button>
 				<h1 className="ml-4 text-xl font-semibold">
-					<Link to="/">
+					<Link to="/" search={{ sort: "hot", t: "all" }}>
 						<img
 							src="/tanstack-word-logo-white.svg"
 							alt="TanStack Logo"
@@ -67,6 +67,7 @@ export default function Header() {
 				<nav className="flex-1 p-4 overflow-y-auto">
 					<Link
 						to="/"
+						search={{ sort: "hot", t: "all" }}
 						onClick={() => setIsOpen(false)}
 						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
 						activeProps={{

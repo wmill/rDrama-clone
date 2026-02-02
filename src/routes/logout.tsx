@@ -69,7 +69,7 @@ function LogoutPage() {
 							<Link to="/login">Sign in again</Link>
 						</Button>
 						<Button variant="outline" asChild>
-							<Link to="/">Go Home</Link>
+							<Link to="/" search={{ sort: "hot", t: "all" }}>Go Home</Link>
 						</Button>
 					</div>
 				</div>
@@ -110,7 +110,7 @@ function LogoutPage() {
 						{isLoggingOut ? "Logging out..." : "Log out"}
 					</Button>
 					<Button variant="outline" asChild>
-						<Link to="/">Cancel</Link>
+						<Link to="/" search={{ sort: "hot", t: "all" }}>Cancel</Link>
 					</Button>
 				</div>
 			</div>
