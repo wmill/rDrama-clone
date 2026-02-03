@@ -499,7 +499,7 @@ export async function getCommentWithReplies(
 	if (!targetComment) return null;
 
 	// Recursive query to get all descendants
-	const allDescendants = await db.execute(
+	const result = await db.execute(
 		sql`WITH RECURSIVE descendants AS (
 			SELECT id, author_id, body, body_html, created_utc, edited_utc,
 				   upvotes, downvotes, level, parent_comment_id, parent_submission,
@@ -519,6 +519,7 @@ export async function getCommentWithReplies(
 		INNER JOIN users u ON d.author_id = u.id
 		ORDER BY d.upvotes - d.downvotes DESC`,
 	);
+	const allDescendants = result.rows;
 
 	const commentMap = new Map<number, CommentWithReplies>();
 

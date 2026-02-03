@@ -171,7 +171,7 @@ function PostPage() {
 
 	const handleSortChange = async (newSort: CommentSortType) => {
 		await router.navigate({
-			to: `/post/${post.id}` as "/",
+			to: `/post/${post.id}`,
 			search: { sort: newSort },
 		});
 	};
