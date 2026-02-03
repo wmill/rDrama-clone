@@ -95,7 +95,6 @@ function formatRelativeTime(unixTimestamp: number): string {
 
 type CommentProps = {
 	comment: CommentWithReplies;
-	devKey: string;
 	submissionId: number;
 	currentUserId?: number;
 	userVotes?: Map<number, VoteType>;
@@ -379,7 +378,6 @@ export function Comment({
 								{comment.replies.map((reply) => (
 									<Comment
 										key={reply.id}
-										devKey={String(reply.id)}
 										comment={reply}
 										submissionId={submissionId}
 										currentUserId={currentUserId}
