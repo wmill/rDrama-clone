@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useState } from "react";
+import { z } from "zod";
 
 import { RecentSubmissions } from "@/components/recent-submissions";
 import {
@@ -8,6 +9,12 @@ import {
 	type SortType,
 	type TimeFilter,
 } from "@/lib/submissions.server";
+
+const searchSchema = z.object({
+	sort: z.enum(["new", "hot", "top", "controversial", "comments"]).default("hot"),
+	t: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all"),
+});
+	
 
 const loadSubmissions = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -32,10 +39,7 @@ const loadSubmissions = createServerFn({ method: "GET" })
 
 export const Route = createFileRoute("/")({
 	component: HomePage,
-	validateSearch: (search: Record<string, unknown>) => ({
-		sort: (search.sort as SortType) || "hot",
-		t: (search.t as TimeFilter) || "all",
-	}),
+	validateSearch: searchSchema,
 	loaderDeps: ({ search }) => ({ sort: search.sort, time: search.t }),
 	loader: async ({ deps }) => {
 		return loadSubmissions({ data: { sort: deps.sort, time: deps.time } });

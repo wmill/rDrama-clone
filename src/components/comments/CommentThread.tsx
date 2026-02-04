@@ -210,7 +210,6 @@ function ActualComments({comments, submissionId, currentUserId, userVotes, onRep
 		{comments.map((comment) => (
 			<Comment
 				key={comment.id}
-				devKey={String(comment.id)}
 				comment={comment}
 				submissionId={submissionId}
 				currentUserId={currentUserId}

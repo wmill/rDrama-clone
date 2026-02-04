@@ -31,8 +31,18 @@ export type SubmissionDetail = SubmissionSummary & {
 	distinguishLevel: number;
 };
 
-export type SortType = "new" | "hot" | "top" | "controversial" | "comments";
-export type TimeFilter = "hour" | "day" | "week" | "month" | "year" | "all";
+export const SortTypes = ["new", "hot", "top", "controversial", "comments"] as const;
+export type SortType = (typeof SortTypes)[number];
+
+export const TimeFilters = [
+	"hour",
+	"day",
+	"week",
+	"month",
+	"year",
+	"all",
+] as const;
+export type TimeFilter = (typeof TimeFilters)[number];
 
 function getTimeFilterSeconds(filter: TimeFilter): number | null {
 	const now = Math.floor(Date.now() / 1000);

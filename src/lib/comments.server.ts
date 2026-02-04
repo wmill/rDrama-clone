@@ -45,7 +45,8 @@ export type CommentWithReplies = CommentSummary & {
 	replies: CommentWithReplies[];
 };
 
-export type CommentSortType = "top" | "new" | "old" | "controversial";
+export const CommentSortTypes = ["top", "new", "old", "controversial"] as const;
+export type CommentSortType = (typeof CommentSortTypes)[number];
 
 export async function getCommentsBySubmission(
 	submissionId: number,
