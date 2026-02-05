@@ -14,7 +14,11 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { CommentWithReplies } from "@/lib/comments.server";
-import { createComment, deleteComment, updateComment } from "@/lib/comments.server";
+import {
+	createComment,
+	deleteComment,
+	updateComment,
+} from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import type { VoteType } from "@/lib/votes.server";
 import { VoteButtons } from "./VoteButtons";
@@ -52,7 +56,8 @@ const createCommentFn = createServerFn({ method: "POST" })
 			} catch (err) {
 				return {
 					success: false as const,
-					error: err instanceof Error ? err.message : "Failed to create comment",
+					error:
+						err instanceof Error ? err.message : "Failed to create comment",
 				};
 			}
 		},
@@ -101,6 +106,7 @@ type CommentProps = {
 	depth?: number;
 	maxDepth?: number;
 	onReplyAdded?: () => void;
+	visibleIds?: Set<number>;
 };
 
 export function Comment({
@@ -111,6 +117,7 @@ export function Comment({
 	depth = 0,
 	maxDepth = 10,
 	onReplyAdded,
+	visibleIds,
 }: CommentProps) {
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [showReplyForm, setShowReplyForm] = useState(false);
@@ -194,12 +201,19 @@ export function Comment({
 
 	const borderColor = depthColors[depth % depthColors.length];
 
-	const createdTime = useMemo(() => formatRelativeTime(comment.createdUtc), [comment.createdUtc]);
-	const editedTime = useMemo(() => formatRelativeTime(comment.editedUtc), [comment.editedUtc]);
-
+	const createdTime = useMemo(
+		() => formatRelativeTime(comment.createdUtc),
+		[comment.createdUtc],
+	);
+	const editedTime = useMemo(
+		() => formatRelativeTime(comment.editedUtc),
+		[comment.editedUtc],
+	);
 
 	return (
-		<div className={`${depth > 0 ? `ml-4 border-l-2 ${borderColor} pl-3` : ""}`}>
+		<div
+			className={`${depth > 0 ? `ml-4 border-l-2 ${borderColor} pl-3` : ""}`}
+		>
 			<div className="group py-2">
 				{/* Comment header */}
 				<div className="flex items-center gap-2 text-xs text-slate-400">
@@ -231,9 +245,7 @@ export function Comment({
 					</span>
 
 					{comment.editedUtc > 0 && (
-						<span className="text-slate-500">
-							(edited {editedTime})
-						</span>
+						<span className="text-slate-500">(edited {editedTime})</span>
 					)}
 
 					{isCollapsed && (
@@ -373,22 +385,38 @@ export function Comment({
 						</div>
 
 						{/* Replies */}
-						{comment.replies.length > 0 && depth < maxDepth && (
-							<div className="mt-2">
-								{comment.replies.map((reply) => (
-									<Comment
-										key={reply.id}
-										comment={reply}
-										submissionId={submissionId}
-										currentUserId={currentUserId}
-										userVotes={userVotes}
-										depth={depth + 1}
-										maxDepth={maxDepth}
-										onReplyAdded={onReplyAdded}
-									/>
-								))}
-							</div>
-						)}
+						{comment.replies.length > 0 &&
+							depth < maxDepth &&
+							(() => {
+								const filteredReplies = visibleIds
+									? comment.replies.filter((r) => visibleIds.has(r.id))
+									: comment.replies;
+								const hiddenCount =
+									comment.replies.length - filteredReplies.length;
+								return (
+									<div className="mt-2">
+										{filteredReplies.map((reply) => (
+											<Comment
+												key={reply.id}
+												comment={reply}
+												submissionId={submissionId}
+												currentUserId={currentUserId}
+												userVotes={userVotes}
+												depth={depth + 1}
+												maxDepth={maxDepth}
+												onReplyAdded={onReplyAdded}
+												visibleIds={visibleIds}
+											/>
+										))}
+										{hiddenCount > 0 && (
+											<p className="ml-4 mt-1 text-xs text-slate-500">
+												{hiddenCount} more{" "}
+												{hiddenCount === 1 ? "reply" : "replies"} hidden
+											</p>
+										)}
+									</div>
+								);
+							})()}
 
 						{comment.replies.length > 0 && depth >= maxDepth && (
 							<Link

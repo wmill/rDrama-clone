@@ -1,27 +1,31 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useCallback, useState } from "react";
-
+import { Loader2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { getVisibleCommentIds } from "@/lib/comment-pagination";
 import {
-	createComment,
 	type CommentSortType,
 	type CommentWithReplies,
+	createComment,
 } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import type { VoteType } from "@/lib/votes.server";
 import { Comment } from "./Comment";
-import { Loader2 } from "lucide-react";
+
+const COMMENTS_PAGE_SIZE = Number(
+	import.meta.env.VITE_RESULTS_PER_PAGE_COMMENTS ?? 50,
+);
 
 const createCommentFn = createServerFn({ method: "POST" })
-	.inputValidator(
-		(data: { body: string; parentSubmissionId: number }) => data,
-	)
+	.inputValidator((data: { body: string; parentSubmissionId: number }) => data)
 	.handler(
 		async ({
 			data,
-		}: { data: { body: string; parentSubmissionId: number } }) => {
+		}: {
+			data: { body: string; parentSubmissionId: number };
+		}) => {
 			const user = await getCurrentUser();
 			if (!user) {
 				return { success: false as const, error: "Not logged in" };
@@ -69,7 +73,7 @@ export function CommentThread({
 	userVotes,
 	sort = "top",
 	onSortChange,
-	isLoading
+	isLoading,
 }: CommentThreadProps) {
 	const router = useRouter();
 	const [newComment, setNewComment] = useState("");
@@ -128,9 +132,7 @@ export function CommentThread({
 							placeholder="What are your thoughts?"
 							className="min-h-[100px] border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
 						/>
-						{error && (
-							<p className="text-sm text-red-400">{error}</p>
-						)}
+						{error && <p className="text-sm text-red-400">{error}</p>}
 						<Button
 							onClick={handleSubmitComment}
 							disabled={isSubmitting || !newComment.trim()}
@@ -156,7 +158,7 @@ export function CommentThread({
 					<span className="text-sm text-slate-400">Sort by:</span>
 					<div className="flex gap-1 rounded-lg bg-slate-800 p-1">
 						{sortOptions.map((option) => (
-							<SortButton 
+							<SortButton
 								option={option}
 								onSortChange={onSortChange}
 								sort={sort}
@@ -166,9 +168,8 @@ export function CommentThread({
 				</div>
 			)}
 
-
 			{/* Comments list */}
-			<ActualComments 
+			<ActualComments
 				submissionId={submissionId}
 				currentUserId={currentUserId}
 				userVotes={userVotes}
@@ -187,9 +188,23 @@ type ActualCommentsProps = {
 	userVotes: Map<number, VoteType>;
 	onReplyAdded: () => void;
 	isLoading?: boolean;
-}
+};
 
-function ActualComments({comments, submissionId, currentUserId, userVotes, onReplyAdded, isLoading}: ActualCommentsProps) {
+function ActualComments({
+	comments,
+	submissionId,
+	currentUserId,
+	userVotes,
+	onReplyAdded,
+	isLoading,
+}: ActualCommentsProps) {
+	const [visibleLimit, setVisibleLimit] = useState(COMMENTS_PAGE_SIZE);
+
+	const { visibleIds, totalCount } = useMemo(
+		() => getVisibleCommentIds(comments, visibleLimit),
+		[comments, visibleLimit],
+	);
+
 	if (comments.length === 0) {
 		return (
 			<div className="rounded-lg border border-dashed border-slate-700 p-8 text-center">
@@ -200,32 +215,47 @@ function ActualComments({comments, submissionId, currentUserId, userVotes, onRep
 		);
 	}
 
-	return (<div className="relative space-y-1">
-		{isLoading && (
-			<div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
-				<Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
-			</div>
-		)}
-		
-		{comments.map((comment) => (
-			<Comment
-				key={comment.id}
-				comment={comment}
-				submissionId={submissionId}
-				currentUserId={currentUserId}
-				userVotes={userVotes}
-				onReplyAdded={onReplyAdded}
-			/>
-		))}
-	</div>)
+	return (
+		<div className="relative space-y-1">
+			{isLoading && (
+				<div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
+					<Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+				</div>
+			)}
+
+			{comments.map((comment) => (
+				<Comment
+					key={comment.id}
+					comment={comment}
+					submissionId={submissionId}
+					currentUserId={currentUserId}
+					userVotes={userVotes}
+					onReplyAdded={onReplyAdded}
+					visibleIds={visibleIds}
+				/>
+			))}
+
+			{visibleLimit < totalCount && (
+				<div className="pt-3 text-center">
+					<Button
+						variant="outline"
+						onClick={() => setVisibleLimit((prev) => prev + COMMENTS_PAGE_SIZE)}
+						className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+					>
+						Load more comments ({totalCount - visibleLimit} remaining)
+					</Button>
+				</div>
+			)}
+		</div>
+	);
 }
 
 type SortButtonProps = {
 	option: { value: CommentSortType; label: string };
 	onSortChange?: (sort: CommentSortType) => void;
 	sort?: CommentSortType;
-}
-function SortButton({option, onSortChange, sort}: SortButtonProps){
+};
+function SortButton({ option, onSortChange, sort }: SortButtonProps) {
 	const [loading, setLoading] = useState(false);
 
 	if (loading) {
@@ -241,7 +271,7 @@ function SortButton({option, onSortChange, sort}: SortButtonProps){
 			>
 				{option.label}
 			</button>
-		)
+		);
 	} else {
 		return (
 			<button
@@ -250,7 +280,9 @@ function SortButton({option, onSortChange, sort}: SortButtonProps){
 				onClick={() => {
 					setLoading(true);
 					setTimeout(() => {
-						Promise.resolve().then(() => onSortChange?.(option.value)).finally(() => setLoading(false))
+						Promise.resolve()
+							.then(() => onSortChange?.(option.value))
+							.finally(() => setLoading(false));
 					});
 				}}
 				className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
@@ -261,6 +293,6 @@ function SortButton({option, onSortChange, sort}: SortButtonProps){
 			>
 				{option.label}
 			</button>
-		)
+		);
 	}
 }
