@@ -16,6 +16,7 @@
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
     "generate-data": "tsx scripts/generate-data.ts",
+    "create-user": "tsx scripts/create-user.ts",
     "start": "node --import ./.output/server/instrument.server.mjs .output/server/index.mjs"
   },
   "dependencies": {
