@@ -1,7 +1,8 @@
-import { type SQL, and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { submissions, users } from "@/db/schema";
+import { submissions, users, votes } from "@/db/schema";
+import type { VoteType } from "@/lib/votes.server";
 
 export type SubmissionSummary = {
 	id: number;
@@ -29,9 +30,16 @@ export type SubmissionDetail = SubmissionSummary & {
 	editedUtc: number;
 	views: number;
 	distinguishLevel: number;
+	userVote: VoteType;
 };
 
-export const SortTypes = ["new", "hot", "top", "controversial", "comments"] as const;
+export const SortTypes = [
+	"new",
+	"hot",
+	"top",
+	"controversial",
+	"comments",
+] as const;
 export type SortType = (typeof SortTypes)[number];
 
 export const TimeFilters = [
@@ -185,6 +193,7 @@ export async function getSubmissions(options: {
 
 export async function getSubmissionById(
 	id: number,
+	userId?: number,
 ): Promise<SubmissionDetail | null> {
 	const [result] = await db
 		.select({
@@ -209,17 +218,26 @@ export async function getSubmissionById(
 			editedUtc: submissions.editedUtc,
 			views: submissions.views,
 			distinguishLevel: submissions.distinguishLevel,
+			userVoteType: votes.voteType,
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
+		.leftJoin(
+			votes,
+			userId
+				? and(eq(votes.submissionId, submissions.id), eq(votes.userId, userId))
+				: sql`false`,
+		)
 		.where(eq(submissions.id, id))
 		.limit(1);
 
 	if (!result) return null;
 
+	const { userVoteType, ...rest } = result;
 	return {
-		...result,
-		score: result.upvotes - result.downvotes,
+		...rest,
+		score: rest.upvotes - rest.downvotes,
+		userVote: (userVoteType as VoteType) ?? 0,
 	};
 }
 

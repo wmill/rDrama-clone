@@ -1,89 +1,49 @@
-import { createFileRoute, Link, notFound, useRouter, useRouterState } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Link,
+	notFound,
+	useRouter,
+	useRouterState,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
 
 import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
 import {
-	getCommentsBySubmission,
 	type CommentSortType,
-	type CommentWithReplies,
+	getCommentsBySubmission,
 } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import {
 	getSubmissionById,
-	incrementViews,
 	type SubmissionDetail,
 } from "@/lib/submissions.server";
-import {
-	getCommentVotes,
-	getSubmissionVote,
-	type VoteType,
-} from "@/lib/votes.server";
-import { useMemo } from "react";
+import type { VoteType } from "@/lib/votes.server";
 
 const getPostFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { id: number; commentSort?: CommentSortType }) => data)
 	.handler(
 		async ({
 			data,
-		}: { data: { id: number; commentSort?: CommentSortType } }) => {
-			const post = await getSubmissionById(data.id);
-			if (!post) return null;
+		}: {
+			data: { id: number; commentSort?: CommentSortType };
+		}) => {
+			const user = await getCurrentUser();
+			const userId = user?.id;
 
-			// await incrementViews(data.id);
+			const post = await getSubmissionById(data.id, userId);
+			if (!post) return null;
 
 			const comments = await getCommentsBySubmission(
 				data.id,
 				data.commentSort ?? "top",
+				userId,
 			);
 
-			return { post, comments };
+			return { post, comments, user };
 		},
 	);
-
-const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
-	return getCurrentUser();
-});
-
-const getUserVotesFn = createServerFn({ method: "GET" })
-	.inputValidator(
-		(data: { submissionId: number; commentIds: number[] }) => data,
-	)
-	.handler(
-		async ({
-			data,
-		}: { data: { submissionId: number; commentIds: number[] } }) => {
-			const user = await getCurrentUser();
-			if (!user) {
-				return { submissionVote: 0 as VoteType, commentVotes: new Map() };
-			}
-
-			const [submissionVote, commentVotes] = await Promise.all([
-				getSubmissionVote(user.id, data.submissionId),
-				getCommentVotes(user.id, data.commentIds),
-			]);
-
-			// Convert Map to array for serialization
-			const commentVotesArray = Array.from(commentVotes.entries());
-
-			return { submissionVote, commentVotesArray };
-		},
-	);
-
-function getAllCommentIds(comments: CommentWithReplies[]): number[] {
-	const ids: number[] = [];
-	const traverse = (list: CommentWithReplies[]) => {
-		for (const comment of list) {
-			ids.push(comment.id);
-			if (comment.replies.length > 0) {
-				traverse(comment.replies);
-			}
-		}
-	};
-	traverse(comments);
-	return ids;
-}
 
 export const Route = createFileRoute("/post/$id")({
 	component: PostPage,
@@ -97,34 +57,18 @@ export const Route = createFileRoute("/post/$id")({
 			throw notFound();
 		}
 
-		const [result, user] = await Promise.all([
-			getPostFn({ data: { id, commentSort: deps.commentSort } }),
-			getCurrentUserFn(),
-		]);
+		const result = await getPostFn({
+			data: { id, commentSort: deps.commentSort },
+		});
 
 		if (!result) {
 			throw notFound();
 		}
 
-		// Get user votes if logged in
-		let submissionVote: VoteType = 0;
-		let commentVotesMap = new Map<number, VoteType>();
-
-		if (user) {
-			const commentIds = getAllCommentIds(result.comments);
-			const votes = await getUserVotesFn({
-				data: { submissionId: id, commentIds },
-			});
-			submissionVote = votes.submissionVote;
-			commentVotesMap = new Map(votes.commentVotesArray);
-		}
-
 		return {
 			post: result.post,
 			comments: result.comments,
-			user,
-			submissionVote,
-			commentVotesArray: Array.from(commentVotesMap.entries()),
+			user: result.user,
 		};
 	},
 	notFoundComponent: () => (
@@ -135,7 +79,9 @@ export const Route = createFileRoute("/post/$id")({
 					This post doesn't exist or has been removed.
 				</p>
 				<Button asChild>
-					<Link to="/" search={{ sort: "hot", t: "all" }}>Go Home</Link>
+					<Link to="/" search={{ sort: "hot", t: "all" }}>
+						Go Home
+					</Link>
 				</Button>
 			</div>
 		</div>
@@ -157,8 +103,7 @@ function formatRelativeTime(unixTimestamp: number): string {
 
 function PostPage() {
 	const router = useRouter();
-	const { post, comments, user, submissionVote, commentVotesArray } =
-		Route.useLoaderData();
+	const { post, comments, user } = Route.useLoaderData();
 	const { sort } = Route.useSearch();
 
 	// Track if there's a pending navigation (loading new comments)
@@ -166,24 +111,21 @@ function PostPage() {
 		select: (s) => s.isLoading,
 	});
 
-	const commentVotes = useMemo(() => new Map<number, VoteType>(commentVotesArray), [commentVotesArray]);
-	const memoSubmissionVote = useMemo(() => submissionVote, [submissionVote]);
-
 	const handleSortChange = async (newSort: CommentSortType) => {
 		await router.navigate({
-			to: `/post/${post.id}`,
+			to: "/post/$id",
+			params: { id: String(post.id) },
 			search: { sort: newSort },
 		});
 	};
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
-			
 			<div className="mx-auto max-w-4xl">
 				<PostContent
 					post={post}
 					currentUserId={user?.id}
-					userVote={memoSubmissionVote}
+					userVote={post.userVote}
 				/>
 
 				<div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
@@ -192,7 +134,6 @@ function PostPage() {
 						comments={comments}
 						commentCount={post.commentCount}
 						currentUserId={user?.id}
-						userVotes={commentVotes}
 						sort={sort}
 						onSortChange={handleSortChange}
 						isLoading={isLoading}

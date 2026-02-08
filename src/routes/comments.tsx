@@ -4,13 +4,12 @@ import { Clock, MessageSquare } from "lucide-react";
 
 import { VoteButtons } from "@/components/comments";
 import {
-	getCommentsFeed,
 	type CommentFeedItem,
 	type CommentFeedSortType,
+	getCommentsFeed,
 	type TimeFilter,
 } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
-import { getCommentVotes, type VoteType } from "@/lib/votes.server";
 
 const getCommentsFeedFn = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -23,29 +22,19 @@ const getCommentsFeedFn = createServerFn({ method: "GET" })
 		}: {
 			data: { sort?: CommentFeedSortType; t?: TimeFilter; page?: number };
 		}) => {
+			const user = await getCurrentUser();
 			const limit = 25;
 			const offset = ((data.page ?? 1) - 1) * limit;
-			return getCommentsFeed(data.sort ?? "new", data.t ?? "all", limit, offset);
+			const comments = await getCommentsFeed(
+				data.sort ?? "new",
+				data.t ?? "all",
+				limit,
+				offset,
+				user?.id,
+			);
+			return { comments, user };
 		},
 	);
-
-const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
-	return getCurrentUser();
-});
-
-const getUserVotesFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { commentIds: number[] }) => data)
-	.handler(async ({ data }: { data: { commentIds: number[] } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { commentVotesArray: [] as [number, VoteType][] };
-		}
-
-		const commentVotes = await getCommentVotes(user.id, data.commentIds);
-		const commentVotesArray = Array.from(commentVotes.entries());
-
-		return { commentVotesArray };
-	});
 
 const sortOptions: { value: CommentFeedSortType; label: string }[] = [
 	{ value: "new", label: "New" },
@@ -88,33 +77,21 @@ export const Route = createFileRoute("/comments")({
 		page: search.page,
 	}),
 	loader: async ({ deps }) => {
-		const [comments, user] = await Promise.all([
-			getCommentsFeedFn({ data: { sort: deps.sort, t: deps.t, page: deps.page } }),
-			getCurrentUserFn(),
-		]);
-
-		let commentVotesMap = new Map<number, VoteType>();
-
-		if (user && comments.length > 0) {
-			const commentIds = comments.map((c) => c.id);
-			const votes = await getUserVotesFn({ data: { commentIds } });
-			commentVotesMap = new Map(votes.commentVotesArray);
-		}
+		const result = await getCommentsFeedFn({
+			data: { sort: deps.sort, t: deps.t, page: deps.page },
+		});
 
 		return {
-			comments,
-			user,
-			commentVotesArray: Array.from(commentVotesMap.entries()),
+			comments: result.comments,
+			user: result.user,
 		};
 	},
 });
 
 function CommentsPage() {
 	const router = useRouter();
-	const { comments, user, commentVotesArray } = Route.useLoaderData();
+	const { comments, user } = Route.useLoaderData();
 	const { sort, t, page } = Route.useSearch();
-
-	const commentVotes = new Map<number, VoteType>(commentVotesArray);
 
 	const handleSortChange = async (newSort: CommentFeedSortType) => {
 		await router.navigate({
@@ -218,7 +195,6 @@ function CommentsPage() {
 								key={comment.id}
 								comment={comment}
 								currentUserId={user?.id}
-								userVote={commentVotes.get(comment.id) ?? 0}
 							/>
 						))
 					) : (
@@ -258,11 +234,9 @@ function CommentsPage() {
 function CommentCard({
 	comment,
 	currentUserId,
-	userVote = 0,
 }: {
 	comment: CommentFeedItem;
 	currentUserId?: number;
-	userVote?: VoteType;
 }) {
 	return (
 		<div className="rounded-xl border border-slate-800 bg-slate-900/80 shadow-xl">
@@ -283,7 +257,7 @@ function CommentCard({
 						type="comment"
 						id={comment.id}
 						score={comment.score}
-						userVote={userVote}
+						userVote={comment.userVote}
 						size="sm"
 						disabled={!currentUserId}
 					/>

@@ -20,7 +20,6 @@ import {
 	updateComment,
 } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
-import type { VoteType } from "@/lib/votes.server";
 import { VoteButtons } from "./VoteButtons";
 
 const createCommentFn = createServerFn({ method: "POST" })
@@ -102,19 +101,15 @@ type CommentProps = {
 	comment: CommentWithReplies;
 	submissionId: number;
 	currentUserId?: number;
-	userVotes?: Map<number, VoteType>;
 	depth?: number;
 	maxDepth?: number;
 	onReplyAdded?: () => void;
 };
 
-const emptyVotes = new Map<number, VoteType>();
-
 export const Comment = memo(function Comment({
 	comment,
 	submissionId,
 	currentUserId,
-	userVotes = emptyVotes,
 	depth = 0,
 	maxDepth = 10,
 	onReplyAdded,
@@ -129,7 +124,7 @@ export const Comment = memo(function Comment({
 	const [currentBody, setCurrentBody] = useState(comment.bodyHtml);
 
 	const isAuthor = currentUserId === comment.authorId;
-	const userVote = userVotes.get(comment.id) ?? 0;
+	const userVote = comment.userVote;
 
 	const handleReply = async () => {
 		if (!replyText.trim() || isSubmitting) return;
@@ -393,7 +388,6 @@ export const Comment = memo(function Comment({
 										comment={reply}
 										submissionId={submissionId}
 										currentUserId={currentUserId}
-										userVotes={userVotes}
 										depth={depth + 1}
 										maxDepth={maxDepth}
 										onReplyAdded={onReplyAdded}

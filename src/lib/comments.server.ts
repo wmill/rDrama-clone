@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, gte, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { comments, submissions, users } from "@/db/schema";
+import { comments, commentVotes, submissions, users } from "@/db/schema";
+import type { VoteType } from "@/lib/votes.server";
 
 export type CommentFeedItem = {
 	id: number;
@@ -19,6 +20,7 @@ export type CommentFeedItem = {
 	submissionTitle: string;
 	distinguishLevel: number;
 	isDeleted: boolean;
+	userVote: VoteType;
 };
 
 export type CommentSummary = {
@@ -39,6 +41,7 @@ export type CommentSummary = {
 	isPinned: string | null;
 	distinguishLevel: number;
 	isDeleted: boolean;
+	userVote: VoteType;
 };
 
 export type CommentWithReplies = CommentSummary & {
@@ -51,6 +54,7 @@ export type CommentSortType = (typeof CommentSortTypes)[number];
 export async function getCommentsBySubmission(
 	submissionId: number,
 	sort: CommentSortType = "top",
+	userId?: number,
 ): Promise<CommentWithReplies[]> {
 	let orderBy: SQL[];
 	switch (sort) {
@@ -94,9 +98,19 @@ export async function getCommentsBySubmission(
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
+			userVoteType: commentVotes.voteType,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
+		.leftJoin(
+			commentVotes,
+			userId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
 		.where(
 			and(
 				eq(comments.parentSubmission, submissionId),
@@ -128,6 +142,7 @@ export async function getCommentsBySubmission(
 			isPinned: row.isPinned,
 			distinguishLevel: row.distinguishLevel,
 			isDeleted: row.stateUserDeletedUtc !== null,
+			userVote: (row.userVoteType as VoteType) ?? 0,
 			replies: [],
 		};
 		commentMap.set(row.id, comment);
@@ -175,6 +190,7 @@ export async function getCommentsBySubmission(
 
 export async function getCommentById(
 	id: number,
+	userId?: number,
 ): Promise<CommentSummary | null> {
 	const [result] = await db
 		.select({
@@ -194,9 +210,19 @@ export async function getCommentById(
 			isPinned: comments.isPinned,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			userVoteType: commentVotes.voteType,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
+		.leftJoin(
+			commentVotes,
+			userId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
 		.where(eq(comments.id, id))
 		.limit(1);
 
@@ -220,6 +246,7 @@ export async function getCommentById(
 		isPinned: result.isPinned,
 		distinguishLevel: result.distinguishLevel,
 		isDeleted: result.stateUserDeletedUtc !== null,
+		userVote: (result.userVoteType as VoteType) ?? 0,
 	};
 }
 
@@ -271,6 +298,7 @@ export async function getRecentComments(
 		isPinned: row.isPinned,
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: row.stateUserDeletedUtc !== null,
+		userVote: 0 as VoteType,
 	}));
 }
 
@@ -282,10 +310,9 @@ export async function getCommentsFeed(
 	time: TimeFilter = "all",
 	limit = 25,
 	offset = 0,
+	userId?: number,
 ): Promise<CommentFeedItem[]> {
-	const conditions: SQL[] = [
-		eq(comments.stateMod, "VISIBLE"),
-	];
+	const conditions: SQL[] = [eq(comments.stateMod, "VISIBLE")];
 
 	// Time filter
 	if (time !== "all") {
@@ -349,10 +376,20 @@ export async function getCommentsFeed(
 			submissionTitle: submissions.title,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			userVoteType: commentVotes.voteType,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
 		.innerJoin(submissions, eq(comments.parentSubmission, submissions.id))
+		.leftJoin(
+			commentVotes,
+			userId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
 		.where(and(...conditions))
 		.orderBy(...orderBy)
 		.limit(limit)
@@ -374,6 +411,7 @@ export async function getCommentsFeed(
 		submissionTitle: row.submissionTitle,
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: row.stateUserDeletedUtc !== null,
+		userVote: (row.userVoteType as VoteType) ?? 0,
 	}));
 }
 
@@ -494,12 +532,14 @@ export async function getCommentContext(
 
 export async function getCommentWithReplies(
 	id: number,
+	userId?: number,
 ): Promise<CommentWithReplies | null> {
 	// Get the target comment
-	const targetComment = await getCommentById(id);
+	const targetComment = await getCommentById(id, userId);
 	if (!targetComment) return null;
 
-	// Recursive query to get all descendants
+	// Recursive query to get all descendants, with optional user vote join
+	const userIdParam = userId ?? null;
 	const result = await db.execute(
 		sql`WITH RECURSIVE descendants AS (
 			SELECT id, author_id, body, body_html, created_utc, edited_utc,
@@ -515,9 +555,10 @@ export async function getCommentWithReplies(
 			INNER JOIN descendants d ON c.parent_comment_id = d.id
 			WHERE c.state_mod = 'VISIBLE'
 		)
-		SELECT d.*, u.username as author_name
+		SELECT d.*, u.username as author_name, cv.vote_type as user_vote_type
 		FROM descendants d
 		INNER JOIN users u ON d.author_id = u.id
+		LEFT JOIN commentvotes cv ON cv.comment_id = d.id AND cv.user_id = ${userIdParam}
 		ORDER BY d.upvotes - d.downvotes DESC`,
 	);
 	const allDescendants = result.rows;
@@ -549,6 +590,7 @@ export async function getCommentWithReplies(
 		is_pinned: string | null;
 		distinguish_level: number;
 		state_user_deleted_utc: Date | null;
+		user_vote_type: number | null;
 	}>) {
 		const comment: CommentWithReplies = {
 			id: row.id,
@@ -568,6 +610,7 @@ export async function getCommentWithReplies(
 			isPinned: row.is_pinned,
 			distinguishLevel: row.distinguish_level,
 			isDeleted: row.state_user_deleted_utc !== null,
+			userVote: (row.user_vote_type as VoteType) ?? 0,
 			replies: [],
 		};
 		commentMap.set(row.id, comment);

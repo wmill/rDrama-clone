@@ -4,57 +4,24 @@ import { ArrowLeft, Clock, ExternalLink, MessageSquare } from "lucide-react";
 
 import { Comment } from "@/components/comments";
 import { Button } from "@/components/ui/button";
-import {
-	getCommentWithReplies,
-	type CommentWithReplies,
-} from "@/lib/comments.server";
+import { getCommentWithReplies } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissionById } from "@/lib/submissions.server";
-import { getCommentVotes, type VoteType } from "@/lib/votes.server";
 
 const getCommentFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { id: number }) => data)
 	.handler(async ({ data }: { data: { id: number } }) => {
-		const comment = await getCommentWithReplies(data.id);
+		const user = await getCurrentUser();
+		const userId = user?.id;
+
+		const comment = await getCommentWithReplies(data.id, userId);
 		if (!comment || comment.parentSubmissionId === null) return null;
 
 		const submission = await getSubmissionById(comment.parentSubmissionId);
 		if (!submission) return null;
 
-		return { comment, submission };
+		return { comment, submission, user };
 	});
-
-const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
-	return getCurrentUser();
-});
-
-const getUserVotesFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { commentIds: number[] }) => data)
-	.handler(async ({ data }: { data: { commentIds: number[] } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { commentVotesArray: [] as [number, VoteType][] };
-		}
-
-		const commentVotes = await getCommentVotes(user.id, data.commentIds);
-		const commentVotesArray = Array.from(commentVotes.entries());
-
-		return { commentVotesArray };
-	});
-
-function getAllCommentIds(comment: CommentWithReplies): number[] {
-	const ids: number[] = [comment.id];
-	const traverse = (list: CommentWithReplies[]) => {
-		for (const c of list) {
-			ids.push(c.id);
-			if (c.replies.length > 0) {
-				traverse(c.replies);
-			}
-		}
-	};
-	traverse(comment.replies);
-	return ids;
-}
 
 function formatRelativeTime(unixTimestamp: number): string {
 	const now = Date.now() / 1000;
@@ -77,29 +44,16 @@ export const Route = createFileRoute("/comment/$id")({
 			throw notFound();
 		}
 
-		const [result, user] = await Promise.all([
-			getCommentFn({ data: { id } }),
-			getCurrentUserFn(),
-		]);
+		const result = await getCommentFn({ data: { id } });
 
 		if (!result) {
 			throw notFound();
 		}
 
-		// Get user votes if logged in
-		let commentVotesMap = new Map<number, VoteType>();
-
-		if (user) {
-			const commentIds = getAllCommentIds(result.comment);
-			const votes = await getUserVotesFn({ data: { commentIds } });
-			commentVotesMap = new Map(votes.commentVotesArray);
-		}
-
 		return {
 			comment: result.comment,
 			submission: result.submission,
-			user,
-			commentVotesArray: Array.from(commentVotesMap.entries()),
+			user: result.user,
 		};
 	},
 	notFoundComponent: () => (
@@ -112,7 +66,9 @@ export const Route = createFileRoute("/comment/$id")({
 					This comment doesn't exist or has been removed.
 				</p>
 				<Button asChild>
-					<Link to="/" search={{ sort: "hot", t: "all" }}>Go Home</Link>
+					<Link to="/" search={{ sort: "hot", t: "all" }}>
+						Go Home
+					</Link>
 				</Button>
 			</div>
 		</div>
@@ -120,10 +76,7 @@ export const Route = createFileRoute("/comment/$id")({
 });
 
 function CommentPage() {
-	const { comment, submission, user, commentVotesArray } =
-		Route.useLoaderData();
-
-	const commentVotes = new Map<number, VoteType>(commentVotesArray);
+	const { comment, submission, user } = Route.useLoaderData();
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
@@ -192,7 +145,6 @@ function CommentPage() {
 						comment={comment}
 						submissionId={submission.id}
 						currentUserId={user?.id}
-						userVotes={commentVotes}
 						depth={0}
 						maxDepth={10}
 					/>

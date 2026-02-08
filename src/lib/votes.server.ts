@@ -12,21 +12,6 @@ export type VoteResult = {
 	error?: string;
 };
 
-export async function getSubmissionVote(
-	userId: number,
-	submissionId: number,
-): Promise<VoteType> {
-	const [vote] = await db
-		.select({ voteType: votes.voteType })
-		.from(votes)
-		.where(
-			and(eq(votes.userId, userId), eq(votes.submissionId, submissionId)),
-		)
-		.limit(1);
-
-	return (vote?.voteType as VoteType) ?? 0;
-}
-
 export async function getCommentVote(
 	userId: number,
 	commentId: number,
@@ -45,6 +30,19 @@ export async function getCommentVote(
 	return (vote?.voteType as VoteType) ?? 0;
 }
 
+async function getSubmissionVoteInternal(
+	userId: number,
+	submissionId: number,
+): Promise<VoteType> {
+	const [vote] = await db
+		.select({ voteType: votes.voteType })
+		.from(votes)
+		.where(and(eq(votes.userId, userId), eq(votes.submissionId, submissionId)))
+		.limit(1);
+
+	return (vote?.voteType as VoteType) ?? 0;
+}
+
 export async function voteOnSubmission(
 	userId: number,
 	submissionId: number,
@@ -52,7 +50,7 @@ export async function voteOnSubmission(
 ): Promise<VoteResult> {
 	try {
 		// Get current vote
-		const currentVote = await getSubmissionVote(userId, submissionId);
+		const currentVote = await getSubmissionVoteInternal(userId, submissionId);
 
 		// If same vote, remove it (toggle)
 		if (currentVote === voteType) {
@@ -229,58 +227,4 @@ export async function voteOnComment(
 			error: error instanceof Error ? error.message : "Failed to vote",
 		};
 	}
-}
-
-export async function getSubmissionVotes(
-	userId: number,
-	submissionIds: number[],
-): Promise<Map<number, VoteType>> {
-	if (submissionIds.length === 0) return new Map();
-
-	const results = await db
-		.select({
-			submissionId: votes.submissionId,
-			voteType: votes.voteType,
-		})
-		.from(votes)
-		.where(
-			and(
-				eq(votes.userId, userId),
-				sql`${votes.submissionId} = ANY(${submissionIds})`,
-			),
-		);
-
-	const voteMap = new Map<number, VoteType>();
-	for (const row of results) {
-		voteMap.set(row.submissionId, row.voteType as VoteType);
-	}
-
-	return voteMap;
-}
-
-export async function getCommentVotes(
-	userId: number,
-	commentIds: number[],
-): Promise<Map<number, VoteType>> {
-	if (commentIds.length === 0) return new Map();
-
-	const results = await db
-		.select({
-			commentId: commentVotes.commentId,
-			voteType: commentVotes.voteType,
-		})
-		.from(commentVotes)
-		.where(
-			and(
-				eq(commentVotes.userId, userId),
-				sql`${commentVotes.commentId} = ANY(${commentIds})`,
-			),
-		);
-
-	const voteMap = new Map<number, VoteType>();
-	for (const row of results) {
-		voteMap.set(row.commentId, row.voteType as VoteType);
-	}
-
-	return voteMap;
 }

@@ -14,7 +14,6 @@ import {
 	createComment,
 } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
-import type { VoteType } from "@/lib/votes.server";
 import { Comment } from "./Comment";
 
 const COMMENTS_PAGE_SIZE = Number(
@@ -62,7 +61,6 @@ type CommentThreadProps = {
 	comments: CommentWithReplies[];
 	commentCount: number;
 	currentUserId?: number;
-	userVotes: Map<number, VoteType>;
 	sort?: CommentSortType;
 	isLoading?: boolean;
 	onSortChange?: (sort: CommentSortType) => void;
@@ -73,7 +71,6 @@ export function CommentThread({
 	comments,
 	commentCount,
 	currentUserId,
-	userVotes,
 	sort = "top",
 	onSortChange,
 	isLoading,
@@ -176,7 +173,6 @@ export function CommentThread({
 			<ActualComments
 				submissionId={submissionId}
 				currentUserId={currentUserId}
-				userVotes={userVotes}
 				onReplyAdded={handleReplyAdded}
 				isLoading={isLoading}
 				comments={comments}
@@ -189,7 +185,6 @@ type ActualCommentsProps = {
 	comments: CommentWithReplies[];
 	submissionId: number;
 	currentUserId?: number;
-	userVotes: Map<number, VoteType>;
 	onReplyAdded: () => void;
 	isLoading?: boolean;
 };
@@ -198,7 +193,6 @@ function ActualComments({
 	comments,
 	submissionId,
 	currentUserId,
-	userVotes,
 	onReplyAdded,
 	isLoading,
 }: ActualCommentsProps) {
@@ -241,7 +235,6 @@ function ActualComments({
 					comment={comment}
 					submissionId={submissionId}
 					currentUserId={currentUserId}
-					userVotes={userVotes}
 					onReplyAdded={onReplyAdded}
 				/>
 			))}
