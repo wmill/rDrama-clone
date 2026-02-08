@@ -15,6 +15,7 @@
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
+    "generate-data": "tsx scripts/generate-data.ts",
     "start": "node --import ./.output/server/instrument.server.mjs .output/server/index.mjs"
   },
   "dependencies": {
@@ -53,6 +54,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
+    "@faker-js/faker": "^10.3.0",
     "@tanstack/devtools-vite": "^0.3.11",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
@@ -64,6 +66,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^16.0.0",
     "jsdom": "^27.0.0",
+    "tracery-grammar": "^2.8.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
