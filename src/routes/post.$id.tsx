@@ -31,7 +31,7 @@ const getPostFn = createServerFn({ method: "GET" })
 			const post = await getSubmissionById(data.id);
 			if (!post) return null;
 
-			await incrementViews(data.id);
+			// await incrementViews(data.id);
 
 			const comments = await getCommentsBySubmission(
 				data.id,

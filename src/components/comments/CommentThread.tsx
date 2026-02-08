@@ -4,7 +4,10 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getVisibleCommentIds } from "@/lib/comment-pagination";
+import {
+	filterCommentTree,
+	getVisibleCommentIds,
+} from "@/lib/comment-pagination";
 import {
 	type CommentSortType,
 	type CommentWithReplies,
@@ -162,6 +165,7 @@ export function CommentThread({
 								option={option}
 								onSortChange={onSortChange}
 								sort={sort}
+								key={option.value}
 							/>
 						))}
 					</div>
@@ -205,6 +209,14 @@ function ActualComments({
 		[comments, visibleLimit],
 	);
 
+	// Pre-filter the tree so only visible comments are passed down.
+	// Uses structural sharing: unchanged subtrees keep the same object
+	// reference, allowing React.memo on Comment to skip re-renders.
+	const filteredComments = useMemo(
+		() => filterCommentTree(comments, visibleIds),
+		[comments, visibleIds],
+	);
+
 	if (comments.length === 0) {
 		return (
 			<div className="rounded-lg border border-dashed border-slate-700 p-8 text-center">
@@ -223,7 +235,7 @@ function ActualComments({
 				</div>
 			)}
 
-			{comments.map((comment) => (
+			{filteredComments.map((comment) => (
 				<Comment
 					key={comment.id}
 					comment={comment}
@@ -231,7 +243,6 @@ function ActualComments({
 					currentUserId={currentUserId}
 					userVotes={userVotes}
 					onReplyAdded={onReplyAdded}
-					visibleIds={visibleIds}
 				/>
 			))}
 

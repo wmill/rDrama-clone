@@ -9,7 +9,7 @@ import {
 	Reply,
 	Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -106,18 +106,18 @@ type CommentProps = {
 	depth?: number;
 	maxDepth?: number;
 	onReplyAdded?: () => void;
-	visibleIds?: Set<number>;
 };
 
-export function Comment({
+const emptyVotes = new Map<number, VoteType>();
+
+export const Comment = memo(function Comment({
 	comment,
 	submissionId,
 	currentUserId,
-	userVotes = new Map(),
+	userVotes = emptyVotes,
 	depth = 0,
 	maxDepth = 10,
 	onReplyAdded,
-	visibleIds,
 }: CommentProps) {
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [showReplyForm, setShowReplyForm] = useState(false);
@@ -385,38 +385,22 @@ export function Comment({
 						</div>
 
 						{/* Replies */}
-						{comment.replies.length > 0 &&
-							depth < maxDepth &&
-							(() => {
-								const filteredReplies = visibleIds
-									? comment.replies.filter((r) => visibleIds.has(r.id))
-									: comment.replies;
-								const hiddenCount =
-									comment.replies.length - filteredReplies.length;
-								return (
-									<div className="mt-2">
-										{filteredReplies.map((reply) => (
-											<Comment
-												key={reply.id}
-												comment={reply}
-												submissionId={submissionId}
-												currentUserId={currentUserId}
-												userVotes={userVotes}
-												depth={depth + 1}
-												maxDepth={maxDepth}
-												onReplyAdded={onReplyAdded}
-												visibleIds={visibleIds}
-											/>
-										))}
-										{hiddenCount > 0 && (
-											<p className="ml-4 mt-1 text-xs text-slate-500">
-												{hiddenCount} more{" "}
-												{hiddenCount === 1 ? "reply" : "replies"} hidden
-											</p>
-										)}
-									</div>
-								);
-							})()}
+						{comment.replies.length > 0 && depth < maxDepth && (
+							<div className="mt-2">
+								{comment.replies.map((reply) => (
+									<Comment
+										key={reply.id}
+										comment={reply}
+										submissionId={submissionId}
+										currentUserId={currentUserId}
+										userVotes={userVotes}
+										depth={depth + 1}
+										maxDepth={maxDepth}
+										onReplyAdded={onReplyAdded}
+									/>
+								))}
+							</div>
+						)}
 
 						{comment.replies.length > 0 && depth >= maxDepth && (
 							<Link
@@ -431,4 +415,4 @@ export function Comment({
 			</div>
 		</div>
 	);
-}
+});
