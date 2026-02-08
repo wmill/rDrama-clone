@@ -40,6 +40,7 @@
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.30.0",
     "drizzle-orm": "^0.39.0",
+    "ioredis": "^5.9.2",
     "lucide-react": "^0.544.0",
     "nitro": "latest",
     "pg": "^8.11.0",

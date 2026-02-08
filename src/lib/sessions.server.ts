@@ -1,13 +1,23 @@
 import crypto from "node:crypto";
-import { and, eq, gt, lt } from "drizzle-orm";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
+import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { sessions, users } from "@/db/schema";
+import { users } from "@/db/schema";
+import { redis } from "@/lib/redis";
 import { type SafeUser, sanitizeUser } from "./auth.server";
 
 const SESSION_COOKIE_NAME = "rdrama_session";
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const SESSION_DURATION_MS = SESSION_TTL_SECONDS * 1000;
+
+function sessionKey(id: string): string {
+	return `session:${id}`;
+}
+
+function userSessionsKey(userId: number): string {
+	return `user_sessions:${userId}`;
+}
 
 function generateSessionId(): string {
 	return crypto.randomBytes(32).toString("hex");
@@ -19,29 +29,39 @@ export async function createSession(
 	ipAddress?: string,
 ): Promise<string> {
 	const sessionId = generateSessionId();
-	const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-
-	await db.insert(sessions).values({
-		id: sessionId,
+	const data = JSON.stringify({
 		userId,
-		expiresAt,
+		createdAt: new Date().toISOString(),
 		userAgent,
 		ipAddress,
 	});
+
+	const pipeline = redis.pipeline();
+	pipeline.set(sessionKey(sessionId), data, "EX", SESSION_TTL_SECONDS);
+	pipeline.sadd(userSessionsKey(userId), sessionId);
+	await pipeline.exec();
 
 	return sessionId;
 }
 
 export async function getSessionById(sessionId: string) {
-	const [session] = await db
-		.select()
-		.from(sessions)
-		.where(
-			and(eq(sessions.id, sessionId), gt(sessions.expiresAt, new Date())),
-		)
-		.limit(1);
+	const data = await redis.get(sessionKey(sessionId));
+	if (!data) return null;
 
-	return session ?? null;
+	const parsed = JSON.parse(data) as {
+		userId: number;
+		createdAt: string;
+		userAgent?: string;
+		ipAddress?: string;
+	};
+
+	return {
+		id: sessionId,
+		userId: parsed.userId,
+		createdAt: new Date(parsed.createdAt),
+		userAgent: parsed.userAgent ?? null,
+		ipAddress: parsed.ipAddress ?? null,
+	};
 }
 
 export async function getUserFromSession(
@@ -62,27 +82,36 @@ export async function getUserFromSession(
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-	await db.delete(sessions).where(eq(sessions.id, sessionId));
+	const session = await getSessionById(sessionId);
+
+	const pipeline = redis.pipeline();
+	pipeline.del(sessionKey(sessionId));
+	if (session) {
+		pipeline.srem(userSessionsKey(session.userId), sessionId);
+	}
+	await pipeline.exec();
 }
 
 export async function deleteAllUserSessions(userId: number): Promise<void> {
-	await db.delete(sessions).where(eq(sessions.userId, userId));
+	const sessionIds = await redis.smembers(userSessionsKey(userId));
+
+	if (sessionIds.length > 0) {
+		const pipeline = redis.pipeline();
+		for (const id of sessionIds) {
+			pipeline.del(sessionKey(id));
+		}
+		pipeline.del(userSessionsKey(userId));
+		await pipeline.exec();
+	}
 }
 
 export async function extendSession(sessionId: string): Promise<void> {
-	const newExpiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-	await db
-		.update(sessions)
-		.set({ expiresAt: newExpiresAt })
-		.where(eq(sessions.id, sessionId));
+	await redis.expire(sessionKey(sessionId), SESSION_TTL_SECONDS);
 }
 
 export async function cleanupExpiredSessions(): Promise<number> {
-	const result = await db
-		.delete(sessions)
-		.where(lt(sessions.expiresAt, new Date()))
-		.returning();
-	return result.length;
+	// Redis TTL handles expiry automatically — no cleanup needed
+	return 0;
 }
 
 export function setSessionCookie(sessionId: string): void {
