@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { MessageSquare, ExternalLink, FileText } from "lucide-react";
+import { ExternalLink, FileText, MessageSquare } from "lucide-react";
 
+import type { SortType, TimeFilter } from "@/lib/constants";
 import type { SubmissionSummary} from "@/lib/submissions.server";
-import { SortType, TimeFilter } from "@/lib/constants";
+import { formatRelativeTime } from "@/lib/utils";
 
 type RecentSubmissionsProps = {
 	submissions: SubmissionSummary[];
@@ -13,18 +14,7 @@ type RecentSubmissionsProps = {
 	showSortControls?: boolean;
 };
 
-function formatRelativeTime(unixTimestamp: number): string {
-	const now = Date.now() / 1000;
-	const diff = now - unixTimestamp;
 
-	if (diff < 60) return "just now";
-	if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-	if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-	if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-	if (diff < 2592000) return `${Math.floor(diff / 604800)}w ago`;
-	if (diff < 31536000) return `${Math.floor(diff / 2592000)}mo ago`;
-	return `${Math.floor(diff / 31536000)}y ago`;
-}
 
 const sortOptions: { value: SortType; label: string }[] = [
 	{ value: "hot", label: "Hot" },
