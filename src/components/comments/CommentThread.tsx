@@ -1,53 +1,22 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { createCommentFn } from "@/lib/comment-actions.server";
 import {
 	filterCommentTree,
 	getVisibleCommentIds,
 } from "@/lib/comment-pagination";
-import {
-	type CommentSortType,
-	type CommentWithReplies,
-	createComment,
+import type {
+	CommentSortType,
+	CommentWithReplies,
 } from "@/lib/comments.server";
-import { getCurrentUser } from "@/lib/sessions.server";
 import { Comment } from "./Comment";
+import { CommentForm } from "./CommentForm";
 
 const COMMENTS_PAGE_SIZE = Number(
 	import.meta.env.VITE_RESULTS_PER_PAGE_COMMENTS ?? 50,
 );
-
-const createCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { body: string; parentSubmissionId: number }) => data)
-	.handler(
-		async ({
-			data,
-		}: {
-			data: { body: string; parentSubmissionId: number };
-		}) => {
-			const user = await getCurrentUser();
-			if (!user) {
-				return { success: false as const, error: "Not logged in" };
-			}
-			try {
-				const id = await createComment({
-					authorId: user.id,
-					body: data.body,
-					parentSubmissionId: data.parentSubmissionId,
-				});
-				return { success: true as const, id };
-			} catch (err) {
-				return {
-					success: false as const,
-					error:
-						err instanceof Error ? err.message : "Failed to create comment",
-				};
-			}
-		},
-	);
 
 const sortOptions: { value: CommentSortType; label: string }[] = [
 	{ value: "top", label: "Top" },
@@ -76,41 +45,6 @@ export function CommentThread({
 	isLoading,
 }: CommentThreadProps) {
 	const router = useRouter();
-	const [newComment, setNewComment] = useState("");
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const handleSubmitComment = async () => {
-		if (!newComment.trim() || isSubmitting) return;
-
-		if (!currentUserId) {
-			router.navigate({ to: "/login" });
-			return;
-		}
-
-		setError(null);
-		setIsSubmitting(true);
-
-		try {
-			const result = await createCommentFn({
-				data: {
-					body: newComment,
-					parentSubmissionId: submissionId,
-				},
-			});
-
-			if (result.success) {
-				setNewComment("");
-				router.invalidate();
-			} else {
-				setError(result.error ?? "Failed to post comment");
-			}
-		} catch {
-			setError("Failed to post comment");
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
 
 	const handleReplyAdded = useCallback(() => {
 		router.invalidate();
@@ -125,21 +59,16 @@ export function CommentThread({
 				</h2>
 
 				{currentUserId ? (
-					<div className="space-y-2">
-						<Textarea
-							value={newComment}
-							onChange={(e) => setNewComment(e.target.value)}
-							placeholder="What are your thoughts?"
-							className="min-h-[100px] border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
-						/>
-						{error && <p className="text-sm text-red-400">{error}</p>}
-						<Button
-							onClick={handleSubmitComment}
-							disabled={isSubmitting || !newComment.trim()}
-						>
-							{isSubmitting ? "Posting..." : "Post Comment"}
-						</Button>
-					</div>
+					<CommentForm
+						mode="new"
+						onSubmit={async (text) => {
+							const result = await createCommentFn({
+								data: { body: text, parentSubmissionId: submissionId },
+							});
+							if (result.success) router.invalidate();
+							return result;
+						}}
+					/>
 				) : (
 					<div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4 text-center">
 						<p className="text-slate-400">
