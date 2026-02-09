@@ -1,8 +1,19 @@
 import { and, asc, desc, eq, gte, type SQL, sql } from "drizzle-orm";
+import MarkdownIt from "markdown-it";
 
 import { db } from "@/db";
 import { comments, commentVotes, submissions, users } from "@/db/schema";
 import type { VoteType } from "@/lib/votes.server";
+
+const markdown = new MarkdownIt({
+	html: false,
+	linkify: true,
+	breaks: true,
+});
+
+function renderCommentMarkdown(body: string): string {
+	return markdown.render(body);
+}
 
 export type CommentFeedItem = {
 	id: number;
@@ -445,7 +456,7 @@ export async function createComment(data: {
 		.values({
 			authorId: data.authorId,
 			body: data.body,
-			bodyHtml: data.body, // TODO: Implement markdown parsing
+			bodyHtml: renderCommentMarkdown(data.body),
 			parentSubmission: data.parentSubmissionId,
 			parentCommentId: data.parentCommentId ?? null,
 			level,
@@ -486,7 +497,7 @@ export async function updateComment(
 		.update(comments)
 		.set({
 			body,
-			bodyHtml: body, // TODO: Implement markdown parsing
+			bodyHtml: renderCommentMarkdown(body),
 			editedUtc,
 		})
 		.where(and(eq(comments.id, id), eq(comments.authorId, authorId)))
@@ -512,23 +523,23 @@ export async function deleteComment(
 	return result.length > 0;
 }
 
-export async function getCommentContext(
-	commentId: number,
-): Promise<{ submissionId: number; submissionTitle: string } | null> {
-	const [result] = await db.execute(
-		sql`SELECT s.id, s.title FROM comments c
-        JOIN submissions s ON c.parent_submission = s.id
-        WHERE c.id = ${commentId}`,
-	);
+// export async function getCommentContext(
+// 	commentId: number,
+// ): Promise<{ submissionId: number; submissionTitle: string } | null> {
+// 	const [result]  = await db.execute(
+// 		sql`SELECT s.id, s.title FROM comments c
+//         JOIN submissions s ON c.parent_submission = s.id
+//         WHERE c.id = ${commentId}`,
+// 	);
 
-	if (!result) return null;
+// 	if (!result) return null;
 
-	const row = result as { id: number; title: string };
-	return {
-		submissionId: row.id,
-		submissionTitle: row.title,
-	};
-}
+// 	const row = result as { id: number; title: string };
+// 	return {
+// 		submissionId: row.id,
+// 		submissionTitle: row.title,
+// 	};
+// }
 
 export async function getCommentWithReplies(
 	id: number,
