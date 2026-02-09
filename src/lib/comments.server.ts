@@ -4,6 +4,7 @@ import MarkdownIt from "markdown-it";
 import { db } from "@/db";
 import { comments, commentVotes, submissions, users } from "@/db/schema";
 import type { VoteType } from "@/lib/votes.server";
+import { CommentFeedSortType, TimeFilter } from "./constants";
 
 const markdown = new MarkdownIt({
 	html: false,
@@ -313,8 +314,7 @@ export async function getRecentComments(
 	}));
 }
 
-export type CommentFeedSortType = "new" | "top" | "controversial";
-export type TimeFilter = "hour" | "day" | "week" | "month" | "year" | "all";
+
 
 export async function getCommentsFeed(
 	sort: CommentFeedSortType = "new",

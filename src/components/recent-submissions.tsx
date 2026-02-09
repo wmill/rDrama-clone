@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquare, ExternalLink, FileText } from "lucide-react";
 
-import type { SubmissionSummary, SortType, TimeFilter } from "@/lib/submissions.server";
+import type { SubmissionSummary} from "@/lib/submissions.server";
+import { SortType, TimeFilter } from "@/lib/constants";
 
 type RecentSubmissionsProps = {
 	submissions: SubmissionSummary[];

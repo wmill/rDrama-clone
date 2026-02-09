@@ -3,6 +3,7 @@ import { and, desc, eq, type SQL, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { submissions, users, votes } from "@/db/schema";
 import type { VoteType } from "@/lib/votes.server";
+import { SortType, TimeFilter } from "./constants";
 
 export type SubmissionSummary = {
 	id: number;
@@ -33,24 +34,7 @@ export type SubmissionDetail = SubmissionSummary & {
 	userVote: VoteType;
 };
 
-export const SortTypes = [
-	"new",
-	"hot",
-	"top",
-	"controversial",
-	"comments",
-] as const;
-export type SortType = (typeof SortTypes)[number];
 
-export const TimeFilters = [
-	"hour",
-	"day",
-	"week",
-	"month",
-	"year",
-	"all",
-] as const;
-export type TimeFilter = (typeof TimeFilters)[number];
 
 function getTimeFilterSeconds(filter: TimeFilter): number | null {
 	const now = Math.floor(Date.now() / 1000);

@@ -5,14 +5,17 @@ import { z } from "zod";
 
 import { RecentSubmissions } from "@/components/recent-submissions";
 import {
-	getSubmissions,
+	SortTypes,
+	TimeFilters,
 	type SortType,
 	type TimeFilter,
-} from "@/lib/submissions.server";
+} from "@/lib/constants";
+
+import { getSubmissions } from "@/lib/submissions.server";
 
 const searchSchema = z.object({
-	sort: z.enum(["new", "hot", "top", "controversial", "comments"]).default("hot"),
-	t: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all"),
+	sort: z.enum(SortTypes).default("hot"),
+	t: z.enum(TimeFilters).default("all"),
 });
 	
 
