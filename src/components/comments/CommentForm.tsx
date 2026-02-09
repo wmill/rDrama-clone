@@ -100,26 +100,23 @@ export function CommentForm({
 		<div className="space-y-2">
 			{/* Write / Preview tabs */}
 
-						
-				<Textarea
-					value={text}
-					onChange={(e) => setText(e.target.value)}
-					placeholder={config.placeholder}
-					className={`${config.minHeight} border-slate-700 bg-slate-800 text-white placeholder:text-slate-500`}
-				/>
-				<div
-					className={`p-3`}
-				>
-					{text.trim() ? (
-						<div
-							className="prose prose-invert prose-sm max-w-none text-slate-300"
-							// biome-ignore lint/security/noDangerouslySetInnerHtml: Rendered from markdown-it with html:false
-							dangerouslySetInnerHTML={{ __html: previewHtml }}
-						/>
-					) : (
-						<p className="text-sm text-slate-500 italic">Nothing to preview</p>
-					)}
-				</div>
+			<Textarea
+				value={text}
+				onChange={(e) => setText(e.target.value)}
+				placeholder={config.placeholder}
+				className={`${config.minHeight} border-slate-700 bg-slate-800 text-white placeholder:text-slate-500`}
+			/>
+			<div className={`p-3`}>
+				{text.trim() ? (
+					<div
+						className="prose prose-invert prose-sm max-w-none text-slate-300"
+						// biome-ignore lint/security/noDangerouslySetInnerHtml: Rendered from markdown-it with html:false
+						dangerouslySetInnerHTML={{ __html: previewHtml }}
+					/>
+				) : (
+					<p className="text-sm text-slate-500 italic">Nothing to preview</p>
+				)}
+			</div>
 
 			{error && <p className="text-sm text-red-400">{error}</p>}
 

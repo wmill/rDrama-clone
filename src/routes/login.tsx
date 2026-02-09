@@ -72,7 +72,9 @@ function LoginPage() {
 					</p>
 					<div className="flex gap-4">
 						<Button asChild>
-							<Link to="/" search={{ sort: "hot", t: "all" }}>Go Home</Link>
+							<Link to="/" search={{ sort: "hot", t: "all" }}>
+								Go Home
+							</Link>
 						</Button>
 						<Button variant="outline" asChild>
 							<Link to="/logout">Log out</Link>

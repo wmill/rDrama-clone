@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ExternalLink, FileText, MessageSquare } from "lucide-react";
 
 import type { SortType, TimeFilter } from "@/lib/constants";
-import type { SubmissionSummary} from "@/lib/submissions.server";
+import type { SubmissionSummary } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
 
 type RecentSubmissionsProps = {
@@ -13,8 +13,6 @@ type RecentSubmissionsProps = {
 	onTimeChange?: (time: TimeFilter) => void;
 	showSortControls?: boolean;
 };
-
-
 
 const sortOptions: { value: SortType; label: string }[] = [
 	{ value: "hot", label: "Hot" },
@@ -62,9 +60,7 @@ export function RecentSubmissions({
 						<p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80">
 							Community posts
 						</p>
-						<h2 className="text-2xl font-extrabold text-white">
-							Submissions
-						</h2>
+						<h2 className="text-2xl font-extrabold text-white">Submissions</h2>
 					</div>
 					<Link
 						to="/submit"

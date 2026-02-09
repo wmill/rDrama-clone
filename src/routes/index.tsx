@@ -5,10 +5,10 @@ import { z } from "zod";
 
 import { RecentSubmissions } from "@/components/recent-submissions";
 import {
-	SortTypes,
-	TimeFilters,
 	type SortType,
+	SortTypes,
 	type TimeFilter,
+	TimeFilters,
 } from "@/lib/constants";
 
 import { getSubmissions } from "@/lib/submissions.server";
@@ -17,7 +17,6 @@ const searchSchema = z.object({
 	sort: z.enum(SortTypes).default("hot"),
 	t: z.enum(TimeFilters).default("all"),
 });
-	
 
 const loadSubmissions = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -26,7 +25,9 @@ const loadSubmissions = createServerFn({ method: "GET" })
 	.handler(
 		async ({
 			data,
-		}: { data: { sort?: SortType; time?: TimeFilter; limit?: number } }) => {
+		}: {
+			data: { sort?: SortType; time?: TimeFilter; limit?: number };
+		}) => {
 			try {
 				return await getSubmissions({
 					sort: data.sort ?? "hot",

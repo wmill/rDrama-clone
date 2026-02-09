@@ -1,5 +1,5 @@
-import { createMiddleware } from "@tanstack/react-start";
 import { redirect } from "@tanstack/react-router";
+import { createMiddleware } from "@tanstack/react-start";
 
 import type { SafeUser } from "@/lib/auth.server";
 import { getCurrentUser } from "@/lib/sessions.server";

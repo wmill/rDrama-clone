@@ -17,8 +17,15 @@ const submitSchema = z
 			.string()
 			.min(1, "Title is required")
 			.max(500, "Title must be 500 characters or less"),
-		url: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
-		body: z.string().max(20000, "Body must be 20000 characters or less").optional(),
+		url: z
+			.string()
+			.url("Please enter a valid URL")
+			.optional()
+			.or(z.literal("")),
+		body: z
+			.string()
+			.max(20000, "Body must be 20000 characters or less")
+			.optional(),
 		isNsfw: z.boolean().default(false),
 	})
 	.refine((data) => data.url || data.body, {
@@ -33,7 +40,10 @@ const submitAction = createServerFn({ method: "POST" })
 	.handler(async ({ data }: { data: SubmitInput }) => {
 		const user = await getCurrentUser();
 		if (!user) {
-			return { success: false as const, error: "You must be logged in to submit" };
+			return {
+				success: false as const,
+				error: "You must be logged in to submit",
+			};
 		}
 
 		if (user.isBanned > 0) {
@@ -53,7 +63,8 @@ const submitAction = createServerFn({ method: "POST" })
 		} catch (err) {
 			return {
 				success: false as const,
-				error: err instanceof Error ? err.message : "Failed to create submission",
+				error:
+					err instanceof Error ? err.message : "Failed to create submission",
 			};
 		}
 	});
@@ -91,9 +102,7 @@ function SubmitPage() {
 		return (
 			<div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
 				<div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-xl">
-					<h1 className="mb-4 text-2xl font-bold text-white">
-						Login Required
-					</h1>
+					<h1 className="mb-4 text-2xl font-bold text-white">Login Required</h1>
 					<p className="mb-6 text-slate-400">
 						You need to be logged in to create a post.
 					</p>
@@ -268,7 +277,9 @@ function SubmitPage() {
 								{isLoading ? "Submitting..." : "Submit Post"}
 							</Button>
 							<Button type="button" variant="outline" asChild>
-								<Link to="/" search={{ sort: "hot", t: "all" }}>Cancel</Link>
+								<Link to="/" search={{ sort: "hot", t: "all" }}>
+									Cancel
+								</Link>
 							</Button>
 						</div>
 					</form>

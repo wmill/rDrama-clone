@@ -24,7 +24,6 @@ const getCommentFn = createServerFn({ method: "GET" })
 		return { comment, submission, user };
 	});
 
-
 export const Route = createFileRoute("/comment/$id")({
 	component: CommentPage,
 	loader: async ({ params }) => {

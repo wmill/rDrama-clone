@@ -1,4 +1,3 @@
-
 export const SortTypes = [
 	"new",
 	"hot",

@@ -34,9 +34,7 @@ export type SafeUser = {
 	customTitle: string | null;
 };
 
-export function sanitizeUser(
-	user: typeof users.$inferSelect,
-): SafeUser {
+export function sanitizeUser(user: typeof users.$inferSelect): SafeUser {
 	return {
 		id: user.id,
 		username: user.username,

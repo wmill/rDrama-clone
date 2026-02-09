@@ -5,9 +5,9 @@ import { useState } from "react";
 
 import { getCurrentUser } from "@/lib/sessions.server";
 import {
+	type VoteType,
 	voteOnComment,
 	voteOnSubmission,
-	type VoteType,
 } from "@/lib/votes.server";
 
 const voteSubmissionFn = createServerFn({ method: "POST" })
@@ -15,10 +15,17 @@ const voteSubmissionFn = createServerFn({ method: "POST" })
 	.handler(
 		async ({
 			data,
-		}: { data: { submissionId: number; voteType: VoteType } }) => {
+		}: {
+			data: { submissionId: number; voteType: VoteType };
+		}) => {
 			const user = await getCurrentUser();
 			if (!user) {
-				return { success: false, error: "Not logged in", newScore: 0, userVote: 0 as VoteType };
+				return {
+					success: false,
+					error: "Not logged in",
+					newScore: 0,
+					userVote: 0 as VoteType,
+				};
 			}
 			return voteOnSubmission(user.id, data.submissionId, data.voteType);
 		},
@@ -30,7 +37,12 @@ const voteCommentFn = createServerFn({ method: "POST" })
 		async ({ data }: { data: { commentId: number; voteType: VoteType } }) => {
 			const user = await getCurrentUser();
 			if (!user) {
-				return { success: false, error: "Not logged in", newScore: 0, userVote: 0 as VoteType };
+				return {
+					success: false,
+					error: "Not logged in",
+					newScore: 0,
+					userVote: 0 as VoteType,
+				};
 			}
 			return voteOnComment(user.id, data.commentId, data.voteType);
 		},
