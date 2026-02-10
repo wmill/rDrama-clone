@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import {
 	createComment,
 	deleteComment,
+	getCommentById,
 	updateComment,
 } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
@@ -35,7 +36,8 @@ export const createCommentFn = createServerFn({ method: "POST" })
 					parentSubmissionId: data.parentSubmissionId,
 					parentCommentId: data.parentCommentId,
 				});
-				return { success: true as const, id };
+				const comment = await getCommentById(id, user.id);
+				return { success: true as const, id, comment };
 			} catch (err) {
 				return {
 					success: false as const,

@@ -26,7 +26,7 @@ type CommentProps = {
 	currentUserId?: number;
 	depth?: number;
 	maxDepth?: number;
-	onReplyAdded?: () => void;
+	onReplyAdded?: (comment?: CommentWithReplies) => void;
 };
 
 export const Comment = memo(function Comment({
@@ -214,18 +214,24 @@ export const Comment = memo(function Comment({
 										<CommentForm
 											mode="reply"
 											onSubmit={async (text) => {
-												const result = await createCommentFn({
-													data: {
-														body: text,
-														parentSubmissionId: submissionId,
-														parentCommentId: comment.id,
-													},
-												});
-												if (result.success) onReplyAdded?.();
-												return result;
-											}}
-											onCancel={() => setShowReplyForm(false)}
-										/>
+											const result = await createCommentFn({
+												data: {
+													body: text,
+													parentSubmissionId: submissionId,
+													parentCommentId: comment.id,
+												},
+											});
+											if (result.success) {
+												onReplyAdded?.(
+													result.comment
+														? { ...result.comment, replies: [] }
+														: undefined,
+												);
+											}
+											return result;
+										}}
+										onCancel={() => setShowReplyForm(false)}
+									/>
 									</div>
 								)}
 							</div>

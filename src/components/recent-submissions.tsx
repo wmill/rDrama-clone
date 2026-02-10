@@ -41,16 +41,16 @@ export function RecentSubmissions({
 }: RecentSubmissionsProps) {
 	const showTimeFilter = sort === "top" || sort === "controversial";
 
-	if (!submissions.length) {
-		return (
-			<div className="rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-6 text-slate-200 shadow-xl">
-				<p className="text-lg font-semibold">No submissions yet</p>
-				<p className="text-sm text-slate-400">
-					Be the first to post something!
-				</p>
-			</div>
-		);
-	}
+	// if (!submissions.length) {
+	// 	return (
+	// 		<div className="rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-6 text-slate-200 shadow-xl">
+	// 			<p className="text-lg font-semibold">No submissions yet</p>
+	// 			<p className="text-sm text-slate-400">
+	// 				Be the first to post something!
+	// 			</p>
+	// 		</div>
+	// 	);
+	// }
 
 	return (
 		<div className="rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-6 text-slate-100 shadow-xl">

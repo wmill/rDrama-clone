@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createCommentFn } from "@/lib/comment-actions.server";
 import {
@@ -25,6 +25,79 @@ const sortOptions: { value: CommentSortType; label: string }[] = [
 	{ value: "controversial", label: "Controversial" },
 ];
 
+function compareComments(
+	a: CommentWithReplies,
+	b: CommentWithReplies,
+	sort: CommentSortType,
+) {
+	switch (sort) {
+		case "new":
+			return b.createdUtc - a.createdUtc;
+		case "old":
+			return a.createdUtc - b.createdUtc;
+		default:
+			return b.score - a.score;
+	}
+}
+
+function insertIntoList(
+	list: CommentWithReplies[],
+	comment: CommentWithReplies,
+	sort: CommentSortType,
+) {
+	const next = [...list, comment];
+	next.sort((a, b) => compareComments(a, b, sort));
+	return next;
+}
+
+function insertReply(
+	comments: CommentWithReplies[],
+	parentId: number,
+	comment: CommentWithReplies,
+	sort: CommentSortType,
+) {
+	let changed = false;
+	const next = comments.map((item) => {
+		if (item.id === parentId) {
+			changed = true;
+			return {
+				...item,
+				replies: insertIntoList(item.replies, comment, sort),
+			};
+		}
+
+		if (item.replies.length === 0) {
+			return item;
+		}
+
+		const updatedReplies = insertReply(item.replies, parentId, comment, sort);
+		if (updatedReplies !== item.replies) {
+			changed = true;
+			return { ...item, replies: updatedReplies };
+		}
+
+		return item;
+	});
+
+	return changed ? next : comments;
+}
+
+function insertCommentTree(
+	comments: CommentWithReplies[],
+	comment: CommentWithReplies,
+	sort: CommentSortType,
+) {
+	if (comment.parentCommentId === null) {
+		return insertIntoList(comments, comment, sort);
+	}
+
+	const updated = insertReply(comments, comment.parentCommentId, comment, sort);
+	if (updated === comments) {
+		return insertIntoList(comments, comment, sort);
+	}
+	return updated;
+}
+
 type CommentThreadProps = {
 	submissionId: number;
 	comments: CommentWithReplies[];
@@ -45,17 +118,38 @@ export function CommentThread({
 	isLoading,
 }: CommentThreadProps) {
 	const router = useRouter();
+	const [commentTree, setCommentTree] = useState(comments);
+	const [localCommentCount, setLocalCommentCount] = useState(commentCount);
+	const [visibleLimit, setVisibleLimit] = useState(COMMENTS_PAGE_SIZE);
 
-	const handleReplyAdded = useCallback(() => {
-		router.invalidate();
-	}, [router]);
+	useEffect(() => {
+		setCommentTree(comments);
+		setLocalCommentCount(commentCount);
+	}, [commentCount, comments]);
+
+	const handleReplyAdded = useCallback(
+		(comment?: CommentWithReplies) => {
+			if (!comment) {
+				router.invalidate();
+				return;
+			}
+
+			setCommentTree((prev) =>
+				insertCommentTree(prev, comment, sort),
+			);
+			setLocalCommentCount((prev) => prev + 1);
+			setVisibleLimit((prev) => prev + 1);
+		},
+		[router, sort],
+	);
 
 	return (
 		<div className="space-y-4">
 			{/* Comment form */}
 			<div className="space-y-3">
 				<h2 className="text-lg font-semibold text-white">
-					{commentCount} {commentCount === 1 ? "Comment" : "Comments"}
+					{localCommentCount}{" "}
+					{localCommentCount === 1 ? "Comment" : "Comments"}
 				</h2>
 
 				{currentUserId ? (
@@ -65,7 +159,13 @@ export function CommentThread({
 							const result = await createCommentFn({
 								data: { body: text, parentSubmissionId: submissionId },
 							});
-							if (result.success) router.invalidate();
+							if (result.success) {
+								handleReplyAdded(
+									result.comment
+										? { ...result.comment, replies: [] }
+										: undefined,
+								);
+							}
 							return result;
 						}}
 					/>
@@ -104,7 +204,9 @@ export function CommentThread({
 				currentUserId={currentUserId}
 				onReplyAdded={handleReplyAdded}
 				isLoading={isLoading}
-				comments={comments}
+				comments={commentTree}
+				visibleLimit={visibleLimit}
+				onVisibleLimitChange={setVisibleLimit}
 			/>
 		</div>
 	);
@@ -114,7 +216,9 @@ type ActualCommentsProps = {
 	comments: CommentWithReplies[];
 	submissionId: number;
 	currentUserId?: number;
-	onReplyAdded: () => void;
+	onReplyAdded: (comment?: CommentWithReplies) => void;
+	visibleLimit: number;
+	onVisibleLimitChange: (updater: (prev: number) => number) => void;
 	isLoading?: boolean;
 };
 
@@ -123,10 +227,10 @@ function ActualComments({
 	submissionId,
 	currentUserId,
 	onReplyAdded,
+	visibleLimit,
+	onVisibleLimitChange,
 	isLoading,
 }: ActualCommentsProps) {
-	const [visibleLimit, setVisibleLimit] = useState(COMMENTS_PAGE_SIZE);
-
 	const { visibleIds, totalCount } = useMemo(
 		() => getVisibleCommentIds(comments, visibleLimit),
 		[comments, visibleLimit],
@@ -172,7 +276,9 @@ function ActualComments({
 				<div className="pt-3 text-center">
 					<Button
 						variant="outline"
-						onClick={() => setVisibleLimit((prev) => prev + COMMENTS_PAGE_SIZE)}
+						onClick={() =>
+							onVisibleLimitChange((prev) => prev + COMMENTS_PAGE_SIZE)
+						}
 						className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
 					>
 						Load more comments ({totalCount - visibleLimit} remaining)
