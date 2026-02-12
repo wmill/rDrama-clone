@@ -33,14 +33,15 @@ const getPostFn = createServerFn({ method: "GET" })
 			const user = await getCurrentUser();
 			const userId = user?.id;
 
-			const post = await getSubmissionById(data.id, userId);
+			const [post, comments] = await Promise.all([
+				getSubmissionById(data.id, userId),
+				getCommentsBySubmission(
+					data.id,
+					data.commentSort ?? "top",
+					userId,
+				),
+			]);
 			if (!post) return null;
-
-			const comments = await getCommentsBySubmission(
-				data.id,
-				data.commentSort ?? "top",
-				userId,
-			);
 
 			return { post, comments, user };
 		},
