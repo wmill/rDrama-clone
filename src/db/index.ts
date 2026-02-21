@@ -26,4 +26,7 @@ pool.on("error", (err) => {
 	console.error("[DB Pool Error]", err.message);
 });
 
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool, {
+	schema,
+	logger: process.env.NODE_ENV !== "production",
+});
