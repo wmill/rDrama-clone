@@ -1,15 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import {
-	ChevronDown,
-	ChevronUp,
-	Clock,
-	MessageSquare,
-	Pencil,
-	Reply,
-	Trash2,
-} from "lucide-react";
+import chevronDownUrl from "lucide-static/icons/chevron-down.svg?url";
+import chevronUpUrl from "lucide-static/icons/chevron-up.svg?url";
+import clockUrl from "lucide-static/icons/clock.svg?url";
+import messageSquareUrl from "lucide-static/icons/message-square.svg?url";
+import pencilUrl from "lucide-static/icons/pencil.svg?url";
+import replyUrl from "lucide-static/icons/reply.svg?url";
+import trash2Url from "lucide-static/icons/trash-2.svg?url";
 import { memo, useMemo, useState } from "react";
-
+import { IconMask } from "@/components/ui/icon-mask";
 import {
 	createCommentFn,
 	deleteCommentFn,
@@ -77,6 +75,7 @@ export const Comment = memo(function Comment({
 		() => formatRelativeTime(comment.editedUtc),
 		[comment.editedUtc],
 	);
+	// debugger;
 
 	return (
 		<div
@@ -91,9 +90,17 @@ export const Comment = memo(function Comment({
 						className="flex items-center gap-1 hover:text-slate-300"
 					>
 						{isCollapsed ? (
-							<ChevronDown className="h-3 w-3" />
+							<IconMask
+								src={chevronDownUrl}
+								className="h-3 w-3"
+								colorClassName="bg-current"
+							/>
 						) : (
-							<ChevronUp className="h-3 w-3" />
+							<IconMask
+								src={chevronUpUrl}
+								className="h-3 w-3"
+								colorClassName="bg-current"
+							/>
 						)}
 					</button>
 
@@ -108,7 +115,11 @@ export const Comment = memo(function Comment({
 					)}
 
 					<span className="flex items-center gap-1">
-						<Clock className="h-3 w-3" />
+						<IconMask
+							src={clockUrl}
+							className="h-3 w-3"
+							colorClassName="bg-current"
+						/>
 						{createdTime}
 					</span>
 
@@ -172,18 +183,26 @@ export const Comment = memo(function Comment({
 												onClick={() => setShowReplyForm(!showReplyForm)}
 												className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
 											>
-												<Reply className="h-3 w-3" />
+												<IconMask
+													src={replyUrl}
+													className="h-3 w-3"
+													colorClassName="bg-current"
+												/>
 												Reply
 											</button>
 										)}
 
 										<Link
-											to={`/comment/${comment.id}` as "/"}
-											className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
-										>
-											<MessageSquare className="h-3 w-3" />
-											Permalink
-										</Link>
+										to={`/comment/${comment.id}` as "/"}
+										className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
+									>
+										<IconMask
+											src={messageSquareUrl}
+											className="h-3 w-3"
+											colorClassName="bg-current"
+										/>
+										Permalink
+									</Link>
 
 										{isAuthor && (
 											<>
@@ -192,7 +211,11 @@ export const Comment = memo(function Comment({
 													onClick={() => setIsEditing(true)}
 													className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
 												>
-													<Pencil className="h-3 w-3" />
+													<IconMask
+														src={pencilUrl}
+														className="h-3 w-3"
+														colorClassName="bg-current"
+													/>
 													Edit
 												</button>
 												<button
@@ -200,7 +223,11 @@ export const Comment = memo(function Comment({
 													onClick={handleDelete}
 													className="flex items-center gap-1 text-slate-500 hover:text-red-400"
 												>
-													<Trash2 className="h-3 w-3" />
+													<IconMask
+														src={trash2Url}
+														className="h-3 w-3"
+														colorClassName="bg-current"
+													/>
 													Delete
 												</button>
 											</>

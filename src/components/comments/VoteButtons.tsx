@@ -1,6 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ArrowBigDown, ArrowBigUp } from "lucide-react";
+import arrowBigDownUrl from "lucide-static/icons/arrow-big-down.svg?url";
+import arrowBigUpUrl from "lucide-static/icons/arrow-big-up.svg?url";
 import { useState } from "react";
 
 import { getCurrentUser } from "@/lib/sessions.server";
@@ -9,6 +10,7 @@ import {
 	voteOnComment,
 	voteOnSubmission,
 } from "@/lib/votes.server";
+import { IconMask } from "@/components/ui/icon-mask";
 
 const voteSubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { submissionId: number; voteType: VoteType }) => data)
@@ -155,15 +157,19 @@ export function VoteButtons({
 				type="button"
 				onClick={() => handleVote(1)}
 				disabled={disabled || isVoting}
-				className={`rounded ${classes.button} transition-colors ${
+				className={`group rounded ${classes.button} transition-colors ${
 					userVote === 1
 						? "text-orange-500 bg-orange-500/10"
 						: "text-slate-400 hover:bg-slate-800 hover:text-orange-500"
 				} disabled:opacity-50 disabled:cursor-not-allowed`}
 				aria-label="Upvote"
 			>
-				<ArrowBigUp
-					className={`${classes.icon} ${userVote === 1 ? "fill-current" : ""}`}
+				<IconMask
+					src={arrowBigUpUrl}
+					className={classes.icon}
+					colorClassName={
+						userVote === 1 ? "bg-orange-500" : "bg-slate-400 group-hover:bg-orange-500"
+					}
 				/>
 			</button>
 
@@ -183,15 +189,19 @@ export function VoteButtons({
 				type="button"
 				onClick={() => handleVote(-1)}
 				disabled={disabled || isVoting}
-				className={`rounded ${classes.button} transition-colors ${
+				className={`group rounded ${classes.button} transition-colors ${
 					userVote === -1
 						? "text-blue-500 bg-blue-500/10"
 						: "text-slate-400 hover:bg-slate-800 hover:text-blue-500"
 				} disabled:opacity-50 disabled:cursor-not-allowed`}
 				aria-label="Downvote"
 			>
-				<ArrowBigDown
-					className={`${classes.icon} ${userVote === -1 ? "fill-current" : ""}`}
+				<IconMask
+					src={arrowBigDownUrl}
+					className={classes.icon}
+					colorClassName={
+						userVote === -1 ? "bg-blue-500" : "bg-slate-400 group-hover:bg-blue-500"
+					}
 				/>
 			</button>
 		</div>
