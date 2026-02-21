@@ -1,10 +1,12 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Clock, ExternalLink, MessageSquare } from "lucide-react";
+import { useMemo } from "react";
 
 import { Comment } from "@/components/comments";
 import { Button } from "@/components/ui/button";
-import { getCommentWithReplies } from "@/lib/comments.server";
+import { buildCommentForest } from "@/lib/comment-tree";
+import { getCommentThreadFlat } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissionById } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
@@ -15,13 +17,16 @@ const getCommentFn = createServerFn({ method: "GET" })
 		const user = await getCurrentUser();
 		const userId = user?.id;
 
-		const comment = await getCommentWithReplies(data.id, userId);
-		if (!comment || comment.parentSubmissionId === null) return null;
+		const comments = await getCommentThreadFlat(data.id, userId);
+		if (!comments || comments.length === 0) return null;
 
-		const submission = await getSubmissionById(comment.parentSubmissionId);
+		const target = comments[0];
+		if (target.parentSubmissionId === null) return null;
+
+		const submission = await getSubmissionById(target.parentSubmissionId);
 		if (!submission) return null;
 
-		return { comment, submission, user };
+		return { comments, submission, user };
 	});
 
 export const Route = createFileRoute("/comment/$id")({
@@ -39,7 +44,7 @@ export const Route = createFileRoute("/comment/$id")({
 		}
 
 		return {
-			comment: result.comment,
+			comments: result.comments,
 			submission: result.submission,
 			user: result.user,
 		};
@@ -64,7 +69,13 @@ export const Route = createFileRoute("/comment/$id")({
 });
 
 function CommentPage() {
-	const { comment, submission, user } = Route.useLoaderData();
+	const { comments, submission, user } = Route.useLoaderData();
+	const { byId } = useMemo(() => buildCommentForest(comments, "top"), [comments]);
+	const comment = byId.get(comments[0]?.id ?? -1);
+
+	if (!comment) {
+		return null;
+	}
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">

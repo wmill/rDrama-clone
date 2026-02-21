@@ -15,7 +15,7 @@ import {
 	deleteCommentFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
-import type { CommentWithReplies } from "@/lib/comments.server";
+import type { CommentFlat, CommentWithReplies } from "@/lib/comments.server";
 import { formatRelativeTime } from "@/lib/utils";
 import { CommentForm } from "./CommentForm";
 import { VoteButtons } from "./VoteButtons";
@@ -26,7 +26,7 @@ type CommentProps = {
 	currentUserId?: number;
 	depth?: number;
 	maxDepth?: number;
-	onReplyAdded?: (comment?: CommentWithReplies) => void;
+	onReplyAdded?: (comment?: CommentFlat) => void;
 };
 
 export const Comment = memo(function Comment({
@@ -222,11 +222,7 @@ export const Comment = memo(function Comment({
 												},
 											});
 											if (result.success) {
-												onReplyAdded?.(
-													result.comment
-														? { ...result.comment, replies: [] }
-														: undefined,
-												);
+												onReplyAdded?.(result.comment ?? undefined);
 											}
 											return result;
 										}}

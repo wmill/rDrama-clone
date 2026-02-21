@@ -1,18 +1,25 @@
-import { Link, useRouter } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { Comment } from "@/components/comments/Comment";
+import { CommentForm } from "@/components/comments/CommentForm";
 import { Button } from "@/components/ui/button";
-import { createCommentFn } from "@/lib/comment-actions.server";
+import {
+	createCommentFn,
+	getCommentsSinceFn,
+} from "@/lib/comment-actions.server";
 import {
 	filterCommentTree,
 	getVisibleCommentIds,
 } from "@/lib/comment-pagination";
+import { buildCommentTree } from "@/lib/comment-tree";
+import { useCommentStore } from "@/lib/comment-store";
 import type {
+	CommentFlat,
 	CommentSortType,
 	CommentWithReplies,
 } from "@/lib/comments.server";
-import { Comment } from "./Comment";
-import { CommentForm } from "./CommentForm";
 
 const COMMENTS_PAGE_SIZE = Number(
 	import.meta.env.VITE_RESULTS_PER_PAGE_COMMENTS ?? 50,
@@ -25,122 +32,109 @@ const sortOptions: { value: CommentSortType; label: string }[] = [
 	{ value: "controversial", label: "Controversial" },
 ];
 
-function compareComments(
-	a: CommentWithReplies,
-	b: CommentWithReplies,
-	sort: CommentSortType,
-) {
-	switch (sort) {
-		case "new":
-			return b.createdUtc - a.createdUtc;
-		case "old":
-			return a.createdUtc - b.createdUtc;
-		default:
-			return b.score - a.score;
-	}
-}
-
-function insertIntoList(
-	list: CommentWithReplies[],
-	comment: CommentWithReplies,
-	sort: CommentSortType,
-) {
-	const next = [...list, comment];
-	next.sort((a, b) => compareComments(a, b, sort));
-	return next;
-}
-
-function insertReply(
-	comments: CommentWithReplies[],
-	parentId: number,
-	comment: CommentWithReplies,
-	sort: CommentSortType,
-) {
-	let changed = false;
-	const next = comments.map((item) => {
-		if (item.id === parentId) {
-			changed = true;
-			return {
-				...item,
-				replies: insertIntoList(item.replies, comment, sort),
-			};
-		}
-
-		if (item.replies.length === 0) {
-			return item;
-		}
-
-		const updatedReplies = insertReply(item.replies, parentId, comment, sort);
-		if (updatedReplies !== item.replies) {
-			changed = true;
-			return { ...item, replies: updatedReplies };
-		}
-
-		return item;
-	});
-
-	return changed ? next : comments;
-}
-
-function insertCommentTree(
-	comments: CommentWithReplies[],
-	comment: CommentWithReplies,
-	sort: CommentSortType,
-) {
-	if (comment.parentCommentId === null) {
-		return insertIntoList(comments, comment, sort);
-	}
-
-	const updated = insertReply(comments, comment.parentCommentId, comment, sort);
-	if (updated === comments) {
-		return insertIntoList(comments, comment, sort);
-	}
-	return updated;
-}
-
 type CommentThreadProps = {
 	submissionId: number;
-	comments: CommentWithReplies[];
+	comments: CommentFlat[];
 	commentCount: number;
+	commentsLastFetchedAt: number;
 	currentUserId?: number;
-	sort?: CommentSortType;
-	isLoading?: boolean;
-	onSortChange?: (sort: CommentSortType) => void;
+	initialSort?: CommentSortType;
 };
 
 export function CommentThread({
 	submissionId,
 	comments,
 	commentCount,
+	commentsLastFetchedAt,
 	currentUserId,
-	sort = "top",
-	onSortChange,
-	isLoading,
+	initialSort = "top",
 }: CommentThreadProps) {
-	const router = useRouter();
-	const [commentTree, setCommentTree] = useState(comments);
-	const [localCommentCount, setLocalCommentCount] = useState(commentCount);
+	const [sort, setSort] = useState<CommentSortType>(initialSort);
 	const [visibleLimit, setVisibleLimit] = useState(COMMENTS_PAGE_SIZE);
+	const [isSyncing, setIsSyncing] = useState(false);
+
+	const initSubmission = useCommentStore((state) => state.initSubmission);
+	const mergeComments = useCommentStore((state) => state.mergeComments);
+	const submissionState = useCommentStore(
+		(state) => state.submissions[submissionId],
+	);
 
 	useEffect(() => {
-		setCommentTree(comments);
-		setLocalCommentCount(commentCount);
-	}, [commentCount, comments]);
+		initSubmission(
+			submissionId,
+			comments,
+			commentCount,
+			commentsLastFetchedAt,
+		);
+		setVisibleLimit(COMMENTS_PAGE_SIZE);
+	}, [
+		commentCount,
+		comments,
+		commentsLastFetchedAt,
+		initSubmission,
+		submissionId,
+	]);
+
+	useEffect(() => {
+		setSort(initialSort);
+	}, [initialSort, submissionId]);
+
+	const flatComments = useMemo(() => {
+		if (!submissionState) return [];
+		return submissionState.allIds
+			.map((id) => submissionState.byId[id])
+			.filter(Boolean);
+	}, [submissionState]);
+
+	const localCommentCount = submissionState?.commentCount ?? commentCount;
+	const lastFetchedAt =
+		submissionState?.lastFetchedAt ?? commentsLastFetchedAt;
+
+	const commentTree = useMemo(
+		() => buildCommentTree(flatComments, sort),
+		[flatComments, sort],
+	);
+
+	const handleMerge = useCallback(
+		(newComments: CommentFlat[], fetchedAt: number) => {
+			const newCount = mergeComments(
+				submissionId,
+				newComments,
+				fetchedAt,
+			);
+			if (newCount > 0) {
+				setVisibleLimit((prev) => prev + newCount);
+			}
+		},
+		[mergeComments, submissionId],
+	);
 
 	const handleReplyAdded = useCallback(
-		(comment?: CommentWithReplies) => {
-			if (!comment) {
-				router.invalidate();
-				return;
-			}
-
-			setCommentTree((prev) =>
-				insertCommentTree(prev, comment, sort),
-			);
-			setLocalCommentCount((prev) => prev + 1);
-			setVisibleLimit((prev) => prev + 1);
+		(comment?: CommentFlat) => {
+			if (!comment) return;
+			handleMerge([comment], comment.createdUtc);
 		},
-		[router, sort],
+		[handleMerge],
+	);
+
+	const handleSortChange = useCallback(
+		async (nextSort: CommentSortType) => {
+			setSort(nextSort);
+
+			if (!submissionState) return;
+			setIsSyncing(true);
+			try {
+				const result = await getCommentsSinceFn({
+					data: { submissionId, since: lastFetchedAt },
+				});
+				if (result.success) {
+					handleMerge(result.comments, result.lastFetchedAt);
+				}
+			} finally {
+				setIsSyncing(false);
+			}
+		},
+		[handleMerge, lastFetchedAt, submissionId, submissionState],
 	);
 
 	return (
@@ -148,8 +142,7 @@ export function CommentThread({
 			{/* Comment form */}
 			<div className="space-y-3">
 				<h2 className="text-lg font-semibold text-white">
-					{localCommentCount}{" "}
-					{localCommentCount === 1 ? "Comment" : "Comments"}
+					{localCommentCount} {localCommentCount === 1 ? "Comment" : "Comments"}
 				</h2>
 
 				{currentUserId ? (
@@ -159,12 +152,8 @@ export function CommentThread({
 							const result = await createCommentFn({
 								data: { body: text, parentSubmissionId: submissionId },
 							});
-							if (result.success) {
-								handleReplyAdded(
-									result.comment
-										? { ...result.comment, replies: [] }
-										: undefined,
-								);
+							if (result.success && result.comment) {
+								handleReplyAdded(result.comment);
 							}
 							return result;
 						}}
@@ -182,14 +171,14 @@ export function CommentThread({
 			</div>
 
 			{/* Sort options */}
-			{comments.length > 0 && (
+			{flatComments.length > 0 && (
 				<div className="flex items-center gap-2">
 					<span className="text-sm text-slate-400">Sort by:</span>
 					<div className="flex gap-1 rounded-lg bg-slate-800 p-1">
 						{sortOptions.map((option) => (
 							<SortButton
 								option={option}
-								onSortChange={onSortChange}
+								onSortChange={handleSortChange}
 								sort={sort}
 								key={option.value}
 							/>
@@ -203,7 +192,7 @@ export function CommentThread({
 				submissionId={submissionId}
 				currentUserId={currentUserId}
 				onReplyAdded={handleReplyAdded}
-				isLoading={isLoading}
+				isLoading={isSyncing}
 				comments={commentTree}
 				visibleLimit={visibleLimit}
 				onVisibleLimitChange={setVisibleLimit}
@@ -216,7 +205,7 @@ type ActualCommentsProps = {
 	comments: CommentWithReplies[];
 	submissionId: number;
 	currentUserId?: number;
-	onReplyAdded: (comment?: CommentWithReplies) => void;
+	onReplyAdded: (comment?: CommentFlat) => void;
 	visibleLimit: number;
 	onVisibleLimitChange: (updater: (prev: number) => number) => void;
 	isLoading?: boolean;
@@ -291,7 +280,7 @@ function ActualComments({
 
 type SortButtonProps = {
 	option: { value: CommentSortType; label: string };
-	onSortChange?: (sort: CommentSortType) => void;
+	onSortChange: (sort: CommentSortType) => void;
 	sort?: CommentSortType;
 };
 function SortButton({ option, onSortChange, sort }: SortButtonProps) {
@@ -311,27 +300,26 @@ function SortButton({ option, onSortChange, sort }: SortButtonProps) {
 				{option.label}
 			</button>
 		);
-	} else {
-		return (
-			<button
-				key={option.value}
-				type="button"
-				onClick={() => {
-					setLoading(true);
-					setTimeout(() => {
-						Promise.resolve()
-							.then(() => onSortChange?.(option.value))
-							.finally(() => setLoading(false));
-					});
-				}}
-				className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-					sort === option.value
-						? "bg-cyan-500 text-white"
-						: "text-slate-400 hover:text-white"
-				}`}
-			>
-				{option.label}
-			</button>
-		);
 	}
+	return (
+		<button
+			key={option.value}
+			type="button"
+			onClick={() => {
+				setLoading(true);
+				setTimeout(() => {
+					Promise.resolve()
+						.then(() => onSortChange(option.value))
+						.finally(() => setLoading(false));
+				});
+			}}
+			className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+				sort === option.value
+					? "bg-cyan-500 text-white"
+					: "text-slate-400 hover:text-white"
+			}`}
+		>
+			{option.label}
+		</button>
+	);
 }

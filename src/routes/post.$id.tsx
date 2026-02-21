@@ -2,8 +2,6 @@ import {
 	createFileRoute,
 	Link,
 	notFound,
-	useRouter,
-	useRouterState,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
@@ -12,7 +10,7 @@ import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
 import {
 	type CommentSortType,
-	getCommentsBySubmission,
+	getCommentsBySubmissionFlat,
 } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import {
@@ -20,30 +18,29 @@ import {
 	type SubmissionDetail,
 } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { useCommentStore } from "@/lib/comment-store";
 import type { VoteType } from "@/lib/votes.server";
 
 const getPostFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { id: number; commentSort?: CommentSortType }) => data)
+	.inputValidator((data: { id: number }) => data)
 	.handler(
-		async ({
-			data,
-		}: {
-			data: { id: number; commentSort?: CommentSortType };
-		}) => {
+		async ({ data }: { data: { id: number } }) => {
 			const user = await getCurrentUser();
 			const userId = user?.id;
 
 			const [post, comments] = await Promise.all([
 				getSubmissionById(data.id, userId),
-				getCommentsBySubmission(
-					data.id,
-					data.commentSort ?? "top",
-					userId,
-				),
+				getCommentsBySubmissionFlat(data.id, userId),
 			]);
 			if (!post) return null;
 
-			return { post, comments, user };
+			const commentsLastFetchedAt =
+				comments.reduce(
+					(max, comment) => Math.max(max, comment.createdUtc),
+					0,
+				) || Math.floor(Date.now() / 1000);
+
+			return { post, comments, commentsLastFetchedAt, user };
 		},
 	);
 
@@ -52,16 +49,13 @@ export const Route = createFileRoute("/post/$id")({
 	validateSearch: (search: Record<string, unknown>) => ({
 		sort: (search.sort as CommentSortType) || "top",
 	}),
-	loaderDeps: ({ search }) => ({ commentSort: search.sort }),
-	loader: async ({ params, deps }) => {
+	loader: async ({ params }) => {
 		const id = Number.parseInt(params.id, 10);
 		if (Number.isNaN(id)) {
 			throw notFound();
 		}
 
-		const result = await getPostFn({
-			data: { id, commentSort: deps.commentSort },
-		});
+		const result = await getPostFn({ data: { id } });
 
 		if (!result) {
 			throw notFound();
@@ -70,6 +64,7 @@ export const Route = createFileRoute("/post/$id")({
 		return {
 			post: result.post,
 			comments: result.comments,
+			commentsLastFetchedAt: result.commentsLastFetchedAt,
 			user: result.user,
 		};
 	},
@@ -91,28 +86,19 @@ export const Route = createFileRoute("/post/$id")({
 });
 
 function PostPage() {
-	const router = useRouter();
-	const { post, comments, user } = Route.useLoaderData();
+	const { post, comments, commentsLastFetchedAt, user } = Route.useLoaderData();
 	const { sort } = Route.useSearch();
-
-	// Track if there's a pending navigation (loading new comments)
-	const isLoading = useRouterState({
-		select: (s) => s.isLoading,
-	});
-
-	const handleSortChange = async (newSort: CommentSortType) => {
-		await router.navigate({
-			to: "/post/$id",
-			params: { id: String(post.id) },
-			search: { sort: newSort },
-		});
-	};
+	const storeCommentCount = useCommentStore(
+		(state) => state.submissions[post.id]?.commentCount,
+	);
+	const displayCommentCount = storeCommentCount ?? post.commentCount;
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
 			<div className="mx-auto max-w-4xl">
 				<PostContent
 					post={post}
+					commentCount={displayCommentCount}
 					currentUserId={user?.id}
 					userVote={post.userVote}
 				/>
@@ -122,10 +108,9 @@ function PostPage() {
 						submissionId={post.id}
 						comments={comments}
 						commentCount={post.commentCount}
+						commentsLastFetchedAt={commentsLastFetchedAt}
 						currentUserId={user?.id}
-						sort={sort}
-						onSortChange={handleSortChange}
-						isLoading={isLoading}
+						initialSort={sort}
 					/>
 				</div>
 			</div>
@@ -135,10 +120,12 @@ function PostPage() {
 
 function PostContent({
 	post,
+	commentCount,
 	currentUserId,
 	userVote = 0,
 }: {
 	post: SubmissionDetail;
+	commentCount: number;
 	currentUserId?: number;
 	userVote?: VoteType;
 }) {
@@ -230,7 +217,7 @@ function PostContent({
 			<div className="flex items-center gap-4 border-t border-slate-800 p-4">
 				<div className="flex items-center gap-1 text-slate-400">
 					<MessageSquare className="h-5 w-5" />
-					<span>{post.commentCount} comments</span>
+					<span>{commentCount} comments</span>
 				</div>
 
 				<div className="flex items-center gap-1 text-slate-400">

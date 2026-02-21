@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import {
 	createComment,
 	deleteComment,
+	getCommentsBySubmissionSince,
 	getCommentById,
 	updateComment,
 } from "@/lib/comments.server";
@@ -68,4 +69,19 @@ export const deleteCommentFn = createServerFn({ method: "POST" })
 		}
 		const result = await deleteComment(data.id, user.id);
 		return { success: result };
+	});
+
+export const getCommentsSinceFn = createServerFn({ method: "GET" })
+	.inputValidator((data: { submissionId: number; since: number }) => data)
+	.handler(async ({ data }: { data: { submissionId: number; since: number } }) => {
+		const user = await getCurrentUser();
+		const comments = await getCommentsBySubmissionSince(
+			data.submissionId,
+			data.since,
+			user?.id,
+		);
+		const lastFetchedAt =
+			comments.reduce((max, comment) => Math.max(max, comment.createdUtc), 0) ||
+			Math.floor(Date.now() / 1000);
+		return { success: true as const, comments, lastFetchedAt };
 	});

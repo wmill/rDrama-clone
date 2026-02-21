@@ -59,6 +59,7 @@ export type CommentSummary = {
 export type CommentWithReplies = CommentSummary & {
 	replies: CommentWithReplies[];
 };
+export type CommentFlat = CommentSummary;
 
 export const CommentSortTypes = ["top", "new", "old", "controversial"] as const;
 export type CommentSortType = (typeof CommentSortTypes)[number];
@@ -198,6 +199,247 @@ export async function getCommentsBySubmission(
 	sortReplies(rootComments);
 
 	return rootComments;
+}
+
+function mapCommentRow(row: {
+	id: number;
+	authorId: number;
+	authorName: string;
+	body: string | null;
+	bodyHtml: string;
+	createdUtc: number;
+	editedUtc: number;
+	upvotes: number;
+	downvotes: number;
+	level: number;
+	parentCommentId: number | null;
+	parentSubmissionId: number | null;
+	descendantCount: number;
+	isPinned: string | null;
+	distinguishLevel: number;
+	stateUserDeletedUtc: Date | null;
+	userVoteType?: number | null;
+}): CommentFlat {
+	return {
+		id: row.id,
+		authorId: row.authorId,
+		authorName: row.authorName,
+		body: row.body,
+		bodyHtml: row.bodyHtml,
+		createdUtc: row.createdUtc,
+		editedUtc: row.editedUtc,
+		upvotes: row.upvotes,
+		downvotes: row.downvotes,
+		score: row.upvotes - row.downvotes,
+		level: row.level,
+		parentCommentId: row.parentCommentId,
+		parentSubmissionId: row.parentSubmissionId,
+		descendantCount: row.descendantCount,
+		isPinned: row.isPinned,
+		distinguishLevel: row.distinguishLevel,
+		isDeleted: row.stateUserDeletedUtc !== null,
+		userVote: (row.userVoteType as VoteType) ?? 0,
+	};
+}
+
+function mapCommentSqlRow(row: {
+	id: number;
+	author_id: number;
+	author_name: string;
+	body: string | null;
+	body_html: string;
+	created_utc: number;
+	edited_utc: number;
+	upvotes: number;
+	downvotes: number;
+	level: number;
+	parent_comment_id: number | null;
+	parent_submission: number | null;
+	descendant_count: number;
+	is_pinned: string | null;
+	distinguish_level: number;
+	state_user_deleted_utc: Date | null;
+	user_vote_type: number | null;
+}): CommentFlat {
+	return {
+		id: row.id,
+		authorId: row.author_id,
+		authorName: row.author_name,
+		body: row.body,
+		bodyHtml: row.body_html,
+		createdUtc: row.created_utc,
+		editedUtc: row.edited_utc,
+		upvotes: row.upvotes,
+		downvotes: row.downvotes,
+		score: row.upvotes - row.downvotes,
+		level: row.level,
+		parentCommentId: row.parent_comment_id,
+		parentSubmissionId: row.parent_submission,
+		descendantCount: row.descendant_count,
+		isPinned: row.is_pinned,
+		distinguishLevel: row.distinguish_level,
+		isDeleted: row.state_user_deleted_utc !== null,
+		userVote: (row.user_vote_type as VoteType) ?? 0,
+	};
+}
+
+export async function getCommentsBySubmissionFlat(
+	submissionId: number,
+	userId?: number,
+): Promise<CommentFlat[]> {
+	const results = await db
+		.select({
+			id: comments.id,
+			authorId: comments.authorId,
+			authorName: users.username,
+			body: comments.body,
+			bodyHtml: comments.bodyHtml,
+			createdUtc: comments.createdUtc,
+			editedUtc: comments.editedUtc,
+			upvotes: comments.upvotes,
+			downvotes: comments.downvotes,
+			level: comments.level,
+			parentCommentId: comments.parentCommentId,
+			parentSubmissionId: comments.parentSubmission,
+			descendantCount: comments.descendantCount,
+			isPinned: comments.isPinned,
+			distinguishLevel: comments.distinguishLevel,
+			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
+			userVoteType: commentVotes.voteType,
+		})
+		.from(comments)
+		.innerJoin(users, eq(comments.authorId, users.id))
+		.leftJoin(
+			commentVotes,
+			userId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.where(
+			and(
+				eq(comments.parentSubmission, submissionId),
+				eq(comments.stateMod, "VISIBLE"),
+			),
+		)
+		.orderBy(desc(comments.createdUtc));
+
+	return results.map((row) =>
+		mapCommentRow({
+			...row,
+			parentSubmissionId: row.parentSubmissionId,
+		}),
+	);
+}
+
+export async function getCommentsBySubmissionSince(
+	submissionId: number,
+	since: number,
+	userId?: number,
+): Promise<CommentFlat[]> {
+	const results = await db
+		.select({
+			id: comments.id,
+			authorId: comments.authorId,
+			authorName: users.username,
+			body: comments.body,
+			bodyHtml: comments.bodyHtml,
+			createdUtc: comments.createdUtc,
+			editedUtc: comments.editedUtc,
+			upvotes: comments.upvotes,
+			downvotes: comments.downvotes,
+			level: comments.level,
+			parentCommentId: comments.parentCommentId,
+			parentSubmissionId: comments.parentSubmission,
+			descendantCount: comments.descendantCount,
+			isPinned: comments.isPinned,
+			distinguishLevel: comments.distinguishLevel,
+			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
+			userVoteType: commentVotes.voteType,
+		})
+		.from(comments)
+		.innerJoin(users, eq(comments.authorId, users.id))
+		.leftJoin(
+			commentVotes,
+			userId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.where(
+			and(
+				eq(comments.parentSubmission, submissionId),
+				eq(comments.stateMod, "VISIBLE"),
+				gte(comments.createdUtc, since),
+			),
+		)
+		.orderBy(desc(comments.createdUtc));
+
+	return results.map((row) =>
+		mapCommentRow({
+			...row,
+			parentSubmissionId: row.parentSubmissionId,
+		}),
+	);
+}
+
+export async function getCommentThreadFlat(
+	id: number,
+	userId?: number,
+): Promise<CommentFlat[] | null> {
+	const target = await getCommentById(id, userId);
+	if (!target) return null;
+
+	const userIdParam = userId ?? null;
+	const result = await db.execute(
+		sql`WITH RECURSIVE descendants AS (
+			SELECT id, author_id, body, body_html, created_utc, edited_utc,
+				   upvotes, downvotes, level, parent_comment_id, parent_submission,
+				   descendant_count, is_pinned, distinguish_level, state_user_deleted_utc
+			FROM comments
+			WHERE parent_comment_id = ${id} AND state_mod = 'VISIBLE'
+			UNION ALL
+			SELECT c.id, c.author_id, c.body, c.body_html, c.created_utc, c.edited_utc,
+				   c.upvotes, c.downvotes, c.level, c.parent_comment_id, c.parent_submission,
+				   c.descendant_count, c.is_pinned, c.distinguish_level, c.state_user_deleted_utc
+			FROM comments c
+			INNER JOIN descendants d ON c.parent_comment_id = d.id
+			WHERE c.state_mod = 'VISIBLE'
+		)
+		SELECT d.*, u.username as author_name, cv.vote_type as user_vote_type
+		FROM descendants d
+		INNER JOIN users u ON d.author_id = u.id
+		LEFT JOIN commentvotes cv ON cv.comment_id = d.id AND cv.user_id = ${userIdParam}
+		ORDER BY d.upvotes - d.downvotes DESC`,
+	);
+
+	const descendants = (result.rows as Array<{
+		id: number;
+		author_id: number;
+		author_name: string;
+		body: string | null;
+		body_html: string;
+		created_utc: number;
+		edited_utc: number;
+		upvotes: number;
+		downvotes: number;
+		level: number;
+		parent_comment_id: number | null;
+		parent_submission: number | null;
+		descendant_count: number;
+		is_pinned: string | null;
+		distinguish_level: number;
+		state_user_deleted_utc: Date | null;
+		user_vote_type: number | null;
+	}>).map((row) => mapCommentSqlRow(row));
+
+	return [target, ...descendants];
 }
 
 export async function getCommentById(
