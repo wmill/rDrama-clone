@@ -13,8 +13,8 @@ import {
 	filterCommentTree,
 	getVisibleCommentIds,
 } from "@/lib/comment-pagination";
-import { buildCommentTree } from "@/lib/comment-tree";
 import { useCommentStore } from "@/lib/comment-store";
+import { buildCommentTree } from "@/lib/comment-tree";
 import type {
 	CommentFlat,
 	CommentSortType,
@@ -244,7 +244,7 @@ function ActualComments({
 	}
 
 	return (
-		<div className="relative space-y-1">
+		<div style={{contentVisibility: "auto"}} className="relative space-y-1">
 			{isLoading && (
 				<div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
 					<Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
