@@ -3,14 +3,13 @@ import { createServerFn } from "@tanstack/react-start";
 import arrowBigDownUrl from "lucide-static/icons/arrow-big-down.svg?url";
 import arrowBigUpUrl from "lucide-static/icons/arrow-big-up.svg?url";
 import { useState } from "react";
-
+import { IconMask } from "@/components/ui/icon-mask";
 import { getCurrentUser } from "@/lib/sessions.server";
 import {
 	type VoteType,
 	voteOnComment,
 	voteOnSubmission,
 } from "@/lib/votes.server";
-import { IconMask } from "@/components/ui/icon-mask";
 
 const voteSubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { submissionId: number; voteType: VoteType }) => data)

@@ -81,7 +81,7 @@ export const Comment = memo(function Comment({
 		<div
 			className={`${depth > 0 ? `ml-4 border-l-2 ${borderColor} pl-3` : ""}`}
 		>
-			<div className="group py-2">
+			<div className="py-2">
 				{/* Comment header */}
 				<div className="flex items-center gap-2 text-xs text-slate-400">
 					<button
