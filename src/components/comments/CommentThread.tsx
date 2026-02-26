@@ -31,6 +31,7 @@ const sortOptions: { value: CommentSortType; label: string }[] = [
 	{ value: "old", label: "Old" },
 	{ value: "controversial", label: "Controversial" },
 ];
+const ROOT_BATCH_SIZE = 5;
 
 type CommentThreadProps = {
 	submissionId: number;
@@ -58,6 +59,8 @@ export function CommentThread({
 	const submissionState = useCommentStore(
 		(state) => state.submissions[submissionId],
 	);
+
+	const [rootRenderedCount, setRootRenderedCount] = useState(0);
 
 	useEffect(() => {
 		initSubmission(
@@ -120,6 +123,7 @@ export function CommentThread({
 	const handleSortChange = useCallback(
 		async (nextSort: CommentSortType) => {
 			setSort(nextSort);
+			setRootRenderedCount(0);
 
 			if (!submissionState) return;
 			setIsSyncing(true);
@@ -196,6 +200,8 @@ export function CommentThread({
 				comments={commentTree}
 				visibleLimit={visibleLimit}
 				onVisibleLimitChange={setVisibleLimit}
+				rootRenderedCount={rootRenderedCount}
+				setRootRenderedCount={setRootRenderedCount}
 			/>
 		</div>
 	);
@@ -209,6 +215,8 @@ type ActualCommentsProps = {
 	visibleLimit: number;
 	onVisibleLimitChange: (updater: (prev: number) => number) => void;
 	isLoading?: boolean;
+	rootRenderedCount: number;
+	setRootRenderedCount: (count: number) => void;
 };
 
 function ActualComments({
@@ -219,7 +227,10 @@ function ActualComments({
 	visibleLimit,
 	onVisibleLimitChange,
 	isLoading,
+	rootRenderedCount,
+	setRootRenderedCount,
 }: ActualCommentsProps) {
+	
 	const { visibleIds, totalCount } = useMemo(
 		() => getVisibleCommentIds(comments, visibleLimit),
 		[comments, visibleLimit],
@@ -231,6 +242,39 @@ function ActualComments({
 	const filteredComments = useMemo(
 		() => filterCommentTree(comments, visibleIds),
 		[comments, visibleIds],
+	);
+	const rootTarget = filteredComments.length;
+
+	useEffect(() => {
+		if (rootRenderedCount > rootTarget) {
+			setRootRenderedCount(rootTarget);
+		}
+	}, [rootRenderedCount, rootTarget]);
+
+	useEffect(() => {
+		if (rootRenderedCount >= rootTarget) return;
+		let cancelled = false;
+
+		const intervalId = window.setInterval(() => {
+			if (cancelled) return;
+			setRootRenderedCount((prev) => {
+				const next = Math.min(prev + ROOT_BATCH_SIZE, rootTarget);
+				if (next >= rootTarget) {
+					window.clearInterval(intervalId);
+				}
+				return next;
+			});
+		}, 10);
+
+		return () => {
+			cancelled = true;
+			window.clearInterval(intervalId);
+		};
+	}, [rootRenderedCount, rootTarget]);
+
+	const stagedComments = useMemo(
+		() => filteredComments.slice(0, rootRenderedCount),
+		[filteredComments, rootRenderedCount],
 	);
 
 	if (comments.length === 0) {
@@ -251,7 +295,7 @@ function ActualComments({
 				</div>
 			)}
 
-			{filteredComments.map((comment) => (
+			{stagedComments.map((comment) => (
 				<Comment
 					key={comment.id}
 					comment={comment}
