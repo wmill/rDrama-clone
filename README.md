@@ -4,7 +4,7 @@ Documentation about the old site is in project_specs.
 
 The specs include generated test db data so that llms will have something to inspect.
 
-The original tanstack readme follows.
+The original tanstack readme follows. Project is still in progress.
 
 ----
 
@@ -17,6 +17,18 @@ To run this application:
 ```bash
 pnpm install
 pnpm start
+```
+
+# Set up Postgres and Redis using docker
+
+```bash
+docker commpose up -d postgres redis
+```
+
+# Generate some sample data to get going on development
+
+```bash
+pnpm generate-data --comments 5000 --max-depth 30 --submissions 30
 ```
 
 # Building For Production
