@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, type SQL, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, type SQL, sql } from "drizzle-orm";
 import MarkdownIt from "markdown-it";
 
 import { db } from "@/db";
@@ -666,6 +666,83 @@ export async function getCommentsFeed(
 	}));
 }
 
+export async function getCommentAncestors(
+	id: number,
+	userId?: number,
+): Promise<CommentSummary[]> {
+	const rows = await db.execute(
+		sql`SELECT path::text FROM comments WHERE id = ${id}`,
+	);
+	const row = rows.rows[0] as { path: string } | undefined;
+	if (!row?.path) return [];
+
+	const labels = row.path.split(".");
+	const ancestorIds = labels.slice(0, -1).map(Number);
+	const recentAncestors = ancestorIds.slice(-3);
+
+	if (recentAncestors.length === 0) return [];
+
+	const results = await db
+		.select({
+			id: comments.id,
+			authorId: comments.authorId,
+			authorName: users.username,
+			body: comments.body,
+			bodyHtml: comments.bodyHtml,
+			createdUtc: comments.createdUtc,
+			editedUtc: comments.editedUtc,
+			upvotes: comments.upvotes,
+			downvotes: comments.downvotes,
+			level: comments.level,
+			parentCommentId: comments.parentCommentId,
+			parentSubmissionId: comments.parentSubmission,
+			descendantCount: comments.descendantCount,
+			isPinned: comments.isPinned,
+			distinguishLevel: comments.distinguishLevel,
+			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			userVoteType: commentVotes.voteType,
+		})
+		.from(comments)
+		.innerJoin(users, eq(comments.authorId, users.id))
+		.leftJoin(
+			commentVotes,
+			userId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.where(inArray(comments.id, recentAncestors));
+
+	return recentAncestors
+		.map((aid) => {
+			const r = results.find((c) => c.id === aid);
+			if (!r) return null;
+			return {
+				id: r.id,
+				authorId: r.authorId,
+				authorName: r.authorName,
+				body: r.body,
+				bodyHtml: r.bodyHtml,
+				createdUtc: r.createdUtc,
+				editedUtc: r.editedUtc,
+				upvotes: r.upvotes,
+				downvotes: r.downvotes,
+				score: r.upvotes - r.downvotes,
+				level: r.level,
+				parentCommentId: r.parentCommentId,
+				parentSubmissionId: r.parentSubmissionId,
+				descendantCount: r.descendantCount,
+				isPinned: r.isPinned,
+				distinguishLevel: r.distinguishLevel,
+				isDeleted: r.stateUserDeletedUtc !== null,
+				userVote: (r.userVoteType as VoteType) ?? 0,
+			} satisfies CommentSummary;
+		})
+		.filter((c): c is CommentSummary => c !== null);
+}
+
 export async function createComment(data: {
 	authorId: number;
 	body: string;
@@ -707,6 +784,16 @@ export async function createComment(data: {
 			volunteerJanitorBadness: 0,
 		})
 		.returning({ id: comments.id });
+
+	// Set ltree path
+	await db.execute(
+		sql`UPDATE comments SET path =
+			CASE
+				WHEN parent_comment_id IS NULL THEN ${result.id.toString()}::ltree
+				ELSE (SELECT path FROM comments WHERE id = ${data.parentCommentId ?? null}) || ${result.id.toString()}::ltree
+			END
+		WHERE id = ${result.id}`,
+	);
 
 	// Update parent comment's descendant count
 	if (data.parentCommentId) {

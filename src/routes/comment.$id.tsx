@@ -6,7 +6,11 @@ import { useMemo } from "react";
 import { Comment } from "@/components/comments";
 import { Button } from "@/components/ui/button";
 import { buildCommentForest } from "@/lib/comment-tree";
-import { getCommentThreadFlat } from "@/lib/comments.server";
+import {
+	getCommentAncestors,
+	getCommentThreadFlat,
+} from "@/lib/comments.server";
+import type { CommentSummary } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissionById } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
@@ -23,10 +27,13 @@ const getCommentFn = createServerFn({ method: "GET" })
 		const target = comments[0];
 		if (target.parentSubmissionId === null) return null;
 
-		const submission = await getSubmissionById(target.parentSubmissionId);
+		const [submission, ancestors] = await Promise.all([
+			getSubmissionById(target.parentSubmissionId),
+			getCommentAncestors(data.id, userId),
+		]);
 		if (!submission) return null;
 
-		return { comments, submission, user };
+		return { comments, submission, user, ancestors };
 	});
 
 export const Route = createFileRoute("/comment/$id")({
@@ -47,6 +54,7 @@ export const Route = createFileRoute("/comment/$id")({
 			comments: result.comments,
 			submission: result.submission,
 			user: result.user,
+			ancestors: result.ancestors,
 		};
 	},
 	notFoundComponent: () => (
@@ -68,8 +76,36 @@ export const Route = createFileRoute("/comment/$id")({
 	),
 });
 
+function AncestorCommentCard({
+	comment,
+	depth,
+}: { comment: CommentSummary; depth: number }) {
+	const indentPx = depth * 12;
+	return (
+		<Link
+			to={`/comment/${comment.id}` as "/"}
+			className="block opacity-60 hover:opacity-80 transition-opacity"
+			style={{ paddingLeft: `${indentPx}px` }}
+		>
+			<div className="border-l-2 border-slate-600 pl-3 py-1">
+				<div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+					<span className="font-medium text-slate-300">
+						{comment.authorName}
+					</span>
+					<span>{formatRelativeTime(comment.createdUtc)}</span>
+				</div>
+				<p className="text-sm text-slate-400 line-clamp-2">
+					{comment.isDeleted
+						? "[deleted]"
+						: (comment.body ?? comment.bodyHtml.replace(/<[^>]+>/g, ""))}
+				</p>
+			</div>
+		</Link>
+	);
+}
+
 function CommentPage() {
-	const { comments, submission, user } = Route.useLoaderData();
+	const { comments, submission, user, ancestors } = Route.useLoaderData();
 	const { byId } = useMemo(() => buildCommentForest(comments, "top"), [comments]);
 	const comment = byId.get(comments[0]?.id ?? -1);
 
@@ -139,6 +175,25 @@ function CommentPage() {
 					<h2 className="mb-4 text-lg font-semibold text-white">
 						Single Comment Thread
 					</h2>
+
+					{/* Ancestor context (up to 3 parents) */}
+					{ancestors.length > 0 && (
+						<div className="mb-4 space-y-2">
+							<p className="text-xs text-slate-500 uppercase tracking-wide">
+								Context
+							</p>
+							{ancestors.map((ancestor, i) => (
+								<AncestorCommentCard
+									key={ancestor.id}
+									comment={ancestor}
+									depth={i}
+								/>
+							))}
+							<div className="border-l-2 border-cyan-500 pl-3 text-xs text-slate-500">
+								↳ viewing this comment
+							</div>
+						</div>
+					)}
 
 					<Comment
 						comment={comment}

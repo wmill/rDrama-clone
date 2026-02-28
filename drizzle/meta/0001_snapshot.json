@@ -1,0 +1,1176 @@
+{
+  "id": "6ecd5915-8d2d-4202-a865-6bd83be2768f",
+  "prevId": "0b83624d-b590-4970-a827-a24f31fdf61d",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.commentvotes": {
+      "name": "commentvotes",
+      "schema": "",
+      "columns": {
+        "comment_id": {
+          "name": "comment_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vote_type": {
+          "name": "vote_type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "real": {
+          "name": "real",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_datetimez": {
+          "name": "created_datetimez",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "commentvotes_comment_id_comments_id_fk": {
+          "name": "commentvotes_comment_id_comments_id_fk",
+          "tableFrom": "commentvotes",
+          "tableTo": "comments",
+          "columnsFrom": [
+            "comment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "commentvotes_user_id_users_id_fk": {
+          "name": "commentvotes_user_id_users_id_fk",
+          "tableFrom": "commentvotes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.comments": {
+      "name": "comments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_utc": {
+          "name": "created_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parent_submission": {
+          "name": "parent_submission",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distinguish_level": {
+          "name": "distinguish_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "edited_utc": {
+          "name": "edited_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "level": {
+          "name": "level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "parent_comment_id": {
+          "name": "parent_comment_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "over_18": {
+          "name": "over_18",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "upvotes": {
+          "name": "upvotes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "downvotes": {
+          "name": "downvotes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "is_bot": {
+          "name": "is_bot",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sentto": {
+          "name": "sentto",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bannedfor": {
+          "name": "bannedfor",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_pinned": {
+          "name": "is_pinned",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body_html": {
+          "name": "body_html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "realupvotes": {
+          "name": "realupvotes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "top_comment_id": {
+          "name": "top_comment_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_pinned_utc": {
+          "name": "is_pinned_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ghost": {
+          "name": "ghost",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "descendant_count": {
+          "name": "descendant_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "volunteer_janitor_badness": {
+          "name": "volunteer_janitor_badness",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state_user_deleted_utc": {
+          "name": "state_user_deleted_utc",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state_mod": {
+          "name": "state_mod",
+          "type": "statemod",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state_mod_set_by": {
+          "name": "state_mod_set_by",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state_report": {
+          "name": "state_report",
+          "type": "statereport",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "path": {
+          "name": "path",
+          "type": "ltree",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "comments_author_id_users_id_fk": {
+          "name": "comments_author_id_users_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "comments_parent_submission_submissions_id_fk": {
+          "name": "comments_parent_submission_submissions_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "submissions",
+          "columnsFrom": [
+            "parent_submission"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "comments_parent_comment_id_comments_id_fk": {
+          "name": "comments_parent_comment_id_comments_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "comments",
+          "columnsFrom": [
+            "parent_comment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.submissions": {
+      "name": "submissions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_utc": {
+          "name": "created_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "over_18": {
+          "name": "over_18",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "distinguish_level": {
+          "name": "distinguish_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "edited_utc": {
+          "name": "edited_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "is_pinned": {
+          "name": "is_pinned",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "upvotes": {
+          "name": "upvotes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "downvotes": {
+          "name": "downvotes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "thumburl": {
+          "name": "thumburl",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "private": {
+          "name": "private",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "views": {
+          "name": "views",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "is_bot": {
+          "name": "is_bot",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bannedfor": {
+          "name": "bannedfor",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comment_count": {
+          "name": "comment_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stickied": {
+          "name": "stickied",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "varchar(2083)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body_html": {
+          "name": "body_html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "embed_url": {
+          "name": "embed_url",
+          "type": "varchar(1500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title_html": {
+          "name": "title_html",
+          "type": "varchar(1500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "realupvotes": {
+          "name": "realupvotes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flair": {
+          "name": "flair",
+          "type": "varchar(350)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stickied_utc": {
+          "name": "stickied_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ghost": {
+          "name": "ghost",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bump_utc": {
+          "name": "bump_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_id": {
+          "name": "task_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state_user_deleted_utc": {
+          "name": "state_user_deleted_utc",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state_mod": {
+          "name": "state_mod",
+          "type": "statemod",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state_mod_set_by": {
+          "name": "state_mod_set_by",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state_report": {
+          "name": "state_report",
+          "type": "statereport",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "submissions_author_id_users_id_fk": {
+          "name": "submissions_author_id_users_id_fk",
+          "tableFrom": "submissions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "passhash": {
+          "name": "passhash",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_utc": {
+          "name": "created_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "admin_level": {
+          "name": "admin_level",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "over_18": {
+          "name": "over_18",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_activated": {
+          "name": "is_activated",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bio": {
+          "name": "bio",
+          "type": "varchar(1500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bio_html": {
+          "name": "bio_html",
+          "type": "varchar(10000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "referred_by": {
+          "name": "referred_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_banned": {
+          "name": "is_banned",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "ban_reason": {
+          "name": "ban_reason",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "login_nonce": {
+          "name": "login_nonce",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "reserved": {
+          "name": "reserved",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mfa_secret": {
+          "name": "mfa_secret",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_private": {
+          "name": "is_private",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "unban_utc": {
+          "name": "unban_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "is_nofollow": {
+          "name": "is_nofollow",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "custom_filter_list": {
+          "name": "custom_filter_list",
+          "type": "varchar(1000)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "stored_subscriber_count": {
+          "name": "stored_subscriber_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "ban_evade": {
+          "name": "ban_evade",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "original_username": {
+          "name": "original_username",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "customtitle": {
+          "name": "customtitle",
+          "type": "varchar(1000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "defaultsorting": {
+          "name": "defaultsorting",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'new'"
+        },
+        "defaulttime": {
+          "name": "defaulttime",
+          "type": "varchar(5)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "namecolor": {
+          "name": "namecolor",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "titlecolor": {
+          "name": "titlecolor",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profileurl": {
+          "name": "profileurl",
+          "type": "varchar(65)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bannerurl": {
+          "name": "bannerurl",
+          "type": "varchar(65)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidevotedon": {
+          "name": "hidevotedon",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "newtab": {
+          "name": "newtab",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "flairchanged": {
+          "name": "flairchanged",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "defaultsortingcomments": {
+          "name": "defaultsortingcomments",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'new'"
+        },
+        "theme": {
+          "name": "theme",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slurreplacer": {
+          "name": "slurreplacer",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "shadowbanned": {
+          "name": "shadowbanned",
+          "type": "varchar(25)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "newtabexternal": {
+          "name": "newtabexternal",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "customtitleplain": {
+          "name": "customtitleplain",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "themecolor": {
+          "name": "themecolor",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changelogsub": {
+          "name": "changelogsub",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "css": {
+          "name": "css",
+          "type": "varchar(4000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profilecss": {
+          "name": "profilecss",
+          "type": "varchar(4000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "coins": {
+          "name": "coins",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "agendaposter": {
+          "name": "agendaposter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "post_count": {
+          "name": "post_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "comment_count": {
+          "name": "comment_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "highres": {
+          "name": "highres",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "patron": {
+          "name": "patron",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "controversial": {
+          "name": "controversial",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "verified": {
+          "name": "verified",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cardview": {
+          "name": "cardview",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_award_count": {
+          "name": "received_award_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "highlightcomments": {
+          "name": "highlightcomments",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "nitter": {
+          "name": "nitter",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "truescore": {
+          "name": "truescore",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "frontsize": {
+          "name": "frontsize",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 25
+        },
+        "coins_spent": {
+          "name": "coins_spent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "procoins": {
+          "name": "procoins",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "verifiedcolor": {
+          "name": "verifiedcolor",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "friends": {
+          "name": "friends",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "friends_html": {
+          "name": "friends_html",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enemies": {
+          "name": "enemies",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enemies_html": {
+          "name": "enemies_html",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fp": {
+          "name": "fp",
+          "type": "varchar(21)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lootboxes_bought": {
+          "name": "lootboxes_bought",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "winnings": {
+          "name": "winnings",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "patron_utc": {
+          "name": "patron_utc",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "house": {
+          "name": "house",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reddit": {
+          "name": "reddit",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "volunteer_last_started_utc": {
+          "name": "volunteer_last_started_utc",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "volunteer_janitor_correctness": {
+          "name": "volunteer_janitor_correctness",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chat_authorized": {
+          "name": "chat_authorized",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chat_lastseen": {
+          "name": "chat_lastseen",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "filter_behavior": {
+          "name": "filter_behavior",
+          "type": "filterbehavior",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.votes": {
+      "name": "votes",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "submission_id": {
+          "name": "submission_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vote_type": {
+          "name": "vote_type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "real": {
+          "name": "real",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_datetimez": {
+          "name": "created_datetimez",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "votes_user_id_users_id_fk": {
+          "name": "votes_user_id_users_id_fk",
+          "tableFrom": "votes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "votes_submission_id_submissions_id_fk": {
+          "name": "votes_submission_id_submissions_id_fk",
+          "tableFrom": "votes",
+          "tableTo": "submissions",
+          "columnsFrom": [
+            "submission_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.filterbehavior": {
+      "name": "filterbehavior",
+      "schema": "public",
+      "values": [
+        "AUTOMATIC",
+        "UNFILTERED",
+        "FILTERED"
+      ]
+    },
+    "public.statemod": {
+      "name": "statemod",
+      "schema": "public",
+      "values": [
+        "VISIBLE",
+        "FILTERED",
+        "REMOVED"
+      ]
+    },
+    "public.statereport": {
+      "name": "statereport",
+      "schema": "public",
+      "values": [
+        "UNREPORTED",
+        "RESOLVED",
+        "REPORTED",
+        "IGNORED"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

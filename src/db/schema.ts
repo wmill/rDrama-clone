@@ -1,5 +1,6 @@
 import {
 	boolean,
+	customType,
 	doublePrecision,
 	integer,
 	pgEnum,
@@ -10,6 +11,12 @@ import {
 	timestamp,
 	varchar,
 } from "drizzle-orm/pg-core";
+
+const ltree = customType<{ data: string; driverData: string }>({
+	dataType() {
+		return "ltree";
+	},
+});
 
 export const stateModEnum = pgEnum("statemod", [
 	"VISIBLE",
@@ -200,6 +207,7 @@ export const comments = pgTable("comments", {
 	stateMod: stateModEnum("state_mod").notNull(),
 	stateModSetBy: varchar("state_mod_set_by"),
 	stateReport: stateReportEnum("state_report").notNull(),
+	path: ltree("path"),
 });
 
 export const commentVotes = pgTable(
