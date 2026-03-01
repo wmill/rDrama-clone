@@ -288,7 +288,7 @@ function ActualComments({
 	}
 
 	return (
-		<div style={{contentVisibility: "auto"}} className="relative space-y-1">
+		<div style={{contentVisibility: "auto"}} className="relative space-y-1 min-h-screen">
 			{isLoading && (
 				<div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
 					<Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
