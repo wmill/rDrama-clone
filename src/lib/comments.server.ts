@@ -53,6 +53,7 @@ export type CommentSummary = {
 	isPinned: string | null;
 	distinguishLevel: number;
 	isDeleted: boolean;
+	isModHidden: boolean;
 	userVote: VoteType;
 };
 
@@ -63,6 +64,47 @@ export type CommentFlat = CommentSummary;
 
 export const CommentSortTypes = ["top", "new", "old", "controversial"] as const;
 export type CommentSortType = (typeof CommentSortTypes)[number];
+
+const MOD_HIDDEN_PLACEHOLDER = "[removed by moderator]";
+
+function isModeratorHiddenState(stateMod: string | null | undefined): boolean {
+	return stateMod === "FILTERED" || stateMod === "REMOVED";
+}
+
+function applyCommentVisibilityState(params: {
+	authorName: string;
+	body: string | null;
+	bodyHtml: string;
+	stateUserDeletedUtc: Date | null;
+	stateMod?: string | null;
+}): {
+	authorName: string;
+	body: string | null;
+	bodyHtml: string;
+	isDeleted: boolean;
+	isModHidden: boolean;
+} {
+	const isDeleted = params.stateUserDeletedUtc !== null;
+	const isModHidden = isModeratorHiddenState(params.stateMod);
+
+	if (isModHidden) {
+		return {
+			authorName: "[deleted]",
+			body: MOD_HIDDEN_PLACEHOLDER,
+			bodyHtml: MOD_HIDDEN_PLACEHOLDER,
+			isDeleted,
+			isModHidden,
+		};
+	}
+
+	return {
+		authorName: params.authorName,
+		body: params.body,
+		bodyHtml: params.bodyHtml,
+		isDeleted,
+		isModHidden,
+	};
+}
 
 export async function getCommentsBySubmission(
 	submissionId: number,
@@ -138,24 +180,10 @@ export async function getCommentsBySubmission(
 	// First pass: create all comment objects
 	for (const row of results) {
 		const comment: CommentWithReplies = {
-			id: row.id,
-			authorId: row.authorId,
-			authorName: row.authorName,
-			body: row.body,
-			bodyHtml: row.bodyHtml,
-			createdUtc: row.createdUtc,
-			editedUtc: row.editedUtc,
-			upvotes: row.upvotes,
-			downvotes: row.downvotes,
-			score: row.upvotes - row.downvotes,
-			level: row.level,
-			parentCommentId: row.parentCommentId,
-			parentSubmissionId: row.parentSubmissionId,
-			descendantCount: row.descendantCount,
-			isPinned: row.isPinned,
-			distinguishLevel: row.distinguishLevel,
-			isDeleted: row.stateUserDeletedUtc !== null,
-			userVote: (row.userVoteType as VoteType) ?? 0,
+			...mapCommentRow({
+				...row,
+				parentSubmissionId: row.parentSubmissionId,
+			}),
 			replies: [],
 		};
 		commentMap.set(row.id, comment);
@@ -218,14 +246,23 @@ function mapCommentRow(row: {
 	isPinned: string | null;
 	distinguishLevel: number;
 	stateUserDeletedUtc: Date | null;
+	stateMod?: string | null;
 	userVoteType?: number | null;
 }): CommentFlat {
-	return {
-		id: row.id,
-		authorId: row.authorId,
+	const visibility = applyCommentVisibilityState({
 		authorName: row.authorName,
 		body: row.body,
 		bodyHtml: row.bodyHtml,
+		stateUserDeletedUtc: row.stateUserDeletedUtc,
+		stateMod: row.stateMod,
+	});
+
+	return {
+		id: row.id,
+		authorId: row.authorId,
+		authorName: visibility.authorName,
+		body: visibility.body,
+		bodyHtml: visibility.bodyHtml,
 		createdUtc: row.createdUtc,
 		editedUtc: row.editedUtc,
 		upvotes: row.upvotes,
@@ -237,7 +274,8 @@ function mapCommentRow(row: {
 		descendantCount: row.descendantCount,
 		isPinned: row.isPinned,
 		distinguishLevel: row.distinguishLevel,
-		isDeleted: row.stateUserDeletedUtc !== null,
+		isDeleted: visibility.isDeleted,
+		isModHidden: visibility.isModHidden,
 		userVote: (row.userVoteType as VoteType) ?? 0,
 	};
 }
@@ -259,14 +297,23 @@ function mapCommentSqlRow(row: {
 	is_pinned: string | null;
 	distinguish_level: number;
 	state_user_deleted_utc: Date | null;
+	state_mod?: string | null;
 	user_vote_type: number | null;
 }): CommentFlat {
-	return {
-		id: row.id,
-		authorId: row.author_id,
+	const visibility = applyCommentVisibilityState({
 		authorName: row.author_name,
 		body: row.body,
 		bodyHtml: row.body_html,
+		stateUserDeletedUtc: row.state_user_deleted_utc,
+		stateMod: row.state_mod,
+	});
+
+	return {
+		id: row.id,
+		authorId: row.author_id,
+		authorName: visibility.authorName,
+		body: visibility.body,
+		bodyHtml: visibility.bodyHtml,
 		createdUtc: row.created_utc,
 		editedUtc: row.edited_utc,
 		upvotes: row.upvotes,
@@ -278,7 +325,8 @@ function mapCommentSqlRow(row: {
 		descendantCount: row.descendant_count,
 		isPinned: row.is_pinned,
 		distinguishLevel: row.distinguish_level,
-		isDeleted: row.state_user_deleted_utc !== null,
+		isDeleted: visibility.isDeleted,
+		isModHidden: visibility.isModHidden,
 		userVote: (row.user_vote_type as VoteType) ?? 0,
 	};
 }
@@ -398,46 +446,43 @@ export async function getCommentThreadFlat(
 
 	const userIdParam = userId ?? null;
 	const result = await db.execute(
-		sql`WITH RECURSIVE descendants AS (
-			SELECT id, author_id, body, body_html, created_utc, edited_utc,
-				   upvotes, downvotes, level, parent_comment_id, parent_submission,
-				   descendant_count, is_pinned, distinguish_level, state_user_deleted_utc
-			FROM comments
-			WHERE parent_comment_id = ${id} AND state_mod = 'VISIBLE'
-			UNION ALL
-			SELECT c.id, c.author_id, c.body, c.body_html, c.created_utc, c.edited_utc,
-				   c.upvotes, c.downvotes, c.level, c.parent_comment_id, c.parent_submission,
-				   c.descendant_count, c.is_pinned, c.distinguish_level, c.state_user_deleted_utc
-			FROM comments c
-			INNER JOIN descendants d ON c.parent_comment_id = d.id
-			WHERE c.state_mod = 'VISIBLE'
+		sql`WITH target AS (
+			SELECT path FROM comments WHERE id = ${id}
 		)
-		SELECT d.*, u.username as author_name, cv.vote_type as user_vote_type
-		FROM descendants d
-		INNER JOIN users u ON d.author_id = u.id
-		LEFT JOIN commentvotes cv ON cv.comment_id = d.id AND cv.user_id = ${userIdParam}
-		ORDER BY d.upvotes - d.downvotes DESC`,
+		SELECT c.id, c.author_id, c.body, c.body_html, c.created_utc, c.edited_utc,
+			   c.upvotes, c.downvotes, c.level, c.parent_comment_id, c.parent_submission,
+			   c.descendant_count, c.is_pinned, c.distinguish_level, c.state_user_deleted_utc,
+			   c.state_mod, u.username as author_name, cv.vote_type as user_vote_type
+		FROM comments c
+		INNER JOIN target t ON c.path <@ t.path
+		INNER JOIN users u ON c.author_id = u.id
+		LEFT JOIN commentvotes cv ON cv.comment_id = c.id AND cv.user_id = ${userIdParam}
+		WHERE c.id <> ${id}
+		ORDER BY c.upvotes - c.downvotes DESC`,
 	);
 
-	const descendants = (result.rows as Array<{
-		id: number;
-		author_id: number;
-		author_name: string;
-		body: string | null;
-		body_html: string;
-		created_utc: number;
-		edited_utc: number;
-		upvotes: number;
-		downvotes: number;
-		level: number;
-		parent_comment_id: number | null;
-		parent_submission: number | null;
-		descendant_count: number;
-		is_pinned: string | null;
-		distinguish_level: number;
-		state_user_deleted_utc: Date | null;
-		user_vote_type: number | null;
-	}>).map((row) => mapCommentSqlRow(row));
+	const descendants = (
+		result.rows as Array<{
+			id: number;
+			author_id: number;
+			author_name: string;
+			body: string | null;
+			body_html: string;
+			created_utc: number;
+			edited_utc: number;
+			upvotes: number;
+			downvotes: number;
+			level: number;
+			parent_comment_id: number | null;
+			parent_submission: number | null;
+			descendant_count: number;
+			is_pinned: string | null;
+			distinguish_level: number;
+			state_user_deleted_utc: Date | null;
+			state_mod: string;
+			user_vote_type: number | null;
+		}>
+	).map((row) => mapCommentSqlRow(row));
 
 	return [target, ...descendants];
 }
@@ -464,6 +509,7 @@ export async function getCommentById(
 			isPinned: comments.isPinned,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
 			userVoteType: commentVotes.voteType,
 		})
 		.from(comments)
@@ -481,27 +527,11 @@ export async function getCommentById(
 		.limit(1);
 
 	if (!result) return null;
-
-	return {
-		id: result.id,
-		authorId: result.authorId,
-		authorName: result.authorName,
-		body: result.body,
-		bodyHtml: result.bodyHtml,
-		createdUtc: result.createdUtc,
-		editedUtc: result.editedUtc,
-		upvotes: result.upvotes,
-		downvotes: result.downvotes,
-		score: result.upvotes - result.downvotes,
-		level: result.level,
-		parentCommentId: result.parentCommentId,
+	return mapCommentRow({
+		...result,
 		parentSubmissionId: result.parentSubmissionId,
-		descendantCount: result.descendantCount,
-		isPinned: result.isPinned,
-		distinguishLevel: result.distinguishLevel,
-		isDeleted: result.stateUserDeletedUtc !== null,
-		userVote: (result.userVoteType as VoteType) ?? 0,
-	};
+		stateMod: result.stateMod,
+	});
 }
 
 export async function getRecentComments(
@@ -552,6 +582,7 @@ export async function getRecentComments(
 		isPinned: row.isPinned,
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: row.stateUserDeletedUtc !== null,
+		isModHidden: false,
 		userVote: 0 as VoteType,
 	}));
 }
@@ -627,6 +658,7 @@ export async function getCommentsFeed(
 			submissionTitle: submissions.title,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
 			userVoteType: commentVotes.voteType,
 		})
 		.from(comments)
@@ -700,6 +732,7 @@ export async function getCommentAncestors(
 			isPinned: comments.isPinned,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
 			userVoteType: commentVotes.voteType,
 		})
 		.from(comments)
@@ -719,12 +752,19 @@ export async function getCommentAncestors(
 		.map((aid) => {
 			const r = results.find((c) => c.id === aid);
 			if (!r) return null;
-			return {
-				id: r.id,
-				authorId: r.authorId,
+			const visibility = applyCommentVisibilityState({
 				authorName: r.authorName,
 				body: r.body,
 				bodyHtml: r.bodyHtml,
+				stateUserDeletedUtc: r.stateUserDeletedUtc,
+				stateMod: r.stateMod,
+			});
+			return {
+				id: r.id,
+				authorId: r.authorId,
+				authorName: visibility.authorName,
+				body: visibility.body,
+				bodyHtml: visibility.bodyHtml,
 				createdUtc: r.createdUtc,
 				editedUtc: r.editedUtc,
 				upvotes: r.upvotes,
@@ -736,7 +776,8 @@ export async function getCommentAncestors(
 				descendantCount: r.descendantCount,
 				isPinned: r.isPinned,
 				distinguishLevel: r.distinguishLevel,
-				isDeleted: r.stateUserDeletedUtc !== null,
+				isDeleted: visibility.isDeleted,
+				isModHidden: visibility.isModHidden,
 				userVote: (r.userVoteType as VoteType) ?? 0,
 			} satisfies CommentSummary;
 		})
@@ -876,28 +917,22 @@ export async function getCommentWithReplies(
 	const targetComment = await getCommentById(id, userId);
 	if (!targetComment) return null;
 
-	// Recursive query to get all descendants, with optional user vote join
+	// Ltree query to get all descendants, with optional user vote join
 	const userIdParam = userId ?? null;
 	const result = await db.execute(
-		sql`WITH RECURSIVE descendants AS (
-			SELECT id, author_id, body, body_html, created_utc, edited_utc,
-				   upvotes, downvotes, level, parent_comment_id, parent_submission,
-				   descendant_count, is_pinned, distinguish_level, state_user_deleted_utc
-			FROM comments
-			WHERE parent_comment_id = ${id} AND state_mod = 'VISIBLE'
-			UNION ALL
-			SELECT c.id, c.author_id, c.body, c.body_html, c.created_utc, c.edited_utc,
-				   c.upvotes, c.downvotes, c.level, c.parent_comment_id, c.parent_submission,
-				   c.descendant_count, c.is_pinned, c.distinguish_level, c.state_user_deleted_utc
-			FROM comments c
-			INNER JOIN descendants d ON c.parent_comment_id = d.id
-			WHERE c.state_mod = 'VISIBLE'
+		sql`WITH target AS (
+			SELECT path FROM comments WHERE id = ${id}
 		)
-		SELECT d.*, u.username as author_name, cv.vote_type as user_vote_type
-		FROM descendants d
-		INNER JOIN users u ON d.author_id = u.id
-		LEFT JOIN commentvotes cv ON cv.comment_id = d.id AND cv.user_id = ${userIdParam}
-		ORDER BY d.upvotes - d.downvotes DESC`,
+		SELECT c.id, c.author_id, c.body, c.body_html, c.created_utc, c.edited_utc,
+			   c.upvotes, c.downvotes, c.level, c.parent_comment_id, c.parent_submission,
+			   c.descendant_count, c.is_pinned, c.distinguish_level, c.state_user_deleted_utc,
+			   c.state_mod, u.username as author_name, cv.vote_type as user_vote_type
+		FROM comments c
+		INNER JOIN target t ON c.path <@ t.path
+		INNER JOIN users u ON c.author_id = u.id
+		LEFT JOIN commentvotes cv ON cv.comment_id = c.id AND cv.user_id = ${userIdParam}
+		WHERE c.id <> ${id}
+		ORDER BY c.upvotes - c.downvotes DESC`,
 	);
 	const allDescendants = result.rows;
 
@@ -928,27 +963,12 @@ export async function getCommentWithReplies(
 		is_pinned: string | null;
 		distinguish_level: number;
 		state_user_deleted_utc: Date | null;
+		state_mod: string;
 		user_vote_type: number | null;
 	}>) {
+		const mapped = mapCommentSqlRow(row);
 		const comment: CommentWithReplies = {
-			id: row.id,
-			authorId: row.author_id,
-			authorName: row.author_name,
-			body: row.body,
-			bodyHtml: row.body_html,
-			createdUtc: row.created_utc,
-			editedUtc: row.edited_utc,
-			upvotes: row.upvotes,
-			downvotes: row.downvotes,
-			score: row.upvotes - row.downvotes,
-			level: row.level,
-			parentCommentId: row.parent_comment_id,
-			parentSubmissionId: row.parent_submission,
-			descendantCount: row.descendant_count,
-			isPinned: row.is_pinned,
-			distinguishLevel: row.distinguish_level,
-			isDeleted: row.state_user_deleted_utc !== null,
-			userVote: (row.user_vote_type as VoteType) ?? 0,
+			...mapped,
 			replies: [],
 		};
 		commentMap.set(row.id, comment);

@@ -6,11 +6,11 @@ import { useMemo } from "react";
 import { Comment } from "@/components/comments";
 import { Button } from "@/components/ui/button";
 import { buildCommentForest } from "@/lib/comment-tree";
+import type { CommentSummary } from "@/lib/comments.server";
 import {
 	getCommentAncestors,
 	getCommentThreadFlat,
 } from "@/lib/comments.server";
-import type { CommentSummary } from "@/lib/comments.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissionById } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
@@ -79,7 +79,10 @@ export const Route = createFileRoute("/comment/$id")({
 function AncestorCommentCard({
 	comment,
 	depth,
-}: { comment: CommentSummary; depth: number }) {
+}: {
+	comment: CommentSummary;
+	depth: number;
+}) {
 	const indentPx = depth * 12;
 	return (
 		<Link
@@ -95,9 +98,11 @@ function AncestorCommentCard({
 					<span>{formatRelativeTime(comment.createdUtc)}</span>
 				</div>
 				<p className="text-sm text-slate-400 line-clamp-2">
-					{comment.isDeleted
-						? "[deleted]"
-						: (comment.body ?? comment.bodyHtml.replace(/<[^>]+>/g, ""))}
+					{comment.isModHidden
+						? "[removed by moderator]"
+						: comment.isDeleted
+							? "[deleted]"
+							: (comment.body ?? comment.bodyHtml.replace(/<[^>]+>/g, ""))}
 				</p>
 			</div>
 		</Link>
@@ -106,7 +111,10 @@ function AncestorCommentCard({
 
 function CommentPage() {
 	const { comments, submission, user, ancestors } = Route.useLoaderData();
-	const { byId } = useMemo(() => buildCommentForest(comments, "top"), [comments]);
+	const { byId } = useMemo(
+		() => buildCommentForest(comments, "top"),
+		[comments],
+	);
 	const comment = byId.get(comments[0]?.id ?? -1);
 
 	if (!comment) {

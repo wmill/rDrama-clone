@@ -40,6 +40,8 @@ export const Comment = memo(function Comment({
 	const [isEditing, setIsEditing] = useState(false);
 	const [isDeleted, setIsDeleted] = useState(comment.isDeleted);
 	const [currentBody, setCurrentBody] = useState(comment.bodyHtml);
+	const isModHidden = comment.isModHidden;
+	const isContentHidden = isDeleted || isModHidden;
 
 	const isAuthor = currentUserId === comment.authorId;
 	const userVote = comment.userVote;
@@ -105,7 +107,7 @@ export const Comment = memo(function Comment({
 					</button>
 
 					<span className="font-medium text-cyan-400">
-						{isDeleted ? "[deleted]" : comment.authorName}
+						{isContentHidden ? "[deleted]" : comment.authorName}
 					</span>
 
 					{comment.distinguishLevel > 0 && (
@@ -175,9 +177,9 @@ export const Comment = memo(function Comment({
 								)}
 
 								{/* Actions */}
-								{!isEditing && !isDeleted && (
+								{!isEditing && (
 									<div className="mt-2 flex items-center gap-3 text-xs">
-										{currentUserId && (
+										{currentUserId && !isDeleted && !isModHidden && (
 											<button
 												type="button"
 												onClick={() => setShowReplyForm(!showReplyForm)}
@@ -193,18 +195,18 @@ export const Comment = memo(function Comment({
 										)}
 
 										<Link
-										to={`/comment/${comment.id}` as "/"}
-										className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
-									>
-										<IconMask
-											src={messageSquareUrl}
-											className="h-3 w-3"
-											colorClassName="bg-current"
-										/>
-										Permalink
-									</Link>
+											to={`/comment/${comment.id}` as "/"}
+											className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
+										>
+											<IconMask
+												src={messageSquareUrl}
+												className="h-3 w-3"
+												colorClassName="bg-current"
+											/>
+											Permalink
+										</Link>
 
-										{isAuthor && (
+										{isAuthor && !isDeleted && !isModHidden && (
 											<>
 												<button
 													type="button"
@@ -236,25 +238,25 @@ export const Comment = memo(function Comment({
 								)}
 
 								{/* Reply form */}
-								{showReplyForm && (
+								{showReplyForm && !isModHidden && !isDeleted && (
 									<div className="mt-3">
 										<CommentForm
 											mode="reply"
 											onSubmit={async (text) => {
-											const result = await createCommentFn({
-												data: {
-													body: text,
-													parentSubmissionId: submissionId,
-													parentCommentId: comment.id,
-												},
-											});
-											if (result.success) {
-												onReplyAdded?.(result.comment ?? undefined);
-											}
-											return result;
-										}}
-										onCancel={() => setShowReplyForm(false)}
-									/>
+												const result = await createCommentFn({
+													data: {
+														body: text,
+														parentSubmissionId: submissionId,
+														parentCommentId: comment.id,
+													},
+												});
+												if (result.success) {
+													onReplyAdded?.(result.comment ?? undefined);
+												}
+												return result;
+											}}
+											onCancel={() => setShowReplyForm(false)}
+										/>
 									</div>
 								)}
 							</div>
