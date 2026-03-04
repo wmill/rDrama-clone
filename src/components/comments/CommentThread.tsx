@@ -297,8 +297,8 @@ function ActualComments({
 				/>
 			))}
 
-			{visibleLimit < totalCount && (
-				<div className="pt-3 text-center">
+			{!isLoading && visibleLimit < totalCount && (
+				<div className="pt-3 text-center absolute bottom-0 left-0 w-full bg-gradient-to-t from-slate-900/80 to-transparent">
 					<Button
 						variant="outline"
 						onClick={() =>
