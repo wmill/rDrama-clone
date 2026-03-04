@@ -19,10 +19,7 @@ function compareComments(
 	}
 }
 
-function sortReplies(
-	comments: CommentWithReplies[],
-	sort: CommentSortType,
-) {
+function sortReplies(comments: CommentWithReplies[], sort: CommentSortType) {
 	comments.sort((a, b) => compareComments(a, b, sort));
 	for (const comment of comments) {
 		if (comment.replies.length > 0) {

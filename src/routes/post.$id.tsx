@@ -1,13 +1,10 @@
-import {
-	createFileRoute,
-	Link,
-	notFound,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
 
 import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
+import { useCommentStore } from "@/lib/comment-store";
 import {
 	type CommentSortType,
 	getCommentsBySubmissionFlat,
@@ -18,31 +15,26 @@ import {
 	type SubmissionDetail,
 } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
-import { useCommentStore } from "@/lib/comment-store";
 import type { VoteType } from "@/lib/votes.server";
 
 const getPostFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { id: number }) => data)
-	.handler(
-		async ({ data }: { data: { id: number } }) => {
-			const user = await getCurrentUser();
-			const userId = user?.id;
+	.handler(async ({ data }: { data: { id: number } }) => {
+		const user = await getCurrentUser();
+		const userId = user?.id;
 
-			const [post, comments] = await Promise.all([
-				getSubmissionById(data.id, userId),
-				getCommentsBySubmissionFlat(data.id, userId),
-			]);
-			if (!post) return null;
+		const [post, comments] = await Promise.all([
+			getSubmissionById(data.id, userId),
+			getCommentsBySubmissionFlat(data.id, userId),
+		]);
+		if (!post) return null;
 
-			const commentsLastFetchedAt =
-				comments.reduce(
-					(max, comment) => Math.max(max, comment.createdUtc),
-					0,
-				) || Math.floor(Date.now() / 1000);
+		const commentsLastFetchedAt =
+			comments.reduce((max, comment) => Math.max(max, comment.createdUtc), 0) ||
+			Math.floor(Date.now() / 1000);
 
-			return { post, comments, commentsLastFetchedAt, user };
-		},
-	);
+		return { post, comments, commentsLastFetchedAt, user };
+	});
 
 export const Route = createFileRoute("/post/$id")({
 	component: PostPage,

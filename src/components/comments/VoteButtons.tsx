@@ -167,7 +167,9 @@ export function VoteButtons({
 					src={arrowBigUpUrl}
 					className={classes.icon}
 					colorClassName={
-						userVote === 1 ? "bg-orange-500" : "bg-slate-400 group-hover:bg-orange-500"
+						userVote === 1
+							? "bg-orange-500"
+							: "bg-slate-400 group-hover:bg-orange-500"
 					}
 				/>
 			</button>
@@ -199,7 +201,9 @@ export function VoteButtons({
 					src={arrowBigDownUrl}
 					className={classes.icon}
 					colorClassName={
-						userVote === -1 ? "bg-blue-500" : "bg-slate-400 group-hover:bg-blue-500"
+						userVote === -1
+							? "bg-blue-500"
+							: "bg-slate-400 group-hover:bg-blue-500"
 					}
 				/>
 			</button>

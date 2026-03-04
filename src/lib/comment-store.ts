@@ -36,12 +36,7 @@ function normalizeComments(comments: CommentFlat[]) {
 
 export const useCommentStore = create<CommentStoreState>((set, get) => ({
 	submissions: {},
-	initSubmission: (
-		submissionId,
-		comments,
-		commentCount,
-		lastFetchedAt,
-	) => {
+	initSubmission: (submissionId, comments, commentCount, lastFetchedAt) => {
 		const normalized = normalizeComments(comments);
 		set((state) => ({
 			submissions: {

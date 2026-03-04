@@ -63,12 +63,7 @@ export function CommentThread({
 	const [rootRenderedCount, setRootRenderedCount] = useState(0);
 
 	useEffect(() => {
-		initSubmission(
-			submissionId,
-			comments,
-			commentCount,
-			commentsLastFetchedAt,
-		);
+		initSubmission(submissionId, comments, commentCount, commentsLastFetchedAt);
 		setVisibleLimit(COMMENTS_PAGE_SIZE);
 	}, [
 		commentCount,
@@ -90,8 +85,7 @@ export function CommentThread({
 	}, [submissionState]);
 
 	const localCommentCount = submissionState?.commentCount ?? commentCount;
-	const lastFetchedAt =
-		submissionState?.lastFetchedAt ?? commentsLastFetchedAt;
+	const lastFetchedAt = submissionState?.lastFetchedAt ?? commentsLastFetchedAt;
 
 	const commentTree = useMemo(
 		() => buildCommentTree(flatComments, sort),
@@ -100,11 +94,7 @@ export function CommentThread({
 
 	const handleMerge = useCallback(
 		(newComments: CommentFlat[], fetchedAt: number) => {
-			const newCount = mergeComments(
-				submissionId,
-				newComments,
-				fetchedAt,
-			);
+			const newCount = mergeComments(submissionId, newComments, fetchedAt);
 			if (newCount > 0) {
 				setVisibleLimit((prev) => prev + newCount);
 			}
@@ -230,7 +220,6 @@ function ActualComments({
 	rootRenderedCount,
 	setRootRenderedCount,
 }: ActualCommentsProps) {
-	
 	const { visibleIds, totalCount } = useMemo(
 		() => getVisibleCommentIds(comments, visibleLimit),
 		[comments, visibleLimit],
@@ -288,7 +277,10 @@ function ActualComments({
 	}
 
 	return (
-		<div style={{contentVisibility: "auto"}} className="relative space-y-1 min-h-screen">
+		<div
+			style={{ contentVisibility: "auto" }}
+			className="relative space-y-1 min-h-screen"
+		>
 			{isLoading && (
 				<div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
 					<Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
