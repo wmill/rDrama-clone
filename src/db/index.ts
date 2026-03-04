@@ -1,14 +1,7 @@
-import { resolve } from "node:path";
-import { config } from "dotenv";
-
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import * as schema from "./schema.ts";
-
-// Load .env.local first, then .env (dotenv won't overwrite existing values)
-config({ path: resolve(process.cwd(), ".env.local") });
-config({ path: resolve(process.cwd(), ".env") });
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

@@ -16,11 +16,14 @@ import { Route as MeRouteImport } from './routes/me'
 import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CommentsRouteImport } from './routes/comments'
+import { Route as AtmeRouteImport } from './routes/@me'
+import { Route as AtusernameRouteImport } from './routes/@$username'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PostIdRouteImport } from './routes/post.$id'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
 import { Route as CommentIdRouteImport } from './routes/comment.$id'
+import { Route as AtusernamePostsRouteImport } from './routes/@$username.posts'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
 import { Route as DemoSentryTestingRouteImport } from './routes/demo/sentry.testing'
@@ -68,6 +71,16 @@ const CommentsRoute = CommentsRouteImport.update({
   path: '/comments',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtmeRoute = AtmeRouteImport.update({
+  id: '/@me',
+  path: '/@me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtusernameRoute = AtusernameRouteImport.update({
+  id: '/@$username',
+  path: '/@$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -92,6 +105,11 @@ const CommentIdRoute = CommentIdRouteImport.update({
   id: '/comment/$id',
   path: '/comment/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AtusernamePostsRoute = AtusernamePostsRouteImport.update({
+  id: '/posts',
+  path: '/posts',
+  getParentRoute: () => AtusernameRoute,
 } as any)
 const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
   id: '/demo/start/server-funcs',
@@ -151,6 +169,8 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/@$username': typeof AtusernameRouteWithChildren
+  '/@me': typeof AtmeRoute
   '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
@@ -158,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/@$username/posts': typeof AtusernamePostsRoute
   '/comment/$id': typeof CommentIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
@@ -176,6 +197,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/@$username': typeof AtusernameRouteWithChildren
+  '/@me': typeof AtmeRoute
   '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
@@ -183,6 +206,7 @@ export interface FileRoutesByTo {
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/@$username/posts': typeof AtusernamePostsRoute
   '/comment/$id': typeof CommentIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
@@ -202,6 +226,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/@$username': typeof AtusernameRouteWithChildren
+  '/@me': typeof AtmeRoute
   '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
@@ -209,6 +235,7 @@ export interface FileRoutesById {
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/@$username/posts': typeof AtusernamePostsRoute
   '/comment/$id': typeof CommentIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
@@ -229,6 +256,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/@$username'
+    | '/@me'
     | '/comments'
     | '/login'
     | '/logout'
@@ -236,6 +265,7 @@ export interface FileRouteTypes {
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/@$username/posts'
     | '/comment/$id'
     | '/demo/drizzle'
     | '/demo/tanstack-query'
@@ -254,6 +284,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/@$username'
+    | '/@me'
     | '/comments'
     | '/login'
     | '/logout'
@@ -261,6 +293,7 @@ export interface FileRouteTypes {
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/@$username/posts'
     | '/comment/$id'
     | '/demo/drizzle'
     | '/demo/tanstack-query'
@@ -279,6 +312,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/@$username'
+    | '/@me'
     | '/comments'
     | '/login'
     | '/logout'
@@ -286,6 +321,7 @@ export interface FileRouteTypes {
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/@$username/posts'
     | '/comment/$id'
     | '/demo/drizzle'
     | '/demo/tanstack-query'
@@ -305,6 +341,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AtusernameRoute: typeof AtusernameRouteWithChildren
+  AtmeRoute: typeof AtmeRoute
   CommentsRoute: typeof CommentsRoute
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
@@ -380,6 +418,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/@me': {
+      id: '/@me'
+      path: '/@me'
+      fullPath: '/@me'
+      preLoaderRoute: typeof AtmeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/@$username': {
+      id: '/@$username'
+      path: '/@$username'
+      fullPath: '/@$username'
+      preLoaderRoute: typeof AtusernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -414,6 +466,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/comment/$id'
       preLoaderRoute: typeof CommentIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/@$username/posts': {
+      id: '/@$username/posts'
+      path: '/posts'
+      fullPath: '/@$username/posts'
+      preLoaderRoute: typeof AtusernamePostsRouteImport
+      parentRoute: typeof AtusernameRoute
     }
     '/demo/start/server-funcs': {
       id: '/demo/start/server-funcs'
@@ -495,8 +554,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AtusernameRouteChildren {
+  AtusernamePostsRoute: typeof AtusernamePostsRoute
+}
+
+const AtusernameRouteChildren: AtusernameRouteChildren = {
+  AtusernamePostsRoute: AtusernamePostsRoute,
+}
+
+const AtusernameRouteWithChildren = AtusernameRoute._addFileChildren(
+  AtusernameRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AtusernameRoute: AtusernameRouteWithChildren,
+  AtmeRoute: AtmeRoute,
   CommentsRoute: CommentsRoute,
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,

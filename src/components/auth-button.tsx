@@ -31,13 +31,13 @@ export function AuthButton() {
 	return (
 		<div className="flex items-center gap-3">
 			{user ? (
-				<Link
-					to="/me"
+				<a
+					href={`/@${user.username}`}
 					className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700 transition-colors"
 				>
 					<UserRound className="h-4 w-4 text-cyan-300" />
 					<span className="font-semibold">{user.username}</span>
-				</Link>
+				</a>
 			) : (
 				<div className="text-sm text-slate-300">Not logged in</div>
 			)}

@@ -18,4 +18,7 @@ export default defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  server: {
+    allowedHosts: true,
+  },
 })

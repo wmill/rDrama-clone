@@ -249,3 +249,98 @@ export const votes = pgTable(
 	},
 	(table) => primaryKey({ columns: [table.submissionId, table.userId] }),
 );
+
+export const follows = pgTable(
+	"follows",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		targetId: integer("target_id")
+			.notNull()
+			.references(() => users.id),
+		createdDatetimez: timestamp("created_datetimez", {
+			withTimezone: true,
+			mode: "date",
+		})
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => primaryKey({ columns: [table.targetId, table.userId] }),
+);
+
+export const saveRelationship = pgTable(
+	"save_relationship",
+	{
+		submissionId: integer("submission_id")
+			.notNull()
+			.references(() => submissions.id),
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.submissionId] }),
+);
+
+export const commentSaveRelationship = pgTable(
+	"comment_save_relationship",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		commentId: integer("comment_id")
+			.notNull()
+			.references(() => comments.id),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.commentId] }),
+);
+
+export const badgeDefs = pgTable("badge_defs", {
+	id: serial("id").primaryKey(),
+	name: varchar("name", { length: 50 }).notNull(),
+	description: varchar("description", { length: 200 }),
+});
+
+export const badges = pgTable(
+	"badges",
+	{
+		badgeId: integer("badge_id")
+			.notNull()
+			.references(() => badgeDefs.id),
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		description: varchar("description", { length: 256 }),
+		url: varchar("url", { length: 256 }),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.badgeId] }),
+);
+
+export const awardRelationships = pgTable("award_relationships", {
+	id: serial("id").primaryKey(),
+	userId: integer("user_id")
+		.notNull()
+		.references(() => users.id),
+	submissionId: integer("submission_id").references(() => submissions.id),
+	commentId: integer("comment_id").references(() => comments.id),
+	kind: varchar("kind", { length: 20 }).notNull(),
+});
+
+export const viewers = pgTable(
+	"viewers",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		viewerId: integer("viewer_id")
+			.notNull()
+			.references(() => users.id),
+		lastViewDatetimez: timestamp("last_view_datetimez", {
+			withTimezone: true,
+			mode: "date",
+		})
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.viewerId] }),
+);
