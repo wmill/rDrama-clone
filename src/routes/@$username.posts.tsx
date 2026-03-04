@@ -14,10 +14,10 @@ import {
 	TimeFilters,
 } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { stripHtmlToText } from "@/lib/utils";
 import {
 	getProfilePageData,
 	type ProfilePageData,
-	stripHtmlToText,
 } from "@/lib/users.server";
 
 function parseTime(value: unknown): TimeFilter {

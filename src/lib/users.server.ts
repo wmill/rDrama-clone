@@ -314,11 +314,3 @@ export async function getProfilePageData(options: {
 		hasNextPage,
 	};
 }
-
-export function stripHtmlToText(content: string | null | undefined): string {
-	if (!content) return "";
-	return content
-		.replace(/<[^>]+>/g, " ")
-		.replace(/\s+/g, " ")
-		.trim();
-}

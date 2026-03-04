@@ -5,6 +5,14 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
+export function stripHtmlToText(content: string | null | undefined): string {
+	if (!content) return "";
+	return content
+		.replace(/<[^>]+>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
 export function formatRelativeTime(unixTimestamp: number): string {
 	const now = Date.now() / 1000;
 	const diff = now - unixTimestamp;
