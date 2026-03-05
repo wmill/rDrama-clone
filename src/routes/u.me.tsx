@@ -7,13 +7,13 @@ const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
 	return getCurrentUser();
 });
 
-export const Route = createFileRoute("/@me")({
+export const Route = createFileRoute("/u/me")({
 	component: () => null,
 	loader: async () => {
 		const user = await getCurrentUserFn();
 		if (!user) {
 			throw redirect({ to: "/login" });
 		}
-		throw redirect({ href: `/@${user.username}` });
+		throw redirect({ href: `/u/${user.username}` });
 	},
 });

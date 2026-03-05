@@ -259,7 +259,7 @@ function ActualComments({
 			cancelled = true;
 			window.clearInterval(intervalId);
 		};
-	}, [rootRenderedCount, rootTarget]);
+	}, [rootRenderedCount, rootTarget, setRootRenderedCount]);
 
 	const stagedComments = useMemo(
 		() => filteredComments.slice(0, rootRenderedCount),

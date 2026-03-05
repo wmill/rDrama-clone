@@ -129,7 +129,9 @@ function PostContent({
 			<div className="border-b border-slate-800 p-4">
 				<div className="flex items-center gap-2 text-sm text-slate-400">
 					<span>Posted by</span>
-					<span className="font-medium text-cyan-400">{post.authorName}</span>
+					<a href={`/u/${post.authorName}`} className="font-medium text-cyan-400 hover:underline">
+					{post.authorName}
+				</a>
 					<span className="flex items-center gap-1">
 						<Clock className="h-3 w-3" />
 						{formatRelativeTime(post.createdUtc)}

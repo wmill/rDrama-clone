@@ -92,9 +92,12 @@ function AncestorCommentCard({
 		>
 			<div className="border-l-2 border-slate-600 pl-3 py-1">
 				<div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-					<span className="font-medium text-slate-300">
+					<a
+						href={`/u/${comment.authorName}`}
+						className="font-medium text-slate-300 hover:underline"
+					>
 						{comment.authorName}
-					</span>
+					</a>
 					<span>{formatRelativeTime(comment.createdUtc)}</span>
 				</div>
 				<p className="text-sm text-slate-400 line-clamp-2">
@@ -139,9 +142,9 @@ function CommentPage() {
 				<div className="mb-6 rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
 					<div className="flex items-center gap-2 text-sm text-slate-400">
 						<span>Posted by</span>
-						<span className="font-medium text-cyan-400">
+						<a href={`/u/${submission.authorName}`} className="font-medium text-cyan-400 hover:underline">
 							{submission.authorName}
-						</span>
+						</a>
 						<span className="flex items-center gap-1">
 							<Clock className="h-3 w-3" />
 							{formatRelativeTime(submission.createdUtc)}

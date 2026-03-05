@@ -125,7 +125,7 @@ function MePage() {
 
 				<div className="mt-8 flex gap-4">
 					<Button variant="outline" asChild>
-						<a href={`/@${user.username}`}>View Public Profile</a>
+						<a href={`/u/${user.username}`}>View Public Profile</a>
 					</Button>
 					{/* TODO: Implement settings route in Phase 4 */}
 					<Button disabled variant="outline">

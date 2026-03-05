@@ -250,9 +250,16 @@ function CommentCard({
 				<div className="min-w-0 flex-1">
 					{/* Header */}
 					<div className="flex items-center gap-2 text-xs text-slate-400">
-						<span className="font-medium text-cyan-400">
-							{comment.isDeleted ? "[deleted]" : comment.authorName}
-						</span>
+						{comment.isDeleted ? (
+							<span className="font-medium text-cyan-400">[deleted]</span>
+						) : (
+							<a
+								href={`/u/${comment.authorName}`}
+								className="font-medium text-cyan-400 hover:underline"
+							>
+								{comment.authorName}
+							</a>
+						)}
 						{comment.distinguishLevel > 0 && (
 							<span className="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
 								MOD

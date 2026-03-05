@@ -173,9 +173,12 @@ export function RecentSubmissions({
 										{/* Meta line */}
 										<p className="mt-1 text-sm text-slate-400">
 											<span className="text-slate-500">by</span>{" "}
-											<span className="font-medium text-cyan-400">
+											<a
+												href={`/u/${submission.authorName}`}
+												className="font-medium text-cyan-400 hover:underline"
+											>
 												{submission.authorName}
-											</span>{" "}
+											</a>{" "}
 											<span className="text-slate-600">&middot;</span>{" "}
 											{formatRelativeTime(submission.createdUtc)}
 										</p>

@@ -32,7 +32,7 @@ export function AuthButton() {
 		<div className="flex items-center gap-3">
 			{user ? (
 				<a
-					href={`/@${user.username}`}
+					href={`/u/${user.username}`}
 					className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700 transition-colors"
 				>
 					<UserRound className="h-4 w-4 text-cyan-300" />

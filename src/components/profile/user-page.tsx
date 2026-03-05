@@ -43,8 +43,8 @@ export function UserPage({
 	onPageChange: (page: number) => Promise<void>;
 }) {
 	const user = data.profileUser;
-	const commentsTabHref = `/@${user.username}`;
-	const postsTabHref = `/@${user.username}/posts`;
+	const commentsTabHref = `/u/${user.username}`;
+	const postsTabHref = `/u/${user.username}/posts`;
 	const avatarHref = user.highRes || user.profileUrl || undefined;
 	const sortOptions =
 		data.tab === "posts" ? postSortOptions : commentSortOptions;

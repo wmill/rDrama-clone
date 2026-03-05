@@ -8,8 +8,8 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { UserPage } from "@/components/profile/user-page";
 import {
-	type SortType,
-	SortTypes,
+	type CommentFeedSortType,
+	CommentSortTypes,
 	type TimeFilter,
 	TimeFilters,
 } from "@/lib/constants";
@@ -27,11 +27,14 @@ function parseTime(value: unknown): TimeFilter {
 	return "all";
 }
 
-function parseSort(value: unknown): SortType {
-	if (typeof value === "string" && SortTypes.includes(value as SortType)) {
-		return value as SortType;
+function parseSort(value: unknown): CommentFeedSortType {
+	if (
+		typeof value === "string" &&
+		CommentSortTypes.includes(value as CommentFeedSortType)
+	) {
+		return value as CommentFeedSortType;
 	}
-	return "hot";
+	return "new";
 }
 
 function parsePage(value: unknown): number {
@@ -42,16 +45,16 @@ function parsePage(value: unknown): number {
 	return 1;
 }
 
-function buildPostsProfileHref(
+function buildCommentsProfileHref(
 	username: string,
-	search: { sort: SortType; t: TimeFilter; page: number },
+	search: { sort: CommentFeedSortType; t: TimeFilter; page: number },
 ): string {
 	const params = new URLSearchParams({
 		sort: search.sort,
 		t: search.t,
 		page: String(search.page),
-	});
-	return `/@${username}/posts?${params.toString()}`;
+	})
+	return `/u/${username}?${params.toString()}`;
 }
 
 function buildDescription(data: ProfilePageData): string {
@@ -67,31 +70,40 @@ function buildDescription(data: ProfilePageData): string {
 	return `@${data.profileUser.username} • joined ${joined} • ${data.profileUser.storedSubscriberCount} followers • ${data.profileUser.postCount} posts • ${data.profileUser.commentCount} comments${bio ? ` • ${bio}` : ""}`;
 }
 
-const getUserPostsPageFn = createServerFn({ method: "GET" })
+const getUserCommentsPageFn = createServerFn({ method: "GET" })
 	.inputValidator(
-		(data: { username: string; sort: SortType; t: TimeFilter; page: number }) =>
-			data,
+		(data: {
+			username: string;
+			sort: CommentFeedSortType;
+			t: TimeFilter;
+			page: number;
+		}) => data,
 	)
 	.handler(
 		async ({
 			data,
 		}: {
-			data: { username: string; sort: SortType; t: TimeFilter; page: number };
+			data: {
+				username: string;
+				sort: CommentFeedSortType;
+				t: TimeFilter;
+				page: number;
+			}
 		}) => {
 			const viewer = await getCurrentUser();
 			return getProfilePageData({
 				username: data.username,
-				tab: "posts",
+				tab: "comments",
 				sort: data.sort,
 				t: data.t,
 				page: data.page,
 				viewer,
-			});
+			})
 		},
-	);
+	)
 
-export const Route = createFileRoute("/@$username/posts")({
-	component: UserPostsPage,
+export const Route = createFileRoute("/u/$username")({
+	component: UserCommentsPage,
 	validateSearch: (search: Record<string, unknown>) => ({
 		sort: parseSort(search.sort),
 		t: parseTime(search.t),
@@ -103,21 +115,21 @@ export const Route = createFileRoute("/@$username/posts")({
 		page: search.page,
 	}),
 	loader: async ({ params, deps }) => {
-		const data = await getUserPostsPageFn({
+		const data = await getUserCommentsPageFn({
 			data: {
 				username: params.username,
 				sort: deps.sort,
 				t: deps.t,
 				page: deps.page,
 			},
-		});
+		})
 
 		if (!data) throw notFound();
 
 		if (data.profileUser.username !== params.username) {
 			throw redirect({
-				href: buildPostsProfileHref(data.profileUser.username, deps),
-			});
+				href: buildCommentsProfileHref(data.profileUser.username, deps),
+			})
 		}
 
 		return data;
@@ -132,12 +144,12 @@ export const Route = createFileRoute("/@$username/posts")({
 			loaderData?.profileUser.profileUrl ||
 			"/tanstack-word-logo-white.svg";
 		const url = loaderData
-			? buildPostsProfileHref(username, {
+			? buildCommentsProfileHref(username, {
 					sort: parseSort(loaderData.sort),
 					t: loaderData.t,
 					page: loaderData.page,
 				})
-			: `/@${username}/posts`;
+			: `/u/${username}`;
 
 		return {
 			meta: [
@@ -152,11 +164,11 @@ export const Route = createFileRoute("/@$username/posts")({
 				{ name: "twitter:description", content: description },
 				{ name: "twitter:image", content: image },
 			],
-		};
+		}
 	},
 });
 
-function UserPostsPage() {
+function UserCommentsPage() {
 	const router = useRouter();
 	const data = Route.useLoaderData();
 
@@ -165,31 +177,31 @@ function UserPostsPage() {
 			data={data}
 			onSortChange={async (sort) => {
 				await router.navigate({
-					href: buildPostsProfileHref(data.profileUser.username, {
+					href: buildCommentsProfileHref(data.profileUser.username, {
 						sort: parseSort(sort),
 						t: data.t,
 						page: 1,
 					}),
-				});
+				})
 			}}
 			onTimeChange={async (t) => {
 				await router.navigate({
-					href: buildPostsProfileHref(data.profileUser.username, {
+					href: buildCommentsProfileHref(data.profileUser.username, {
 						sort: parseSort(data.sort),
 						t,
 						page: 1,
 					}),
-				});
+				})
 			}}
 			onPageChange={async (page) => {
 				await router.navigate({
-					href: buildPostsProfileHref(data.profileUser.username, {
+					href: buildCommentsProfileHref(data.profileUser.username, {
 						sort: parseSort(data.sort),
 						t: data.t,
 						page,
 					}),
-				});
+				})
 			}}
 		/>
-	);
+	)
 }

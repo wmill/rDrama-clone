@@ -69,6 +69,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "baseline-browser-mapping": "^2.10.0",
     "dotenv": "^16.0.0",
     "jsdom": "^27.0.0",
     "tracery-grammar": "^2.8.4",
