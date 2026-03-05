@@ -7,7 +7,9 @@ import {
 	pgTable,
 	primaryKey,
 	serial,
+	smallint,
 	text,
+	time,
 	timestamp,
 	varchar,
 } from "drizzle-orm/pg-core";
@@ -33,6 +35,25 @@ export const filterBehaviorEnum = pgEnum("filterbehavior", [
 	"AUTOMATIC",
 	"UNFILTERED",
 	"FILTERED",
+]);
+export const userTagEnum = pgEnum("usertag", [
+	"Quality",
+	"Good",
+	"Comment",
+	"Warning",
+	"Tempban",
+	"Permban",
+	"Spam",
+	"Bot",
+]);
+export const volunteerJanitorResultEnum = pgEnum("volunteerjanitorresult", [
+	"Pending",
+	"TopQuality",
+	"Good",
+	"Neutral",
+	"Bad",
+	"Warning",
+	"Ban",
 ]);
 
 export const users = pgTable("users", {
@@ -126,6 +147,7 @@ export const users = pgTable("users", {
 		mode: "date",
 	}).notNull(),
 	filterBehavior: filterBehaviorEnum("filter_behavior").notNull(),
+	storedFollowingCount: integer("stored_following_count").notNull().default(0),
 });
 
 export const submissions = pgTable("submissions", {
@@ -344,3 +366,259 @@ export const viewers = pgTable(
 	},
 	(table) => primaryKey({ columns: [table.userId, table.viewerId] }),
 );
+
+export const alts = pgTable(
+	"alts",
+	{
+		user1: integer("user1")
+			.notNull()
+			.references(() => users.id),
+		user2: integer("user2")
+			.notNull()
+			.references(() => users.id),
+		isManual: boolean("is_manual").notNull().default(false),
+	},
+	(table) => primaryKey({ columns: [table.user1, table.user2] }),
+);
+
+export const bannedDomains = pgTable("banneddomains", {
+	domain: varchar("domain", { length: 100 }).primaryKey(),
+	reason: varchar("reason", { length: 100 }).notNull(),
+});
+
+export const chatMessage = pgTable("chat_message", {
+	id: serial("id").primaryKey(),
+	authorId: integer("author_id")
+		.notNull()
+		.references(() => users.id),
+	quoteId: integer("quote_id"),
+	text: varchar("text").notNull(),
+	textHtml: varchar("text_html").notNull(),
+	createdDatetimez: timestamp("created_datetimez", {
+		withTimezone: true,
+		mode: "date",
+	})
+		.notNull()
+		.defaultNow(),
+});
+
+export const clientAuths = pgTable(
+	"client_auths",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		oauthClient: integer("oauth_client").notNull(),
+		accessToken: varchar("access_token", { length: 128 }).notNull(),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.oauthClient] }),
+);
+
+export const commentFlags = pgTable("commentflags", {
+	id: serial("id").primaryKey(),
+	userId: integer("user_id")
+		.notNull()
+		.references(() => users.id),
+	commentId: integer("comment_id")
+		.notNull()
+		.references(() => comments.id),
+	reason: varchar("reason", { length: 350 }),
+	createdDatetimez: timestamp("created_datetimez", {
+		withTimezone: true,
+		mode: "date",
+	})
+		.notNull()
+		.defaultNow(),
+});
+
+export const flags = pgTable("flags", {
+	id: serial("id").primaryKey(),
+	userId: integer("user_id")
+		.notNull()
+		.references(() => users.id),
+	postId: integer("post_id")
+		.notNull()
+		.references(() => submissions.id),
+	reason: varchar("reason", { length: 350 }),
+	createdDatetimez: timestamp("created_datetimez", {
+		withTimezone: true,
+		mode: "date",
+	})
+		.notNull()
+		.defaultNow(),
+});
+
+export const marseys = pgTable("marseys", {
+	name: varchar("name", { length: 30 }).primaryKey(),
+	authorId: integer("author_id")
+		.notNull()
+		.references(() => users.id),
+	tags: varchar("tags", { length: 200 }).notNull(),
+	count: integer("count").notNull().default(0),
+});
+
+export const modActions = pgTable("modactions", {
+	id: serial("id").primaryKey(),
+	userId: integer("user_id").references(() => users.id),
+	targetUserId: integer("target_user_id").references(() => users.id),
+	targetSubmissionId: integer("target_submission_id").references(
+		() => submissions.id,
+	),
+	targetCommentId: integer("target_comment_id").references(() => comments.id),
+	kind: varchar("kind", { length: 32 }),
+	note: varchar("_note", { length: 256 }),
+	createdDatetimez: timestamp("created_datetimez", {
+		withTimezone: true,
+		mode: "date",
+	})
+		.notNull()
+		.defaultNow(),
+});
+
+export const notifications = pgTable(
+	"notifications",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		commentId: integer("comment_id")
+			.notNull()
+			.references(() => comments.id),
+		read: boolean("read").notNull(),
+		createdDatetimez: timestamp("created_datetimez", {
+			withTimezone: true,
+			mode: "date",
+		})
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.commentId] }),
+);
+
+export const oauthApps = pgTable("oauth_apps", {
+	id: serial("id").primaryKey(),
+	clientId: varchar("client_id", { length: 64 }),
+	appName: varchar("app_name", { length: 50 }).notNull(),
+	redirectUri: varchar("redirect_uri", { length: 50 }).notNull(),
+	authorId: integer("author_id")
+		.notNull()
+		.references(() => users.id),
+	description: varchar("description", { length: 256 }).notNull(),
+});
+
+export const subscriptions = pgTable(
+	"subscriptions",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		submissionId: integer("submission_id")
+			.notNull()
+			.references(() => submissions.id),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.submissionId] }),
+);
+
+export const tasksRepeatable = pgTable("tasks_repeatable", {
+	id: serial("id").primaryKey(),
+	authorId: integer("author_id")
+		.notNull()
+		.references(() => users.id),
+	typeId: smallint("type_id").notNull(),
+	enabled: boolean("enabled").notNull(),
+	runState: smallint("run_state").notNull(),
+	runTimeLast: timestamp("run_time_last", { mode: "date" }),
+	frequencyDay: smallint("frequency_day").notNull(),
+	timeOfDayUtc: time("time_of_day_utc").notNull(),
+	createdUtc: integer("created_utc").notNull(),
+	label: varchar("label"),
+});
+
+export const tasksRepeatablePython = pgTable("tasks_repeatable_python", {
+	id: integer("id")
+		.primaryKey()
+		.references(() => tasksRepeatable.id),
+	importPath: varchar("import_path").notNull(),
+	callable: varchar("callable").notNull(),
+});
+
+export const tasksRepeatableRuns = pgTable("tasks_repeatable_runs", {
+	id: serial("id").primaryKey(),
+	taskId: integer("task_id")
+		.notNull()
+		.references(() => tasksRepeatable.id),
+	manual: boolean("manual").notNull(),
+	tracebackStr: text("traceback_str"),
+	completedUtc: timestamp("completed_utc", { mode: "date" }),
+	createdUtc: integer("created_utc").notNull(),
+});
+
+export const tasksRepeatableScheduledSubmissions = pgTable(
+	"tasks_repeatable_scheduled_submissions",
+	{
+		id: integer("id")
+			.primaryKey()
+			.references(() => tasksRepeatable.id),
+		authorIdSubmission: integer("author_id_submission").notNull(),
+		ghost: boolean("ghost").notNull(),
+		private: boolean("private").notNull(),
+		over18: boolean("over_18").notNull(),
+		isBot: boolean("is_bot").notNull(),
+		title: varchar("title", { length: 500 }).notNull(),
+		url: varchar("url"),
+		body: text("body"),
+		bodyHtml: text("body_html"),
+		flair: varchar("flair"),
+		embedUrl: varchar("embed_url"),
+	},
+);
+
+export const userBlocks = pgTable(
+	"userblocks",
+	{
+		userId: integer("user_id")
+			.notNull()
+			.references(() => users.id),
+		targetId: integer("target_id")
+			.notNull()
+			.references(() => users.id),
+	},
+	(table) => primaryKey({ columns: [table.userId, table.targetId] }),
+);
+
+export const userNotes = pgTable("usernotes", {
+	id: serial("id").primaryKey(),
+	authorId: integer("author_id")
+		.notNull()
+		.references(() => users.id),
+	referenceUser: integer("reference_user")
+		.notNull()
+		.references(() => users.id),
+	referenceComment: integer("reference_comment").references(() => comments.id),
+	referencePost: integer("reference_post").references(() => submissions.id),
+	note: varchar("note", { length: 10000 }).notNull(),
+	tag: userTagEnum("tag").notNull(),
+	createdDatetimez: timestamp("created_datetimez", {
+		withTimezone: true,
+		mode: "date",
+	})
+		.notNull()
+		.defaultNow(),
+});
+
+export const volunteerJanitor = pgTable("volunteer_janitor", {
+	id: serial("id").primaryKey(),
+	userId: integer("user_id")
+		.notNull()
+		.references(() => users.id),
+	commentId: integer("comment_id")
+		.notNull()
+		.references(() => comments.id),
+	result: volunteerJanitorResultEnum("result").notNull(),
+	recordedDatetimez: timestamp("recorded_datetimez", {
+		withTimezone: true,
+		mode: "date",
+	})
+		.notNull()
+		.defaultNow(),
+});

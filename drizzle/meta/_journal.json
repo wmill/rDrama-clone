@@ -15,6 +15,13 @@
       "when": 1772286572088,
       "tag": "0001_dizzy_ozymandias",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772750553341,
+      "tag": "0002_handy_norrin_radd",
+      "breakpoints": true
     }
   ]
 }
