@@ -206,7 +206,7 @@ type ActualCommentsProps = {
 	onVisibleLimitChange: (updater: (prev: number) => number) => void;
 	isLoading?: boolean;
 	rootRenderedCount: number;
-	setRootRenderedCount: (count: number) => void;
+	setRootRenderedCount: React.Dispatch<React.SetStateAction<number>>;
 };
 
 function ActualComments({
