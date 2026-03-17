@@ -1,4 +1,5 @@
 import {
+	type AnyPgColumn,
 	boolean,
 	customType,
 	doublePrecision,
@@ -203,7 +204,9 @@ export const comments = pgTable("comments", {
 	distinguishLevel: integer("distinguish_level").notNull().default(0),
 	editedUtc: integer("edited_utc").notNull().default(0),
 	level: integer("level").notNull().default(0),
-	parentCommentId: integer("parent_comment_id").references(() => comments.id),
+	parentCommentId: integer("parent_comment_id").references(
+		(): AnyPgColumn => comments.id,
+	),
 	over18: boolean("over_18").notNull().default(false),
 	upvotes: integer("upvotes").notNull().default(1),
 	downvotes: integer("downvotes").notNull().default(0),
@@ -249,7 +252,7 @@ export const commentVotes = pgTable(
 			mode: "date",
 		}).notNull(),
 	},
-	(table) => primaryKey({ columns: [table.commentId, table.userId] }),
+	(table) => [primaryKey({ columns: [table.commentId, table.userId] })],
 );
 
 export const votes = pgTable(
@@ -269,7 +272,7 @@ export const votes = pgTable(
 			mode: "date",
 		}).notNull(),
 	},
-	(table) => primaryKey({ columns: [table.submissionId, table.userId] }),
+	(table) => [primaryKey({ columns: [table.submissionId, table.userId] })],
 );
 
 export const follows = pgTable(
@@ -288,7 +291,7 @@ export const follows = pgTable(
 			.notNull()
 			.defaultNow(),
 	},
-	(table) => primaryKey({ columns: [table.targetId, table.userId] }),
+	(table) => [primaryKey({ columns: [table.targetId, table.userId] })],
 );
 
 export const saveRelationship = pgTable(
@@ -301,7 +304,7 @@ export const saveRelationship = pgTable(
 			.notNull()
 			.references(() => users.id),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.submissionId] }),
+	(table) => [primaryKey({ columns: [table.userId, table.submissionId] })],
 );
 
 export const commentSaveRelationship = pgTable(
@@ -314,7 +317,7 @@ export const commentSaveRelationship = pgTable(
 			.notNull()
 			.references(() => comments.id),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.commentId] }),
+	(table) => [primaryKey({ columns: [table.userId, table.commentId] })],
 );
 
 export const badgeDefs = pgTable("badge_defs", {
@@ -335,7 +338,7 @@ export const badges = pgTable(
 		description: varchar("description", { length: 256 }),
 		url: varchar("url", { length: 256 }),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.badgeId] }),
+	(table) => [primaryKey({ columns: [table.userId, table.badgeId] })],
 );
 
 export const awardRelationships = pgTable("award_relationships", {
@@ -364,7 +367,7 @@ export const viewers = pgTable(
 			.notNull()
 			.defaultNow(),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.viewerId] }),
+	(table) => [primaryKey({ columns: [table.userId, table.viewerId] })],
 );
 
 export const alts = pgTable(
@@ -378,7 +381,7 @@ export const alts = pgTable(
 			.references(() => users.id),
 		isManual: boolean("is_manual").notNull().default(false),
 	},
-	(table) => primaryKey({ columns: [table.user1, table.user2] }),
+	(table) => [primaryKey({ columns: [table.user1, table.user2] })],
 );
 
 export const bannedDomains = pgTable("banneddomains", {
@@ -411,7 +414,7 @@ export const clientAuths = pgTable(
 		oauthClient: integer("oauth_client").notNull(),
 		accessToken: varchar("access_token", { length: 128 }).notNull(),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.oauthClient] }),
+	(table) => [primaryKey({ columns: [table.userId, table.oauthClient] })],
 );
 
 export const commentFlags = pgTable("commentflags", {
@@ -492,7 +495,7 @@ export const notifications = pgTable(
 			.notNull()
 			.defaultNow(),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.commentId] }),
+	(table) => [primaryKey({ columns: [table.userId, table.commentId] })],
 );
 
 export const oauthApps = pgTable("oauth_apps", {
@@ -516,7 +519,7 @@ export const subscriptions = pgTable(
 			.notNull()
 			.references(() => submissions.id),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.submissionId] }),
+	(table) => [primaryKey({ columns: [table.userId, table.submissionId] })],
 );
 
 export const tasksRepeatable = pgTable("tasks_repeatable", {
@@ -583,7 +586,7 @@ export const userBlocks = pgTable(
 			.notNull()
 			.references(() => users.id),
 	},
-	(table) => primaryKey({ columns: [table.userId, table.targetId] }),
+	(table) => [primaryKey({ columns: [table.userId, table.targetId] })],
 );
 
 export const userNotes = pgTable("usernotes", {
