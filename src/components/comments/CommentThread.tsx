@@ -55,7 +55,6 @@ export function CommentThreadBase({
 	const [visibleLimit, setVisibleLimit] = useState(COMMENTS_PAGE_SIZE);
 	const [isSyncing, setIsSyncing] = useState(false);
 
-	const initSubmission = useCommentStore((state) => state.initSubmission);
 	const mergeComments = useCommentStore((state) => state.mergeComments);
 	const submissionState = useCommentStore(
 		(state) => state.submissions[submissionId],
@@ -63,23 +62,27 @@ export function CommentThreadBase({
 
 	const [rootRenderedCount, setRootRenderedCount] = useState(0);
 
-	useEffect(() => {
-		initSubmission(submissionId, comments, commentCount, commentsLastFetchedAt);
-		setVisibleLimit(COMMENTS_PAGE_SIZE);
-	}, [
-		commentCount,
-		comments,
-		commentsLastFetchedAt,
-		initSubmission,
-		submissionId,
-	]);
+	const initialSubmissionState = useMemo(() => {
+		const byId: Record<number, CommentFlat> = {};
+		const allIds: number[] = [];
+		for (const comment of comments) {
+			byId[comment.id] = comment;
+			allIds.push(comment.id);
+		}
+		return {
+			byId,
+			allIds,
+			lastFetchedAt: commentsLastFetchedAt,
+			commentCount,
+		};
+	}, [commentCount, comments, commentsLastFetchedAt]);
 
 	const flatComments = useMemo(() => {
-		if (!submissionState) return [];
+		if (!submissionState) return comments;
 		return submissionState.allIds
 			.map((id) => submissionState.byId[id])
 			.filter(Boolean);
-	}, [submissionState]);
+	}, [comments, submissionState]);
 
 	const localCommentCount = submissionState?.commentCount ?? commentCount;
 	const lastFetchedAt = submissionState?.lastFetchedAt ?? commentsLastFetchedAt;
@@ -91,12 +94,17 @@ export function CommentThreadBase({
 
 	const handleMerge = useCallback(
 		(newComments: CommentFlat[], fetchedAt: number) => {
-			const newCount = mergeComments(submissionId, newComments, fetchedAt);
+			const newCount = mergeComments(
+				submissionId,
+				newComments,
+				fetchedAt,
+				initialSubmissionState,
+			);
 			if (newCount > 0) {
 				setVisibleLimit((prev) => prev + newCount);
 			}
 		},
-		[mergeComments, submissionId],
+		[initialSubmissionState, mergeComments, submissionId],
 	);
 
 	const handleReplyAdded = useCallback(
@@ -358,4 +366,7 @@ function SortButton({ option, onSortChange, sort }: SortButtonProps) {
 	);
 }
 
-export const CommentThread = withIdentity(CommentThreadBase, (props) => props.submissionId);
+export const CommentThread = withIdentity(
+	CommentThreadBase,
+	(props) => props.submissionId,
+);

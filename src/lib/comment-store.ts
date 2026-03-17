@@ -11,52 +11,20 @@ export type SubmissionCommentState = {
 
 type CommentStoreState = {
 	submissions: Record<number, SubmissionCommentState>;
-	initSubmission: (
-		submissionId: number,
-		comments: CommentFlat[],
-		commentCount: number,
-		lastFetchedAt: number,
-	) => void;
 	mergeComments: (
 		submissionId: number,
 		comments: CommentFlat[],
 		lastFetchedAt: number,
+		initialState?: SubmissionCommentState,
 	) => number;
 };
 
-function normalizeComments(comments: CommentFlat[]) {
-	const byId: Record<number, CommentFlat> = {};
-	const allIds: number[] = [];
-	for (const comment of comments) {
-		byId[comment.id] = comment;
-		allIds.push(comment.id);
-	}
-	return { byId, allIds };
-}
-
 export const useCommentStore = create<CommentStoreState>((set, get) => ({
 	submissions: {},
-	initSubmission: (submissionId, comments, commentCount, lastFetchedAt) => {
-		const normalized = normalizeComments(comments);
-		set((state) => ({
-			submissions: {
-				...state.submissions,
-				[submissionId]: {
-					...normalized,
-					lastFetchedAt,
-					commentCount,
-				},
-			},
-		}));
-	},
-	mergeComments: (submissionId, comments, lastFetchedAt) => {
+	mergeComments: (submissionId, comments, lastFetchedAt, initialState) => {
 		const state = get();
-		const submission = state.submissions[submissionId] ?? {
-			byId: {},
-			allIds: [],
-			lastFetchedAt: 0,
-			commentCount: 0,
-		};
+		const submission = state.submissions[submissionId] ?? initialState;
+		if (!submission) return 0;
 
 		let newCount = 0;
 		const byId = { ...submission.byId };
