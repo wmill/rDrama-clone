@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Comment } from "@/components/comments/Comment";
 import { CommentForm } from "@/components/comments/CommentForm";
@@ -20,6 +20,7 @@ import type {
 	CommentSortType,
 	CommentWithReplies,
 } from "@/lib/comments.server";
+import { withIdentity } from "../utils/withIdentity";
 
 const COMMENTS_PAGE_SIZE = Number(
 	import.meta.env.VITE_RESULTS_PER_PAGE_COMMENTS ?? 50,
@@ -42,7 +43,7 @@ type CommentThreadProps = {
 	initialSort?: CommentSortType;
 };
 
-export function CommentThread({
+export function CommentThreadBase({
 	submissionId,
 	comments,
 	commentCount,
@@ -61,6 +62,7 @@ export function CommentThread({
 	);
 
 	const [rootRenderedCount, setRootRenderedCount] = useState(0);
+	const previousSubmissionId = useRef(submissionId);
 
 	useEffect(() => {
 		initSubmission(submissionId, comments, commentCount, commentsLastFetchedAt);
@@ -74,7 +76,10 @@ export function CommentThread({
 	]);
 
 	useEffect(() => {
+		if (previousSubmissionId.current === submissionId) return;
+		previousSubmissionId.current = submissionId;
 		setSort(initialSort);
+		setRootRenderedCount(0);
 	}, [initialSort, submissionId]);
 
 	const flatComments = useMemo(() => {
@@ -238,7 +243,7 @@ function ActualComments({
 		if (rootRenderedCount > rootTarget) {
 			setRootRenderedCount(rootTarget);
 		}
-	}, [rootRenderedCount, rootTarget]);
+	}, [rootRenderedCount, rootTarget, setRootRenderedCount]);
 
 	useEffect(() => {
 		if (rootRenderedCount >= rootTarget) return;
@@ -319,6 +324,7 @@ type SortButtonProps = {
 	onSortChange: (sort: CommentSortType) => void;
 	sort?: CommentSortType;
 };
+
 function SortButton({ option, onSortChange, sort }: SortButtonProps) {
 	const [loading, setLoading] = useState(false);
 
@@ -359,3 +365,5 @@ function SortButton({ option, onSortChange, sort }: SortButtonProps) {
 		</button>
 	);
 }
+
+export const CommentThread = withIdentity(CommentThreadBase, (props) => props.submissionId);
