@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Comment } from "@/components/comments/Comment";
 import { CommentForm } from "@/components/comments/CommentForm";
@@ -62,7 +62,6 @@ export function CommentThreadBase({
 	);
 
 	const [rootRenderedCount, setRootRenderedCount] = useState(0);
-	const previousSubmissionId = useRef(submissionId);
 
 	useEffect(() => {
 		initSubmission(submissionId, comments, commentCount, commentsLastFetchedAt);
@@ -74,13 +73,6 @@ export function CommentThreadBase({
 		initSubmission,
 		submissionId,
 	]);
-
-	useEffect(() => {
-		if (previousSubmissionId.current === submissionId) return;
-		previousSubmissionId.current = submissionId;
-		setSort(initialSort);
-		setRootRenderedCount(0);
-	}, [initialSort, submissionId]);
 
 	const flatComments = useMemo(() => {
 		if (!submissionState) return [];
