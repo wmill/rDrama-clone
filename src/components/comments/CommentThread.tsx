@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Comment } from "@/components/comments/Comment";
 import { CommentForm } from "@/components/comments/CommentForm";
@@ -13,7 +13,6 @@ import {
 	filterCommentTree,
 	getVisibleCommentIds,
 } from "@/lib/comment-pagination";
-import { useCommentStore } from "@/lib/comment-store";
 import { buildCommentTree } from "@/lib/comment-tree";
 import type {
 	CommentFlat,
@@ -41,7 +40,57 @@ type CommentThreadProps = {
 	commentsLastFetchedAt: number;
 	currentUserId?: number;
 	initialSort?: CommentSortType;
+	onCommentCountChange?: (count: number) => void;
 };
+
+type CommentThreadState = {
+	byId: Record<number, CommentFlat>;
+	allIds: number[];
+	commentCount: number;
+	lastFetchedAt: number;
+};
+
+function buildInitialCommentState(
+	comments: CommentFlat[],
+	commentCount: number,
+	lastFetchedAt: number,
+): CommentThreadState {
+	const byId: Record<number, CommentFlat> = {};
+	const allIds: number[] = [];
+	for (const comment of comments) {
+		byId[comment.id] = comment;
+		allIds.push(comment.id);
+	}
+	return { byId, allIds, commentCount, lastFetchedAt };
+}
+
+function mergeCommentState(
+	state: CommentThreadState,
+	newComments: CommentFlat[],
+	fetchedAt: number,
+): { nextState: CommentThreadState; newCount: number } {
+	let newCount = 0;
+	const byId = { ...state.byId };
+	const allIds = state.allIds.slice();
+
+	for (const comment of newComments) {
+		if (!byId[comment.id]) {
+			newCount += 1;
+			allIds.push(comment.id);
+		}
+		byId[comment.id] = comment;
+	}
+
+	return {
+		nextState: {
+			byId,
+			allIds,
+			commentCount: state.commentCount + newCount,
+			lastFetchedAt: Math.max(state.lastFetchedAt, fetchedAt),
+		},
+		newCount,
+	};
+}
 
 export function CommentThreadBase({
 	submissionId,
@@ -50,42 +99,30 @@ export function CommentThreadBase({
 	commentsLastFetchedAt,
 	currentUserId,
 	initialSort = "top",
+	onCommentCountChange,
 }: CommentThreadProps) {
 	const [sort, setSort] = useState<CommentSortType>(initialSort);
 	const [visibleLimit, setVisibleLimit] = useState(COMMENTS_PAGE_SIZE);
 	const [isSyncing, setIsSyncing] = useState(false);
-
-	const mergeComments = useCommentStore((state) => state.mergeComments);
-	const submissionState = useCommentStore(
-		(state) => state.submissions[submissionId],
+	const [commentState, setCommentState] = useState<CommentThreadState>(() =>
+		buildInitialCommentState(comments, commentCount, commentsLastFetchedAt),
 	);
+	const commentStateRef = useRef(commentState);
 
 	const [rootRenderedCount, setRootRenderedCount] = useState(0);
 
-	const initialSubmissionState = useMemo(() => {
-		const byId: Record<number, CommentFlat> = {};
-		const allIds: number[] = [];
-		for (const comment of comments) {
-			byId[comment.id] = comment;
-			allIds.push(comment.id);
-		}
-		return {
-			byId,
-			allIds,
-			lastFetchedAt: commentsLastFetchedAt,
-			commentCount,
-		};
-	}, [commentCount, comments, commentsLastFetchedAt]);
+	useEffect(() => {
+		commentStateRef.current = commentState;
+	}, [commentState]);
 
 	const flatComments = useMemo(() => {
-		if (!submissionState) return comments;
-		return submissionState.allIds
-			.map((id) => submissionState.byId[id])
+		return commentState.allIds
+			.map((id) => commentState.byId[id])
 			.filter(Boolean);
-	}, [comments, submissionState]);
+	}, [commentState]);
 
-	const localCommentCount = submissionState?.commentCount ?? commentCount;
-	const lastFetchedAt = submissionState?.lastFetchedAt ?? commentsLastFetchedAt;
+	const localCommentCount = commentState.commentCount;
+	const lastFetchedAt = commentState.lastFetchedAt;
 
 	const commentTree = useMemo(
 		() => buildCommentTree(flatComments, sort),
@@ -94,17 +131,19 @@ export function CommentThreadBase({
 
 	const handleMerge = useCallback(
 		(newComments: CommentFlat[], fetchedAt: number) => {
-			const newCount = mergeComments(
-				submissionId,
+			const { nextState, newCount } = mergeCommentState(
+				commentStateRef.current,
 				newComments,
 				fetchedAt,
-				initialSubmissionState,
 			);
+			commentStateRef.current = nextState;
+			setCommentState(nextState);
+			onCommentCountChange?.(nextState.commentCount);
 			if (newCount > 0) {
 				setVisibleLimit((prev) => prev + newCount);
 			}
 		},
-		[initialSubmissionState, mergeComments, submissionId],
+		[onCommentCountChange],
 	);
 
 	const handleReplyAdded = useCallback(
@@ -120,7 +159,6 @@ export function CommentThreadBase({
 			setSort(nextSort);
 			setRootRenderedCount(0);
 
-			if (!submissionState) return;
 			setIsSyncing(true);
 			try {
 				const result = await getCommentsSinceFn({
@@ -133,7 +171,7 @@ export function CommentThreadBase({
 				setIsSyncing(false);
 			}
 		},
-		[handleMerge, lastFetchedAt, submissionId, submissionState],
+		[handleMerge, lastFetchedAt, submissionId],
 	);
 
 	return (

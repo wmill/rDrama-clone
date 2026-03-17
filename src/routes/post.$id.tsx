@@ -1,10 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
-import { useCommentStore } from "@/lib/comment-store";
 import {
 	type CommentSortType,
 	getCommentsBySubmissionFlat,
@@ -80,10 +80,13 @@ export const Route = createFileRoute("/post/$id")({
 function PostPage() {
 	const { post, comments, commentsLastFetchedAt, user } = Route.useLoaderData();
 	const { sort } = Route.useSearch();
-	const storeCommentCount = useCommentStore(
-		(state) => state.submissions[post.id]?.commentCount,
+	const [displayCommentCount, setDisplayCommentCount] = useState(
+		post.commentCount,
 	);
-	const displayCommentCount = storeCommentCount ?? post.commentCount;
+
+	useEffect(() => {
+		setDisplayCommentCount(post.commentCount);
+	}, [post.commentCount]);
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
@@ -103,6 +106,7 @@ function PostPage() {
 						commentsLastFetchedAt={commentsLastFetchedAt}
 						currentUserId={user?.id}
 						initialSort={sort}
+						onCommentCountChange={setDisplayCommentCount}
 					/>
 				</div>
 			</div>
@@ -129,9 +133,12 @@ function PostContent({
 			<div className="border-b border-slate-800 p-4">
 				<div className="flex items-center gap-2 text-sm text-slate-400">
 					<span>Posted by</span>
-					<a href={`/u/${post.authorName}`} className="font-medium text-cyan-400 hover:underline">
-					{post.authorName}
-				</a>
+					<a
+						href={`/u/${post.authorName}`}
+						className="font-medium text-cyan-400 hover:underline"
+					>
+						{post.authorName}
+					</a>
 					<span className="flex items-center gap-1">
 						<Clock className="h-3 w-3" />
 						{formatRelativeTime(post.createdUtc)}

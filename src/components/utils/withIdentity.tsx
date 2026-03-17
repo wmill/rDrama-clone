@@ -10,11 +10,7 @@ export function withIdentity<P>(
 	selectKey: (props: P) => React.Key,
 ) {
 	function WithIdentity(props: P) {
-		return (
-			<div>
-				<Wrapped key={selectKey(props)} {...props} />
-			</div>
-		);
+		return <Wrapped key={selectKey(props)} {...props} />
 	}
 
 	WithIdentity.displayName = `withKeyedReset(${
