@@ -538,8 +538,8 @@ function buildCommentTree(
 		const ups = faker.number.int({ min: 1, max: 200 });
 		const downs = faker.number.int({ min: 0, max: 30 });
 
-		let parentTempId: number | null = null;
-		let level = 0;
+			let parentTempId: number | null = null;
+			let level = 1;
 
 		if (comments.length > 0) {
 			// 85% chance of replying, 15% top-level
@@ -602,12 +602,12 @@ async function createCommentsForSubmission(
 
 	const maxLevel = Math.max(...byLevel.keys());
 	console.log(
-		`    Tree built: ${byLevel.get(0)?.length ?? 0} top-level, max depth ${maxLevel}`,
+		`    Tree built: ${byLevel.get(1)?.length ?? 0} top-level, max depth ${maxLevel}`,
 	);
 
 	// 2) Insert level by level, mapping tempId → dbId
 	const tempToDb = new Map<number, number>();
-	// Track top-comment ID: for level-0 it's themselves, for deeper it's inherited
+	// Track top-comment ID: for level-1 it's themselves, for deeper it's inherited
 	const tempToTopTemp = new Map<number, number>();
 	for (const c of tree) {
 		if (c.parentTempId === null) {
@@ -623,7 +623,7 @@ async function createCommentsForSubmission(
 
 	let totalInserted = 0;
 
-	for (let lvl = 0; lvl <= maxLevel; lvl++) {
+	for (let lvl = 1; lvl <= maxLevel; lvl++) {
 		const levelComments = byLevel.get(lvl);
 		if (!levelComments) continue;
 
@@ -647,7 +647,7 @@ async function createCommentsForSubmission(
 					parentSubmission: submissionId,
 					level: c.level,
 					parentCommentId: parentDbId,
-					topCommentId: topDbId, // level-0 gets null now, fixed below
+					topCommentId: topDbId, // level-1 gets null now, fixed below
 					body: c.body,
 					bodyHtml: c.bodyHtml,
 					upvotes: c.upvotes,
@@ -682,7 +682,7 @@ async function createCommentsForSubmission(
 	// 3) Update top-level comments: topCommentId = own ID
 	const { sql, inArray } = await import("drizzle-orm");
 	const topLevelComments = tree
-		.filter((c) => c.level === 0)
+		.filter((c) => c.level === 1)
 		.map((c) => tempToDb.get(c.tempId)!)
 		.filter(Boolean);
 
@@ -701,6 +701,72 @@ async function createCommentsForSubmission(
 	await db.execute(
 		sql`UPDATE submissions SET comment_count = (SELECT count(*) FROM comments WHERE parent_submission = ${submissionId}) WHERE id = ${submissionId}`,
 	);
+}
+
+async function updateGeneratedUserCounts(userIds: number[]): Promise<void> {
+	const { inArray, sql, eq } = await import("drizzle-orm");
+	console.log("Updating generated user post/comment counts...");
+
+	const [postCountsRows, commentCountsRows, usersRows] = await Promise.all([
+		db
+			.select({
+				authorId: schema.submissions.authorId,
+				count: sql<number>`count(*)::int`,
+			})
+			.from(schema.submissions)
+			.where(inArray(schema.submissions.authorId, userIds))
+			.groupBy(schema.submissions.authorId),
+		db
+			.select({
+				authorId: schema.comments.authorId,
+				count: sql<number>`count(*)::int`,
+			})
+			.from(schema.comments)
+			.where(inArray(schema.comments.authorId, userIds))
+			.groupBy(schema.comments.authorId),
+		db
+			.select({
+				id: schema.users.id,
+				username: schema.users.username,
+				postCount: schema.users.postCount,
+				commentCount: schema.users.commentCount,
+			})
+			.from(schema.users)
+			.where(inArray(schema.users.id, userIds)),
+	]);
+
+	const postCountByUser = new Map<number, number>();
+	for (const row of postCountsRows) {
+		postCountByUser.set(row.authorId, row.count);
+	}
+
+	const commentCountByUser = new Map<number, number>();
+	for (const row of commentCountsRows) {
+		commentCountByUser.set(row.authorId, row.count);
+	}
+
+	let updated = 0;
+	for (const user of usersRows) {
+		const nextPostCount = postCountByUser.get(user.id) ?? 0;
+		const nextCommentCount = commentCountByUser.get(user.id) ?? 0;
+		if (
+			user.postCount === nextPostCount &&
+			user.commentCount === nextCommentCount
+		) {
+			continue;
+		}
+
+		await db
+			.update(schema.users)
+			.set({
+				postCount: nextPostCount,
+				commentCount: nextCommentCount,
+			})
+			.where(eq(schema.users.id, user.id));
+		updated += 1;
+	}
+
+	console.log(`  Updated ${updated}/${usersRows.length} users`);
 }
 
 async function updateDescendantCounts(submissionId: number): Promise<void> {
@@ -841,6 +907,8 @@ async function main() {
 			userIds,
 		);
 	}
+
+	await updateGeneratedUserCounts(userIds);
 
 	console.log("\nDone! Generated:");
 	console.log(`  ${NUM_USERS} users`);
