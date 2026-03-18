@@ -125,7 +125,13 @@ function MePage() {
 
 				<div className="mt-8 flex gap-4">
 					<Button variant="outline" asChild>
-						<a href={`/u/${user.username}`}>View Public Profile</a>
+						<Link
+							to="/u/$username"
+							params={{ username: user.username }}
+							search={{ sort: "new", t: "all", page: 1 }}
+						>
+							View Public Profile
+						</Link>
 					</Button>
 					{/* TODO: Implement settings route in Phase 4 */}
 					<Button disabled variant="outline">

@@ -142,9 +142,14 @@ function CommentPage() {
 				<div className="mb-6 rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
 					<div className="flex items-center gap-2 text-sm text-slate-400">
 						<span>Posted by</span>
-						<a href={`/u/${submission.authorName}`} className="font-medium text-cyan-400 hover:underline">
+						<Link
+							to="/u/$username"
+							params={{ username: submission.authorName }}
+							search={{ sort: "new", t: "all", page: 1 }}
+							className="font-medium text-cyan-400 hover:underline"
+						>
 							{submission.authorName}
-						</a>
+						</Link>
 						<span className="flex items-center gap-1">
 							<Clock className="h-3 w-3" />
 							{formatRelativeTime(submission.createdUtc)}
