@@ -1,19 +1,49 @@
-# Performance issues when rendering a large number of comments.
-Not addressing these right now, but look into it for later. 
-- lucide-react uses inline svg elements. These static resources end up being mirrored hundreds of times in the DOM as trees of elements. Switch over to svgs in img tags, as the browser is smarter about reusing those.
-    - note, we will need to colorize the svg icons as they use inline colors which will be unavailable inside an image tag.
-- The tanstack router Link element is a bit slow. It does non-trivial work. Comments should probably use interpolatePath / buildLocation with straight anchor elements to improve performance. 
+# rDreamer TODO
 
+## P1 — Core (must-have)
 
+### Authentication
+- [x] Signup
+- [x] Login / logout
+- [x] Session management
+- [ ] Password recovery (forgot password flow)
 
-# New indexes manually added to db
+### Posts
+- [x] Create post (link + text, NSFW toggle)
+- [x] View post with metadata (score, views, author, time)
+- [x] Voting (upvote/downvote/toggle)
+- [x] Sorting (hot, new, top, controversial, comments)
+- [x] Time filters (hour, day, week, month, year, all)
+- [ ] Edit post
+- [ ] Delete post
+- [ ] Markdown parsing + HTML sanitization for post body/title
 
-CREATE INDEX CONCURRENTLY comments_submission_state_created_idx
-ON comments (parent_submission, state_mod, created_utc DESC);
+### Comments
+- [x] Create comment (nested replies)
+- [x] Edit comment
+- [x] Delete comment
+- [x] Comment voting
+- [x] Comment thread view with ancestor context
+- [x] Comment feed (all comments, paginated, sorted)
 
-CREATE INDEX CONCURRENTLY comments_visible_submission_created_idx
-ON comments (parent_submission, created_utc DESC)
-WHERE state_mod = 'VISIBLE';
+### User Profiles
+- [x] Profile page (bio, post/comment feeds, stats)
+- [x] Sorting + pagination on profile feeds
+- [ ] Edit profile / user settings page
 
-CREATE INDEX CONCURRENTLY commentvotes_user_comment_idx
-ON commentvotes (user_id, comment_id);
+## P2 — Important
+
+- [ ] Post and comment reporting (flag system — DB ready)
+- [ ] Notifications (comment replies — DB ready)
+- [ ] User following / followers (DB ready)
+- [ ] Search (posts and users)
+- [ ] User blocking (DB ready)
+
+## P3 — Someday
+
+- [ ] Moderation panel (flags, mod actions, bans — DB ready)
+- [ ] Admin panel
+- [ ] Chat / messaging (DB ready)
+- [ ] Awards on posts and comments (DB ready)
+- [ ] User badges (DB ready)
+- [ ] OAuth apps (DB ready)
