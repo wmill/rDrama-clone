@@ -1,12 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { ExternalLink, FileText, MessageSquare } from "lucide-react";
 
+import { VoteButtons } from "@/components/comments/VoteButtons";
 import type { SortType, TimeFilter } from "@/lib/constants";
 import type { SubmissionSummary } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
 
 type RecentSubmissionsProps = {
 	submissions: SubmissionSummary[];
+	currentUserId?: number;
 	sort?: SortType;
 	time?: TimeFilter;
 	onSortChange?: (sort: SortType) => void;
@@ -33,6 +35,7 @@ const timeOptions: { value: TimeFilter; label: string }[] = [
 
 export function RecentSubmissions({
 	submissions,
+	currentUserId,
 	sort = "hot",
 	time = "all",
 	onSortChange,
@@ -120,17 +123,13 @@ export function RecentSubmissions({
 						<div className="flex">
 							{/* Vote column */}
 							<div className="flex w-12 flex-col items-center justify-center bg-slate-800/50 py-3">
-								<span
-									className={`text-lg font-bold ${
-										submission.score > 0
-											? "text-orange-500"
-											: submission.score < 0
-												? "text-blue-500"
-												: "text-slate-400"
-									}`}
-								>
-									{submission.score}
-								</span>
+								<VoteButtons
+									type="submission"
+									id={submission.id}
+									score={submission.score}
+									size="sm"
+									disabled={!currentUserId}
+								/>
 							</div>
 
 							{/* Content */}
@@ -153,7 +152,9 @@ export function RecentSubmissions({
 										{/* Title */}
 										<h3 className="text-base font-medium text-white">
 											<Link
-												to={`/post/${submission.id}` as "/"}
+												to="/post/$id"
+												params={{ id: String(submission.id) }}
+												search={{ sort: "top" }}
 												className="hover:text-cyan-400"
 											>
 												{submission.title}
@@ -173,12 +174,14 @@ export function RecentSubmissions({
 										{/* Meta line */}
 										<p className="mt-1 text-sm text-slate-400">
 											<span className="text-slate-500">by</span>{" "}
-											<a
-												href={`/u/${submission.authorName}`}
+											<Link
+												to="/u/$username"
+												params={{ username: submission.authorName }}
+												search={{ sort: "new", t: "all", page: 1 }}
 												className="font-medium text-cyan-400 hover:underline"
 											>
 												{submission.authorName}
-											</a>{" "}
+											</Link>{" "}
 											<span className="text-slate-600">&middot;</span>{" "}
 											{formatRelativeTime(submission.createdUtc)}
 										</p>
@@ -201,7 +204,9 @@ export function RecentSubmissions({
 												</span>
 											)}
 											<Link
-												to={`/post/${submission.id}` as "/"}
+												to="/post/$id"
+												params={{ id: String(submission.id) }}
+												search={{ sort: "top" }}
 												className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
 											>
 												<MessageSquare className="h-3.5 w-3.5" />

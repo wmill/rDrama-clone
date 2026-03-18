@@ -11,6 +11,7 @@ import {
 	TimeFilters,
 } from "@/lib/constants";
 
+import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissions } from "@/lib/submissions.server";
 
 const searchSchema = z.object({
@@ -29,11 +30,16 @@ const loadSubmissions = createServerFn({ method: "GET" })
 			data: { sort?: SortType; time?: TimeFilter; limit?: number };
 		}) => {
 			try {
-				return await getSubmissions({
+				const user = await getCurrentUser();
+				const submissions = await getSubmissions({
 					sort: data.sort ?? "hot",
 					time: data.time ?? "all",
 					limit: data.limit ?? 25,
 				});
+				return {
+					submissions,
+					currentUserId: user?.id,
+				};
 			} catch (error) {
 				console.error("[loadSubmissions Error]", error);
 				throw error;
@@ -52,7 +58,7 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
 	const router = useRouter();
-	const submissions = Route.useLoaderData();
+	const { submissions, currentUserId } = Route.useLoaderData();
 	const { sort, t: time } = Route.useSearch();
 	const [isLoading, setIsLoading] = useState(false);
 
@@ -80,6 +86,7 @@ function HomePage() {
 				<div className={isLoading ? "opacity-50 pointer-events-none" : ""}>
 					<RecentSubmissions
 						submissions={submissions}
+						currentUserId={currentUserId}
 						sort={sort}
 						time={time}
 						onSortChange={handleSortChange}
