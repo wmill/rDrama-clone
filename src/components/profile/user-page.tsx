@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { CalendarDays, ShieldAlert, ShieldCheck, Star } from "lucide-react";
 
 import type {
@@ -5,6 +6,10 @@ import type {
 	SortType,
 	TimeFilter,
 } from "@/lib/constants";
+import {
+	DEFAULT_COMMENTS_PROFILE_SEARCH,
+	DEFAULT_POSTS_PROFILE_SEARCH,
+} from "@/lib/profile-route";
 import type { ProfilePageData } from "@/lib/users.server";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -43,8 +48,6 @@ export function UserPage({
 	onPageChange: (page: number) => Promise<void>;
 }) {
 	const user = data.profileUser;
-	const commentsTabHref = `/u/${user.username}`;
-	const postsTabHref = `/u/${user.username}/posts`;
 	const avatarHref = user.highRes || user.profileUrl || undefined;
 	const sortOptions =
 		data.tab === "posts" ? postSortOptions : commentSortOptions;
@@ -178,8 +181,10 @@ export function UserPage({
 
 				<section className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
 					<div className="mb-4 flex gap-2">
-						<a
-							href={commentsTabHref}
+						<Link
+							to="/u/$username"
+							params={{ username: user.username }}
+							search={DEFAULT_COMMENTS_PROFILE_SEARCH}
 							className={`rounded-md px-3 py-2 text-sm font-medium ${
 								data.tab === "comments"
 									? "bg-cyan-500 text-white"
@@ -187,9 +192,11 @@ export function UserPage({
 							}`}
 						>
 							Comments ({user.commentCount.toLocaleString()})
-						</a>
-						<a
-							href={postsTabHref}
+						</Link>
+						<Link
+							to="/u/$username/posts"
+							params={{ username: user.username }}
+							search={DEFAULT_POSTS_PROFILE_SEARCH}
 							className={`rounded-md px-3 py-2 text-sm font-medium ${
 								data.tab === "posts"
 									? "bg-cyan-500 text-white"
@@ -197,7 +204,7 @@ export function UserPage({
 							}`}
 						>
 							Posts ({user.postCount.toLocaleString()})
-						</a>
+						</Link>
 					</div>
 
 					{data.isPrivateRestricted ? (
@@ -261,12 +268,14 @@ export function UserPage({
 												key={post.id}
 												className="rounded-lg border border-slate-800 bg-slate-950/50 p-4"
 											>
-												<a
-													href={`/post/${post.id}`}
+												<Link
+													to="/post/$id"
+													params={{ id: String(post.id) }}
+													search={{ sort: "top" }}
 													className="text-base font-semibold text-cyan-400 hover:text-cyan-300"
 												>
 													{post.title}
-												</a>
+												</Link>
 												<div className="mt-1 text-xs text-slate-400">
 													{formatRelativeTime(post.createdUtc)} • {post.score}{" "}
 													points • {post.commentCount} comments
@@ -294,12 +303,16 @@ export function UserPage({
 												key={comment.id}
 												className="rounded-lg border border-slate-800 bg-slate-950/50 p-4"
 											>
-												<a
-													href={`/post/${comment.parentSubmissionId}`}
+												<Link
+													to="/post/$id"
+													params={{
+														id: String(comment.parentSubmissionId),
+													}}
+													search={{ sort: "top" }}
 													className="text-sm font-medium text-cyan-400 hover:text-cyan-300"
 												>
 													{comment.submissionTitle}
-												</a>
+												</Link>
 												<div className="mt-1 text-xs text-slate-400">
 													{formatRelativeTime(comment.createdUtc)} •{" "}
 													{comment.score} points

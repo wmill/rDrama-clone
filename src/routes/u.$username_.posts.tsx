@@ -7,52 +7,15 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 
 import { UserPage } from "@/components/profile/user-page";
+import type { SortType, TimeFilter } from "@/lib/constants";
 import {
-	type SortType,
-	SortTypes,
-	type TimeFilter,
-	TimeFilters,
-} from "@/lib/constants";
+	buildProfilePostsHref,
+	parsePostsProfileSearch,
+	parsePostsProfileSort,
+} from "@/lib/profile-route";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { getProfilePageData, type ProfilePageData } from "@/lib/users.server";
 import { stripHtmlToText } from "@/lib/utils";
-import {
-	getProfilePageData,
-	type ProfilePageData,
-} from "@/lib/users.server";
-
-function parseTime(value: unknown): TimeFilter {
-	if (typeof value === "string" && TimeFilters.includes(value as TimeFilter)) {
-		return value as TimeFilter;
-	}
-	return "all";
-}
-
-function parseSort(value: unknown): SortType {
-	if (typeof value === "string" && SortTypes.includes(value as SortType)) {
-		return value as SortType;
-	}
-	return "hot";
-}
-
-function parsePage(value: unknown): number {
-	const parsed = Number(value);
-	if (Number.isFinite(parsed) && parsed > 0) {
-		return Math.floor(parsed);
-	}
-	return 1;
-}
-
-function buildPostsProfileHref(
-	username: string,
-	search: { sort: SortType; t: TimeFilter; page: number },
-): string {
-	const params = new URLSearchParams({
-		sort: search.sort,
-		t: search.t,
-		page: String(search.page),
-	})
-	return `/u/${username}/posts?${params.toString()}`;
-}
 
 function buildDescription(data: ProfilePageData): string {
 	const joined = new Date(
@@ -86,17 +49,14 @@ const getUserPostsPageFn = createServerFn({ method: "GET" })
 				t: data.t,
 				page: data.page,
 				viewer,
-			})
+			});
 		},
-	)
+	);
 
-export const Route = createFileRoute("/u/$username/posts")({
+export const Route = createFileRoute("/u/$username_/posts")({
 	component: UserPostsPage,
-	validateSearch: (search: Record<string, unknown>) => ({
-		sort: parseSort(search.sort),
-		t: parseTime(search.t),
-		page: parsePage(search.page),
-	}),
+	validateSearch: (search: Record<string, unknown>) =>
+		parsePostsProfileSearch(search),
 	loaderDeps: ({ search }) => ({
 		sort: search.sort,
 		t: search.t,
@@ -110,14 +70,14 @@ export const Route = createFileRoute("/u/$username/posts")({
 				t: deps.t,
 				page: deps.page,
 			},
-		})
+		});
 
 		if (!data) throw notFound();
 
 		if (data.profileUser.username !== params.username) {
 			throw redirect({
-				href: buildPostsProfileHref(data.profileUser.username, deps),
-			})
+				href: buildProfilePostsHref(data.profileUser.username, deps),
+			});
 		}
 
 		return data;
@@ -132,12 +92,12 @@ export const Route = createFileRoute("/u/$username/posts")({
 			loaderData?.profileUser.profileUrl ||
 			"/tanstack-word-logo-white.svg";
 		const url = loaderData
-			? buildPostsProfileHref(username, {
-					sort: parseSort(loaderData.sort),
+			? buildProfilePostsHref(username, {
+					sort: parsePostsProfileSort(loaderData.sort),
 					t: loaderData.t,
 					page: loaderData.page,
 				})
-			: `/u/${username}/posts`;
+			: `/u/${encodeURIComponent(username)}/posts`;
 
 		return {
 			meta: [
@@ -152,7 +112,7 @@ export const Route = createFileRoute("/u/$username/posts")({
 				{ name: "twitter:description", content: description },
 				{ name: "twitter:image", content: image },
 			],
-		}
+		};
 	},
 });
 
@@ -165,31 +125,37 @@ function UserPostsPage() {
 			data={data}
 			onSortChange={async (sort) => {
 				await router.navigate({
-					href: buildPostsProfileHref(data.profileUser.username, {
-						sort: parseSort(sort),
+					to: "/u/$username/posts",
+					params: { username: data.profileUser.username },
+					search: {
+						sort: parsePostsProfileSort(sort),
 						t: data.t,
 						page: 1,
-					}),
-				})
+					},
+				});
 			}}
 			onTimeChange={async (t) => {
 				await router.navigate({
-					href: buildPostsProfileHref(data.profileUser.username, {
-						sort: parseSort(data.sort),
+					to: "/u/$username/posts",
+					params: { username: data.profileUser.username },
+					search: {
+						sort: parsePostsProfileSort(data.sort),
 						t,
 						page: 1,
-					}),
-				})
+					},
+				});
 			}}
 			onPageChange={async (page) => {
 				await router.navigate({
-					href: buildPostsProfileHref(data.profileUser.username, {
-						sort: parseSort(data.sort),
+					to: "/u/$username/posts",
+					params: { username: data.profileUser.username },
+					search: {
+						sort: parsePostsProfileSort(data.sort),
 						t: data.t,
 						page,
-					}),
-				})
+					},
+				});
 			}}
 		/>
-	)
+	);
 }

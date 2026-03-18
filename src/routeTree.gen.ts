@@ -16,12 +16,14 @@ import { Route as MeRouteImport } from './routes/me'
 import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CommentsRouteImport } from './routes/comments'
+import { Route as AtusernameRouteImport } from './routes/@$username'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UMeRouteImport } from './routes/u.me'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as PostIdRouteImport } from './routes/post.$id'
 import { Route as CommentIdRouteImport } from './routes/comment.$id'
-import { Route as UUsernamePostsRouteImport } from './routes/u.$username.posts'
+import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
+import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
 
 const SubmitRoute = SubmitRouteImport.update({
   id: '/submit',
@@ -58,6 +60,11 @@ const CommentsRoute = CommentsRouteImport.update({
   path: '/comments',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtusernameRoute = AtusernameRouteImport.update({
+  id: '/@$username',
+  path: '/@$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -83,14 +90,20 @@ const CommentIdRoute = CommentIdRouteImport.update({
   path: '/comment/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtusernamePostsRoute = AtusernamePostsRouteImport.update({
+  id: '/@$username_/posts',
+  path: '/@$username/posts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UUsernamePostsRoute = UUsernamePostsRouteImport.update({
-  id: '/posts',
-  path: '/posts',
-  getParentRoute: () => UUsernameRoute,
+  id: '/u/$username_/posts',
+  path: '/u/$username/posts',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/@$username': typeof AtusernameRoute
   '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
@@ -98,14 +111,16 @@ export interface FileRoutesByFullPath {
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/@$username/posts': typeof AtusernamePostsRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
-  '/u/$username': typeof UUsernameRouteWithChildren
+  '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/@$username': typeof AtusernameRoute
   '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
@@ -113,15 +128,17 @@ export interface FileRoutesByTo {
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/@$username/posts': typeof AtusernamePostsRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
-  '/u/$username': typeof UUsernameRouteWithChildren
+  '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/@$username': typeof AtusernameRoute
   '/comments': typeof CommentsRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
@@ -129,16 +146,18 @@ export interface FileRoutesById {
   '/random_post': typeof Random_postRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/@$username_/posts': typeof AtusernamePostsRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
-  '/u/$username': typeof UUsernameRouteWithChildren
+  '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
-  '/u/$username/posts': typeof UUsernamePostsRoute
+  '/u/$username_/posts': typeof UUsernamePostsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/@$username'
     | '/comments'
     | '/login'
     | '/logout'
@@ -146,6 +165,7 @@ export interface FileRouteTypes {
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/@$username/posts'
     | '/comment/$id'
     | '/post/$id'
     | '/u/$username'
@@ -154,6 +174,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/@$username'
     | '/comments'
     | '/login'
     | '/logout'
@@ -161,6 +182,7 @@ export interface FileRouteTypes {
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/@$username/posts'
     | '/comment/$id'
     | '/post/$id'
     | '/u/$username'
@@ -169,6 +191,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/@$username'
     | '/comments'
     | '/login'
     | '/logout'
@@ -176,15 +199,17 @@ export interface FileRouteTypes {
     | '/random_post'
     | '/signup'
     | '/submit'
+    | '/@$username_/posts'
     | '/comment/$id'
     | '/post/$id'
     | '/u/$username'
     | '/u/me'
-    | '/u/$username/posts'
+    | '/u/$username_/posts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AtusernameRoute: typeof AtusernameRoute
   CommentsRoute: typeof CommentsRoute
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
@@ -192,10 +217,12 @@ export interface RootRouteChildren {
   Random_postRoute: typeof Random_postRoute
   SignupRoute: typeof SignupRoute
   SubmitRoute: typeof SubmitRoute
+  AtusernamePostsRoute: typeof AtusernamePostsRoute
   CommentIdRoute: typeof CommentIdRoute
   PostIdRoute: typeof PostIdRoute
-  UUsernameRoute: typeof UUsernameRouteWithChildren
+  UUsernameRoute: typeof UUsernameRoute
   UMeRoute: typeof UMeRoute
+  UUsernamePostsRoute: typeof UUsernamePostsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -249,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/@$username': {
+      id: '/@$username'
+      path: '/@$username'
+      fullPath: '/@$username'
+      preLoaderRoute: typeof AtusernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -284,30 +318,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/u/$username/posts': {
-      id: '/u/$username/posts'
-      path: '/posts'
+    '/@$username_/posts': {
+      id: '/@$username_/posts'
+      path: '/@$username/posts'
+      fullPath: '/@$username/posts'
+      preLoaderRoute: typeof AtusernamePostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$username_/posts': {
+      id: '/u/$username_/posts'
+      path: '/u/$username/posts'
       fullPath: '/u/$username/posts'
       preLoaderRoute: typeof UUsernamePostsRouteImport
-      parentRoute: typeof UUsernameRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface UUsernameRouteChildren {
-  UUsernamePostsRoute: typeof UUsernamePostsRoute
-}
-
-const UUsernameRouteChildren: UUsernameRouteChildren = {
-  UUsernamePostsRoute: UUsernamePostsRoute,
-}
-
-const UUsernameRouteWithChildren = UUsernameRoute._addFileChildren(
-  UUsernameRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AtusernameRoute: AtusernameRoute,
   CommentsRoute: CommentsRoute,
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
@@ -315,10 +345,12 @@ const rootRouteChildren: RootRouteChildren = {
   Random_postRoute: Random_postRoute,
   SignupRoute: SignupRoute,
   SubmitRoute: SubmitRoute,
+  AtusernamePostsRoute: AtusernamePostsRoute,
   CommentIdRoute: CommentIdRoute,
   PostIdRoute: PostIdRoute,
-  UUsernameRoute: UUsernameRouteWithChildren,
+  UUsernameRoute: UUsernameRoute,
   UMeRoute: UMeRoute,
+  UUsernamePostsRoute: UUsernamePostsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -7,55 +7,15 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 
 import { UserPage } from "@/components/profile/user-page";
+import type { CommentFeedSortType, TimeFilter } from "@/lib/constants";
 import {
-	type CommentFeedSortType,
-	CommentSortTypes,
-	type TimeFilter,
-	TimeFilters,
-} from "@/lib/constants";
+	buildProfileCommentsHref,
+	parseCommentsProfileSearch,
+	parseCommentsProfileSort,
+} from "@/lib/profile-route";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { getProfilePageData, type ProfilePageData } from "@/lib/users.server";
 import { stripHtmlToText } from "@/lib/utils";
-import {
-	getProfilePageData,
-	type ProfilePageData,
-} from "@/lib/users.server";
-
-function parseTime(value: unknown): TimeFilter {
-	if (typeof value === "string" && TimeFilters.includes(value as TimeFilter)) {
-		return value as TimeFilter;
-	}
-	return "all";
-}
-
-function parseSort(value: unknown): CommentFeedSortType {
-	if (
-		typeof value === "string" &&
-		CommentSortTypes.includes(value as CommentFeedSortType)
-	) {
-		return value as CommentFeedSortType;
-	}
-	return "new";
-}
-
-function parsePage(value: unknown): number {
-	const parsed = Number(value);
-	if (Number.isFinite(parsed) && parsed > 0) {
-		return Math.floor(parsed);
-	}
-	return 1;
-}
-
-function buildCommentsProfileHref(
-	username: string,
-	search: { sort: CommentFeedSortType; t: TimeFilter; page: number },
-): string {
-	const params = new URLSearchParams({
-		sort: search.sort,
-		t: search.t,
-		page: String(search.page),
-	})
-	return `/u/${username}?${params.toString()}`;
-}
 
 function buildDescription(data: ProfilePageData): string {
 	const joined = new Date(
@@ -88,7 +48,7 @@ const getUserCommentsPageFn = createServerFn({ method: "GET" })
 				sort: CommentFeedSortType;
 				t: TimeFilter;
 				page: number;
-			}
+			};
 		}) => {
 			const viewer = await getCurrentUser();
 			return getProfilePageData({
@@ -98,17 +58,14 @@ const getUserCommentsPageFn = createServerFn({ method: "GET" })
 				t: data.t,
 				page: data.page,
 				viewer,
-			})
+			});
 		},
-	)
+	);
 
 export const Route = createFileRoute("/u/$username")({
 	component: UserCommentsPage,
-	validateSearch: (search: Record<string, unknown>) => ({
-		sort: parseSort(search.sort),
-		t: parseTime(search.t),
-		page: parsePage(search.page),
-	}),
+	validateSearch: (search: Record<string, unknown>) =>
+		parseCommentsProfileSearch(search),
 	loaderDeps: ({ search }) => ({
 		sort: search.sort,
 		t: search.t,
@@ -122,14 +79,14 @@ export const Route = createFileRoute("/u/$username")({
 				t: deps.t,
 				page: deps.page,
 			},
-		})
+		});
 
 		if (!data) throw notFound();
 
 		if (data.profileUser.username !== params.username) {
 			throw redirect({
-				href: buildCommentsProfileHref(data.profileUser.username, deps),
-			})
+				href: buildProfileCommentsHref(data.profileUser.username, deps),
+			});
 		}
 
 		return data;
@@ -144,12 +101,12 @@ export const Route = createFileRoute("/u/$username")({
 			loaderData?.profileUser.profileUrl ||
 			"/tanstack-word-logo-white.svg";
 		const url = loaderData
-			? buildCommentsProfileHref(username, {
-					sort: parseSort(loaderData.sort),
+			? buildProfileCommentsHref(username, {
+					sort: parseCommentsProfileSort(loaderData.sort),
 					t: loaderData.t,
 					page: loaderData.page,
 				})
-			: `/u/${username}`;
+			: `/u/${encodeURIComponent(username)}`;
 
 		return {
 			meta: [
@@ -164,7 +121,7 @@ export const Route = createFileRoute("/u/$username")({
 				{ name: "twitter:description", content: description },
 				{ name: "twitter:image", content: image },
 			],
-		}
+		};
 	},
 });
 
@@ -177,31 +134,37 @@ function UserCommentsPage() {
 			data={data}
 			onSortChange={async (sort) => {
 				await router.navigate({
-					href: buildCommentsProfileHref(data.profileUser.username, {
-						sort: parseSort(sort),
+					to: "/u/$username",
+					params: { username: data.profileUser.username },
+					search: {
+						sort: parseCommentsProfileSort(sort),
 						t: data.t,
 						page: 1,
-					}),
-				})
+					},
+				});
 			}}
 			onTimeChange={async (t) => {
 				await router.navigate({
-					href: buildCommentsProfileHref(data.profileUser.username, {
-						sort: parseSort(data.sort),
+					to: "/u/$username",
+					params: { username: data.profileUser.username },
+					search: {
+						sort: parseCommentsProfileSort(data.sort),
 						t,
 						page: 1,
-					}),
-				})
+					},
+				});
 			}}
 			onPageChange={async (page) => {
 				await router.navigate({
-					href: buildCommentsProfileHref(data.profileUser.username, {
-						sort: parseSort(data.sort),
+					to: "/u/$username",
+					params: { username: data.profileUser.username },
+					search: {
+						sort: parseCommentsProfileSort(data.sort),
 						t: data.t,
 						page,
-					}),
-				})
+					},
+				});
 			}}
 		/>
-	)
+	);
 }
