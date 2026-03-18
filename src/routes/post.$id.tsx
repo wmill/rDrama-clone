@@ -90,7 +90,7 @@ function PostPage() {
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
-			<div className="mx-auto max-w-4xl">
+			<div className="mx-auto max-w-7xl">
 				<PostContent
 					post={post}
 					commentCount={displayCommentCount}

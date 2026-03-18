@@ -1,5 +1,7 @@
+import { useRouterState } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
+import { create } from "zustand";
 
 import type { SafeUser } from "@/lib/auth.server";
 import { getCurrentUser } from "@/lib/sessions.server";
@@ -16,24 +18,47 @@ const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
 	return getCurrentUser();
 });
 
-export function useAuth(): AuthState {
-	const [user, setUser] = useState<AuthUser | null>(null);
-	const [ready, setReady] = useState(false);
+type AuthStoreState = {
+	user: AuthUser | null;
+	ready: boolean;
+	refresh: () => Promise<void>;
+};
 
-	const refresh = useCallback(async () => {
-		try {
-			const currentUser = await getCurrentUserFn();
-			setUser(currentUser);
-		} catch {
-			setUser(null);
-		} finally {
-			setReady(true);
-		}
-	}, []);
+let refreshInFlight: Promise<void> | null = null;
+
+const useAuthStore = create<AuthStoreState>((set) => ({
+	user: null,
+	ready: false,
+	refresh: async () => {
+		if (refreshInFlight) return refreshInFlight;
+
+		refreshInFlight = (async () => {
+			try {
+				const currentUser = await getCurrentUserFn();
+				set({ user: currentUser, ready: true });
+			} catch {
+				set({ user: null, ready: true });
+			} finally {
+				refreshInFlight = null;
+			}
+		})();
+
+		return refreshInFlight;
+	},
+}));
+
+export function useAuth(): AuthState {
+	const user = useAuthStore((state) => state.user);
+	const ready = useAuthStore((state) => state.ready);
+	const refresh = useAuthStore((state) => state.refresh);
+	const currentHref = useRouterState({
+		select: (state) => state.location.href,
+	});
 
 	useEffect(() => {
-		refresh();
-	}, [refresh]);
+		void currentHref;
+		void refresh();
+	}, [refresh, currentHref]);
 
 	return {
 		user,
