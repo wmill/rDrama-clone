@@ -24,6 +24,7 @@ export type SubmissionSummary = {
 	isPinned: boolean;
 	isNsfw: boolean;
 	stickied: string | null;
+	userVote: VoteType;
 };
 
 export type SubmissionDetail = SubmissionSummary & {
@@ -59,6 +60,7 @@ export async function getSubmissions(options: {
 	offset?: number;
 	authorId?: number;
 	pinnedFirst?: boolean;
+	userId?: number;
 }): Promise<SubmissionSummary[]> {
 	const {
 		sort = "hot",
@@ -67,6 +69,7 @@ export async function getSubmissions(options: {
 		offset = 0,
 		authorId,
 		pinnedFirst = true,
+		userId,
 	} = options;
 
 	const timeFilter = getTimeFilterSeconds(time);
@@ -159,17 +162,25 @@ export async function getSubmissions(options: {
 			isPinned: submissions.isPinned,
 			isNsfw: submissions.over18,
 			stickied: submissions.stickied,
+			userVoteType: votes.voteType,
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
+		.leftJoin(
+			votes,
+			userId
+				? and(eq(votes.submissionId, submissions.id), eq(votes.userId, userId))
+				: sql`false`,
+		)
 		.where(and(...conditions))
 		.orderBy(...orderBy)
 		.limit(limit)
 		.offset(offset);
 
-	return results.map((row) => ({
+	return results.map(({ userVoteType, ...row }) => ({
 		...row,
 		score: row.upvotes - row.downvotes,
+		userVote: (userVoteType as VoteType) ?? 0,
 	}));
 }
 

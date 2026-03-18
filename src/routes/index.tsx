@@ -35,6 +35,7 @@ const loadSubmissions = createServerFn({ method: "GET" })
 					sort: data.sort ?? "hot",
 					time: data.time ?? "all",
 					limit: data.limit ?? 25,
+					userId: user?.id,
 				});
 				return {
 					submissions,

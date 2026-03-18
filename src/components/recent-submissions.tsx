@@ -127,6 +127,7 @@ export function RecentSubmissions({
 									type="submission"
 									id={submission.id}
 									score={submission.score}
+									userVote={submission.userVote}
 									size="sm"
 									disabled={!currentUserId}
 								/>
