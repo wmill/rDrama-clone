@@ -1,9 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import {
-	Home,
-	Menu,
-	X,
-} from "lucide-react";
+import { Home, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 import { AuthButton } from "@/components/auth-button";
