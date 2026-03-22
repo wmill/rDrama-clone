@@ -7,6 +7,10 @@
     "build": "vite build && cp instrument.server.mjs .output/server",
     "serve": "vite preview",
     "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
@@ -60,6 +64,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
     "@faker-js/faker": "^10.3.0",
+    "@playwright/test": "^1.53.2",
     "@tanstack/devtools-vite": "^0.3.11",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
