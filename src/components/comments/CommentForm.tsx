@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MARKDOWN_OPTIONS } from "@/lib/markdown-options";
+import { renderCommentMarkdown } from "@/lib/markdown";
 
 type CommentFormProps = {
 	mode: "new" | "reply" | "edit";
@@ -43,29 +43,10 @@ export function CommentForm({
 	const [text, setText] = useState(initialText);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [previewHtml, setPreviewHtml] = useState("");
-	const mdRef = useRef<{ render: (src: string) => string } | null>(null);
 
 	const config = modeConfig[mode];
-
-	// Lazily load markdown-it on the client
-	useEffect(() => {
-		let cancelled = false;
-		import("markdown-it").then((mod) => {
-			if (cancelled) return;
-			const MarkdownIt = mod.default;
-			mdRef.current = new MarkdownIt(MARKDOWN_OPTIONS);
-		});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
-
-	// Re-render preview whenever text changes while preview is visible
-	useEffect(() => {
-		if (mdRef.current) {
-			setPreviewHtml(mdRef.current.render(text));
-		}
+	const previewHtml = useMemo(() => {
+		return renderCommentMarkdown(text);
 	}, [text]);
 
 	const handleSubmit = async () => {

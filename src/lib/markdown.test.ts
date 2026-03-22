@@ -31,3 +31,20 @@ describe("renderCommentMarkdown", () => {
 		expect(html).toContain("<li>two</li>");
 	});
 });
+
+describe("renderCommentMarkdown plugin contracts", () => {
+	it("renders spoiler sections using ||double pipes|| syntax", () => {
+		const html = renderCommentMarkdown(
+			"I didn't like the part where ||snape killed dumbeldore||",
+		);
+		expect(html).toContain("spoiler");
+		expect(html).toContain("snape killed dumbeldore");
+	});
+
+	it.skip("converts /u/username references to profile links", () => {
+		const html = renderCommentMarkdown("Shoutout to /u/testuser for the fix");
+		expect(html).toContain('href="/u/testuser"');
+		expect(html).toContain("/u/testuser");
+		// Unskip and tighten to exact markup once user-link plugin is implemented.
+	});
+});

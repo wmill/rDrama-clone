@@ -195,6 +195,19 @@ code {
   .prose a:hover {
     color: #67e8f9;
   }
+  .prose .spoiler {
+    color: transparent;
+    background: #334155;
+    border-radius: 0.25rem;
+    padding: 0 0.2em;
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease;
+  }
+  .prose .spoiler:hover,
+  .prose .spoiler:focus-visible {
+    color: inherit;
+    background: #475569;
+  }
   .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
     font-weight: 600;
     margin: 0.75em 0 0.25em;
