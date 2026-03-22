@@ -1,20 +1,10 @@
 import { and, asc, desc, eq, gte, inArray, type SQL, sql } from "drizzle-orm";
-import MarkdownIt from "markdown-it";
 
 import { db } from "@/db";
 import { comments, commentVotes, submissions, users } from "@/db/schema";
+import { renderCommentMarkdown } from "@/lib/markdown";
 import type { VoteType } from "@/lib/votes.server";
 import type { CommentFeedSortType, TimeFilter } from "./constants";
-
-const markdown = new MarkdownIt({
-	html: false,
-	linkify: true,
-	breaks: true,
-});
-
-function renderCommentMarkdown(body: string): string {
-	return markdown.render(body);
-}
 
 export type CommentFeedItem = {
 	id: number;

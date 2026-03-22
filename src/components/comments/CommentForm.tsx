@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { MARKDOWN_OPTIONS } from "@/lib/markdown-options";
 
 type CommentFormProps = {
 	mode: "new" | "reply" | "edit";
@@ -53,7 +54,7 @@ export function CommentForm({
 		import("markdown-it").then((mod) => {
 			if (cancelled) return;
 			const MarkdownIt = mod.default;
-			mdRef.current = new MarkdownIt({ html: false, linkify: true });
+			mdRef.current = new MarkdownIt(MARKDOWN_OPTIONS);
 		});
 		return () => {
 			cancelled = true;
