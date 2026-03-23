@@ -41,10 +41,9 @@ describe("renderCommentMarkdown plugin contracts", () => {
 		expect(html).toContain("snape killed dumbeldore");
 	});
 
-	it.skip("converts /u/username references to profile links", () => {
-		const html = renderCommentMarkdown("Shoutout to /u/testuser for the fix");
+	it("converts @username references to profile links", () => {
+		const html = renderCommentMarkdown("Shoutout to @testuser for the fix");
 		expect(html).toContain('href="/u/testuser"');
-		expect(html).toContain("/u/testuser");
-		// Unskip and tighten to exact markup once user-link plugin is implemented.
+		expect(html).toContain("@testuser");
 	});
 });
