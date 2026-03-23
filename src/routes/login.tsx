@@ -159,10 +159,12 @@ function LoginPage() {
 					</div>
 
 					<div className="flex items-center justify-between">
-						{/* TODO: Implement forgot password route in Phase 1 */}
-						<span className="text-sm text-slate-500 cursor-not-allowed">
+						<Link
+							to="/forgot-password"
+							className="text-sm text-cyan-400 hover:text-cyan-300"
+						>
 							Forgot password?
-						</span>
+						</Link>
 					</div>
 
 					<Button

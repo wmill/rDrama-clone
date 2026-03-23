@@ -1,10 +1,23 @@
 import bcrypt from "bcrypt";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
 
 const SALT_ROUNDS = 12;
+const DEFAULT_THEME = "TheMotte";
+const DEFAULT_COLOR = "fff";
+const DEFAULT_TIME_FILTER = "all";
+const DEFAULT_REDDIT_DOMAIN = "old.reddit.com";
+const DEFAULT_CHAT_LAST_SEEN = new Date(0);
+
+function normalizeUsername(username: string): string {
+	return username.trim();
+}
+
+function normalizeEmail(email: string): string {
+	return email.trim().toLowerCase();
+}
 
 export async function hashPassword(password: string): Promise<string> {
 	return bcrypt.hash(password, SALT_ROUNDS);
@@ -59,19 +72,21 @@ export async function getUserById(id: number) {
 }
 
 export async function getUserByUsername(username: string) {
+	const normalizedUsername = normalizeUsername(username);
 	const [user] = await db
 		.select()
 		.from(users)
-		.where(eq(users.username, username))
+		.where(sql`lower(${users.username}) = ${normalizedUsername.toLowerCase()}`)
 		.limit(1);
 	return user ?? null;
 }
 
 export async function getUserByEmail(email: string) {
+	const normalizedEmail = normalizeEmail(email);
 	const [user] = await db
 		.select()
 		.from(users)
-		.where(eq(users.email, email))
+		.where(sql`lower(${users.email}) = ${normalizedEmail}`)
 		.limit(1);
 	return user ?? null;
 }
@@ -118,24 +133,27 @@ export async function createUser(
 	email: string,
 	password: string,
 ): Promise<SignupResult> {
-	const existingUsername = await getUserByUsername(username);
+	const normalizedUsername = normalizeUsername(username);
+	const normalizedEmail = normalizeEmail(email);
+
+	const existingUsername = await getUserByUsername(normalizedUsername);
 	if (existingUsername) {
 		return { success: false, error: "Username already taken" };
 	}
 
-	const existingEmail = await getUserByEmail(email);
+	const existingEmail = await getUserByEmail(normalizedEmail);
 	if (existingEmail) {
 		return { success: false, error: "Email already registered" };
 	}
 
-	if (username.length < 3 || username.length > 25) {
+	if (normalizedUsername.length < 3 || normalizedUsername.length > 25) {
 		return {
 			success: false,
 			error: "Username must be between 3 and 25 characters",
 		};
 	}
 
-	if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+	if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
 		return {
 			success: false,
 			error: "Username can only contain letters, numbers, and underscores",
@@ -155,21 +173,22 @@ export async function createUser(
 	const [newUser] = await db
 		.insert(users)
 		.values({
-			username,
-			email,
+			username: normalizedUsername,
+			originalUsername: normalizedUsername,
+			email: normalizedEmail,
 			passhash,
 			createdUtc,
-			defaultTime: "day",
-			nameColor: "ffffff",
-			titleColor: "ffffff",
-			themeColor: "ffffff",
-			theme: "default",
-			reddit: "",
+			defaultTime: DEFAULT_TIME_FILTER,
+			nameColor: DEFAULT_COLOR,
+			titleColor: DEFAULT_COLOR,
+			themeColor: DEFAULT_COLOR,
+			theme: DEFAULT_THEME,
+			reddit: DEFAULT_REDDIT_DOMAIN,
 			volunteerJanitorCorrectness: 0,
 			chatAuthorized: false,
-			chatLastSeen: new Date(),
+			chatLastSeen: DEFAULT_CHAT_LAST_SEEN,
 			filterBehavior: "AUTOMATIC",
-			cardView: false,
+			cardView: true,
 		})
 		.returning();
 

@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as Random_postRouteImport } from './routes/random_post'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as CommentsRouteImport } from './routes/comments'
 import { Route as AtusernameRouteImport } from './routes/@$username'
 import { Route as IndexRouteImport } from './routes/index'
@@ -35,6 +37,11 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Random_postRoute = Random_postRouteImport.update({
   id: '/random_post',
   path: '/random_post',
@@ -53,6 +60,11 @@ const LogoutRoute = LogoutRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CommentsRoute = CommentsRouteImport.update({
@@ -105,10 +117,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
   '/comments': typeof CommentsRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
   '/random_post': typeof Random_postRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
@@ -122,10 +136,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
   '/comments': typeof CommentsRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
   '/random_post': typeof Random_postRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
@@ -140,10 +156,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
   '/comments': typeof CommentsRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
   '/random_post': typeof Random_postRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
@@ -159,10 +177,12 @@ export interface FileRouteTypes {
     | '/'
     | '/@$username'
     | '/comments'
+    | '/forgot-password'
     | '/login'
     | '/logout'
     | '/me'
     | '/random_post'
+    | '/reset-password'
     | '/signup'
     | '/submit'
     | '/@$username/posts'
@@ -176,10 +196,12 @@ export interface FileRouteTypes {
     | '/'
     | '/@$username'
     | '/comments'
+    | '/forgot-password'
     | '/login'
     | '/logout'
     | '/me'
     | '/random_post'
+    | '/reset-password'
     | '/signup'
     | '/submit'
     | '/@$username/posts'
@@ -193,10 +215,12 @@ export interface FileRouteTypes {
     | '/'
     | '/@$username'
     | '/comments'
+    | '/forgot-password'
     | '/login'
     | '/logout'
     | '/me'
     | '/random_post'
+    | '/reset-password'
     | '/signup'
     | '/submit'
     | '/@$username_/posts'
@@ -211,10 +235,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AtusernameRoute: typeof AtusernameRoute
   CommentsRoute: typeof CommentsRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
   MeRoute: typeof MeRoute
   Random_postRoute: typeof Random_postRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SubmitRoute: typeof SubmitRoute
   AtusernamePostsRoute: typeof AtusernamePostsRoute
@@ -239,6 +265,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/random_post': {
@@ -267,6 +300,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/comments': {
@@ -339,10 +379,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtusernameRoute: AtusernameRoute,
   CommentsRoute: CommentsRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
   MeRoute: MeRoute,
   Random_postRoute: Random_postRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SubmitRoute: SubmitRoute,
   AtusernamePostsRoute: AtusernamePostsRoute,

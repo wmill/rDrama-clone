@@ -1,3 +1,4 @@
+import "@/lib/env.server";
 import Redis from "ioredis";
 
 const redisUrl = process.env.REDIS_URL;
