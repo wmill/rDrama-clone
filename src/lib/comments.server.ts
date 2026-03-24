@@ -799,47 +799,55 @@ export async function createComment(data: {
 		}
 	}
 
-	const [result] = await db
-		.insert(comments)
-		.values({
-			authorId: data.authorId,
-			body: data.body,
-			bodyHtml: renderCommentMarkdown(data.body),
-			parentSubmission: data.parentSubmissionId,
-			parentCommentId: data.parentCommentId ?? null,
-			level,
-			topCommentId,
-			createdUtc,
-			stateMod: "VISIBLE",
-			stateReport: "UNREPORTED",
-			volunteerJanitorBadness: 0,
-		})
-		.returning({ id: comments.id });
-
-	// Set ltree path
-	await db.execute(
-		sql`UPDATE comments SET path =
-			CASE
-				WHEN parent_comment_id IS NULL THEN ${result.id.toString()}::ltree
-				ELSE (SELECT path FROM comments WHERE id = ${data.parentCommentId ?? null}) || ${result.id.toString()}::ltree
-			END
-		WHERE id = ${result.id}`,
-	);
-
-	// Update parent comment's descendant count
-	if (data.parentCommentId) {
-		await db
-			.update(comments)
-			.set({
-				descendantCount: sql`${comments.descendantCount} + 1`,
+	const result = await db.transaction(async (tx) => {
+		const [createdComment] = await tx
+			.insert(comments)
+			.values({
+				authorId: data.authorId,
+				body: data.body,
+				bodyHtml: renderCommentMarkdown(data.body),
+				parentSubmission: data.parentSubmissionId,
+				parentCommentId: data.parentCommentId ?? null,
+				level,
+				topCommentId,
+				createdUtc,
+				stateMod: "VISIBLE",
+				stateReport: "UNREPORTED",
+				volunteerJanitorBadness: 0,
 			})
-			.where(eq(comments.id, data.parentCommentId));
-	}
+			.returning({ id: comments.id });
 
-	// Update submission comment count
-	await db.execute(
-		sql`UPDATE submissions SET comment_count = comment_count + 1 WHERE id = ${data.parentSubmissionId}`,
-	);
+		await tx.insert(commentVotes).values({
+			userId: data.authorId,
+			commentId: createdComment.id,
+			voteType: 1,
+			createdDatetimez: new Date(),
+		});
+
+		await tx.execute(
+			sql`UPDATE comments SET path =
+				CASE
+					WHEN parent_comment_id IS NULL THEN ${createdComment.id.toString()}::ltree
+					ELSE (SELECT path FROM comments WHERE id = ${data.parentCommentId ?? null}) || ${createdComment.id.toString()}::ltree
+				END
+			WHERE id = ${createdComment.id}`,
+		);
+
+		if (data.parentCommentId) {
+			await tx
+				.update(comments)
+				.set({
+					descendantCount: sql`${comments.descendantCount} + 1`,
+				})
+				.where(eq(comments.id, data.parentCommentId));
+		}
+
+		await tx.execute(
+			sql`UPDATE submissions SET comment_count = comment_count + 1 WHERE id = ${data.parentSubmissionId}`,
+		);
+
+		return createdComment;
+	});
 
 	return result.id;
 }

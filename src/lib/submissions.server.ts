@@ -282,21 +282,32 @@ export async function createSubmission(data: {
 	const url = normalizeOptionalText(data.url);
 	const body = normalizeOptionalText(data.body);
 
-	const [result] = await db
-		.insert(submissions)
-		.values({
-			authorId: data.authorId,
-			title,
-			titleHtml: renderPostTitleHtml(title),
-			url,
-			body,
-			bodyHtml: body ? renderPostBodyMarkdown(body) : null,
-			createdUtc,
-			over18: data.isNsfw ?? false,
-			stateMod: "VISIBLE",
-			stateReport: "UNREPORTED",
-		})
-		.returning({ id: submissions.id });
+	const result = await db.transaction(async (tx) => {
+		const [createdSubmission] = await tx
+			.insert(submissions)
+			.values({
+				authorId: data.authorId,
+				title,
+				titleHtml: renderPostTitleHtml(title),
+				url,
+				body,
+				bodyHtml: body ? renderPostBodyMarkdown(body) : null,
+				createdUtc,
+				over18: data.isNsfw ?? false,
+				stateMod: "VISIBLE",
+				stateReport: "UNREPORTED",
+			})
+			.returning({ id: submissions.id });
+
+		await tx.insert(votes).values({
+			userId: data.authorId,
+			submissionId: createdSubmission.id,
+			voteType: 1,
+			createdDatetimez: new Date(),
+		});
+
+		return createdSubmission;
+	});
 
 	return result.id;
 }
