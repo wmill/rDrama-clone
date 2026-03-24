@@ -1,14 +1,28 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Link,
+	notFound,
+	useRouter,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	type CommentSortType,
 	getCommentsBySubmissionFlat,
 } from "@/lib/comments.server";
+import {
+	deleteSubmissionFn,
+	updateSubmissionFn,
+	type UpdateSubmissionInput,
+} from "@/lib/post-actions.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import {
 	getSubmissionById,
@@ -125,7 +139,75 @@ function PostContent({
 	currentUserId?: number;
 	userVote?: VoteType;
 }) {
+	const router = useRouter();
 	const isAuthor = currentUserId === post.authorId;
+	const [isEditing, setIsEditing] = useState(false);
+	const [title, setTitle] = useState(post.title);
+	const [url, setUrl] = useState(post.url ?? "");
+	const [body, setBody] = useState(post.body ?? "");
+	const [isNsfw, setIsNsfw] = useState(post.isNsfw);
+	const [submitType, setSubmitType] = useState<"link" | "text">(
+		post.url ? "link" : "text",
+	);
+	const [isSaving, setIsSaving] = useState(false);
+	const [isDeleting, setIsDeleting] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const titleId = useId();
+	const urlId = useId();
+	const bodyId = useId();
+	const nsfwId = useId();
+
+	const handleSave = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setError(null);
+		setIsSaving(true);
+
+		const payload: UpdateSubmissionInput = {
+			id: post.id,
+			title,
+			url: submitType === "link" ? url : "",
+			body: submitType === "text" ? body : "",
+			isNsfw,
+		};
+
+		try {
+			const result = await updateSubmissionFn({ data: payload });
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setIsEditing(false);
+			await router.invalidate();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to update post");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const handleDelete = async () => {
+		if (!confirm("Are you sure you want to delete this post?")) {
+			return;
+		}
+
+		setError(null);
+		setIsDeleting(true);
+
+		try {
+			const result = await deleteSubmissionFn({ data: { id: post.id } });
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			await router.navigate({ to: "/", search: { sort: "hot", t: "all" } });
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to delete post");
+		} finally {
+			setIsDeleting(false);
+		}
+	};
 
 	return (
 		<article className="rounded-xl border border-slate-800 bg-slate-900/80 shadow-xl">
@@ -177,39 +259,159 @@ function PostContent({
 
 				{/* Content */}
 				<div className="flex-1 p-6">
-					<h1 className="mb-4 text-2xl font-bold text-white">{post.title}</h1>
+					{isEditing ? (
+						<form onSubmit={handleSave} className="space-y-6">
+							{error && (
+								<div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-400">
+									{error}
+								</div>
+							)}
 
-					{post.url && (
-						<a
-							href={post.url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="mb-4 flex items-center gap-2 text-cyan-400 hover:text-cyan-300"
-						>
-							<ExternalLink className="h-4 w-4" />
-							<span className="truncate">{new URL(post.url).hostname}</span>
-						</a>
-					)}
+							<div className="space-y-2">
+								<Label htmlFor={titleId} className="text-slate-300">
+									Title
+								</Label>
+								<Input
+									id={titleId}
+									type="text"
+									value={title}
+									onChange={(e) => setTitle(e.target.value)}
+									maxLength={500}
+									className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+								/>
+							</div>
 
-					{post.bodyHtml && (
-						<div className="prose prose-invert max-w-none">
-							<div
-								className="text-slate-300"
-								// biome-ignore lint/security/noDangerouslySetInnerHtml: User content is sanitized server-side
-								dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
+							<div className="flex gap-2">
+								<button
+									type="button"
+									onClick={() => setSubmitType("link")}
+									className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+										submitType === "link"
+											? "bg-cyan-500 text-white"
+											: "bg-slate-800 text-slate-300 hover:bg-slate-700"
+									}`}
+								>
+									Link
+								</button>
+								<button
+									type="button"
+									onClick={() => setSubmitType("text")}
+									className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+										submitType === "text"
+											? "bg-cyan-500 text-white"
+											: "bg-slate-800 text-slate-300 hover:bg-slate-700"
+									}`}
+								>
+									Text
+								</button>
+							</div>
+
+							{submitType === "link" ? (
+								<div className="space-y-2">
+									<Label htmlFor={urlId} className="text-slate-300">
+										URL
+									</Label>
+									<Input
+										id={urlId}
+										type="url"
+										value={url}
+										onChange={(e) => setUrl(e.target.value)}
+										className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+									/>
+								</div>
+							) : (
+								<div className="space-y-2">
+									<Label htmlFor={bodyId} className="text-slate-300">
+										Body
+									</Label>
+									<Textarea
+										id={bodyId}
+										value={body}
+										onChange={(e) => setBody(e.target.value)}
+										rows={8}
+										maxLength={20000}
+										className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+									/>
+								</div>
+							)}
+
+							<div className="flex items-center gap-3">
+								<Switch
+									id={nsfwId}
+									checked={isNsfw}
+									onCheckedChange={setIsNsfw}
+								/>
+								<Label htmlFor={nsfwId} className="text-slate-300">
+									Mark as NSFW (18+)
+								</Label>
+							</div>
+
+							<div className="flex gap-3">
+								<Button
+									type="submit"
+									disabled={isSaving}
+									className="bg-cyan-500 hover:bg-cyan-600"
+								>
+									{isSaving ? "Saving..." : "Save changes"}
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => {
+										setTitle(post.title);
+										setUrl(post.url ?? "");
+										setBody(post.body ?? "");
+										setIsNsfw(post.isNsfw);
+										setSubmitType(post.url ? "link" : "text");
+										setError(null);
+										setIsEditing(false);
+									}}
+								>
+									Cancel
+								</Button>
+							</div>
+						</form>
+					) : (
+						<>
+							<h1
+								className="mb-4 text-2xl font-bold text-white"
+								// biome-ignore lint/security/noDangerouslySetInnerHtml: Stored title HTML is sanitized server-side
+								dangerouslySetInnerHTML={{ __html: post.titleHtml }}
 							/>
-						</div>
-					)}
 
-					{post.embedUrl && (
-						<div className="mt-4 aspect-video">
-							<iframe
-								src={post.embedUrl}
-								title="Embedded content"
-								className="h-full w-full rounded-lg"
-								allowFullScreen
-							/>
-						</div>
+							{post.url && (
+								<a
+									href={post.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="mb-4 flex items-center gap-2 text-cyan-400 hover:text-cyan-300"
+								>
+									<ExternalLink className="h-4 w-4" />
+									<span className="truncate">{new URL(post.url).hostname}</span>
+								</a>
+							)}
+
+							{post.bodyHtml && (
+								<div className="prose prose-invert max-w-none">
+									<div
+										className="text-slate-300"
+										// biome-ignore lint/security/noDangerouslySetInnerHtml: User content is sanitized server-side
+										dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
+									/>
+								</div>
+							)}
+
+							{post.embedUrl && (
+								<div className="mt-4 aspect-video">
+									<iframe
+										src={post.embedUrl}
+										title="Embedded content"
+										className="h-full w-full rounded-lg"
+										allowFullScreen
+									/>
+								</div>
+							)}
+						</>
 					)}
 				</div>
 			</div>
@@ -236,11 +438,23 @@ function PostContent({
 
 				{isAuthor && (
 					<div className="ml-auto flex gap-2">
-						<Button variant="outline" size="sm">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setError(null);
+								setIsEditing((value) => !value);
+							}}
+						>
 							Edit
 						</Button>
-						<Button variant="destructive" size="sm">
-							Delete
+						<Button
+							variant="destructive"
+							size="sm"
+							disabled={isDeleting}
+							onClick={handleDelete}
+						>
+							{isDeleting ? "Deleting..." : "Delete"}
 						</Button>
 					</div>
 				)}

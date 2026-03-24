@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderCommentMarkdown } from "@/lib/markdown";
+import {
+	renderCommentMarkdown,
+	renderPostBodyMarkdown,
+	renderPostTitleHtml,
+} from "@/lib/markdown";
 
 describe("renderCommentMarkdown", () => {
 	it("renders common markdown formatting", () => {
@@ -45,5 +49,24 @@ describe("renderCommentMarkdown plugin contracts", () => {
 		const html = renderCommentMarkdown("Shoutout to @testuser for the fix");
 		expect(html).toContain('href="/u/testuser"');
 		expect(html).toContain("@testuser");
+	});
+});
+
+describe("post markdown rendering", () => {
+	it("renders post bodies with the same markdown pipeline", () => {
+		const html = renderPostBodyMarkdown("Hello **post**");
+		expect(html).toContain("<strong>post</strong>");
+	});
+
+	it("renders title markdown inline without wrapping paragraphs", () => {
+		const html = renderPostTitleHtml("Look at **this**");
+		expect(html).toContain("<strong>this</strong>");
+		expect(html).not.toContain("<p>");
+	});
+
+	it("escapes raw HTML in post titles", () => {
+		const html = renderPostTitleHtml("<img src=x onerror=alert(1)>");
+		expect(html).toContain("&lt;img");
+		expect(html).not.toContain("<img");
 	});
 });

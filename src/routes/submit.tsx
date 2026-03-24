@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { createSubmission } from "@/lib/submissions.server";
 
@@ -97,6 +98,8 @@ function SubmitPage() {
 	const urlId = useId();
 	const bodyId = useId();
 	const nsfwId = useId();
+	const titlePreviewHtml = useMemo(() => renderPostTitleHtml(title), [title]);
+	const bodyPreviewHtml = useMemo(() => renderPostBodyMarkdown(body), [body]);
 
 	if (!user) {
 		return (
@@ -215,6 +218,24 @@ function SubmitPage() {
 								<span>{fieldErrors.title}</span>
 								<span>{title.length}/500</span>
 							</div>
+							{submitType === "text" && (
+								<div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+									<p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+										Title Preview
+									</p>
+									{title.trim() ? (
+										<h2
+											className="text-xl font-bold text-white"
+											// biome-ignore lint/security/noDangerouslySetInnerHtml: Rendered from markdown-it with html:false
+											dangerouslySetInnerHTML={{ __html: titlePreviewHtml }}
+										/>
+									) : (
+										<p className="text-sm italic text-slate-500">
+											Nothing to preview
+										</p>
+									)}
+								</div>
+							)}
 						</div>
 
 						{submitType === "link" && (
@@ -253,6 +274,22 @@ function SubmitPage() {
 								<div className="flex justify-between text-xs text-slate-500">
 									<span>{fieldErrors.body}</span>
 									<span>{body.length}/20000</span>
+								</div>
+								<div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+									<p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+										Body Preview
+									</p>
+									{body.trim() ? (
+										<div
+											className="prose prose-invert prose-sm max-w-none text-slate-300"
+											// biome-ignore lint/security/noDangerouslySetInnerHtml: Rendered from markdown-it with html:false
+											dangerouslySetInnerHTML={{ __html: bodyPreviewHtml }}
+										/>
+									) : (
+										<p className="text-sm italic text-slate-500">
+											Nothing to preview
+										</p>
+									)}
 								</div>
 							</div>
 						)}

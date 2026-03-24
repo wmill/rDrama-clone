@@ -10,3 +10,11 @@ const markdown = new MarkdownIt(MARKDOWN_OPTIONS)
 export function renderCommentMarkdown(body: string): string {
 	return markdown.render(body);
 }
+
+export function renderPostBodyMarkdown(body: string): string {
+	return markdown.render(body);
+}
+
+export function renderPostTitleHtml(title: string): string {
+	return markdown.renderInline(title);
+}

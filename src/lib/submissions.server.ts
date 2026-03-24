@@ -1,7 +1,8 @@
-import { and, desc, eq, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { submissions, users, votes } from "@/db/schema";
+import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import type { VoteType } from "@/lib/votes.server";
 import type { SortType, TimeFilter } from "./constants";
 
@@ -53,6 +54,19 @@ function getTimeFilterSeconds(filter: TimeFilter): number | null {
 	}
 }
 
+function normalizeRequiredText(value: string): string {
+	return value.trim();
+}
+
+function normalizeOptionalText(value?: string | null): string | null {
+	if (value === undefined || value === null) {
+		return null;
+	}
+
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
 export async function getSubmissions(options: {
 	sort?: SortType;
 	time?: TimeFilter;
@@ -74,7 +88,10 @@ export async function getSubmissions(options: {
 
 	const timeFilter = getTimeFilterSeconds(time);
 
-	const conditions = [eq(submissions.stateMod, "VISIBLE")];
+	const conditions = [
+		eq(submissions.stateMod, "VISIBLE"),
+		isNull(submissions.stateUserDeletedUtc),
+	];
 
 	if (timeFilter !== null) {
 		conditions.push(sql`${submissions.createdUtc} >= ${timeFilter}`);
@@ -211,6 +228,8 @@ export async function getSubmissionById(
 			editedUtc: submissions.editedUtc,
 			views: submissions.views,
 			distinguishLevel: submissions.distinguishLevel,
+			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
+			stateMod: submissions.stateMod,
 			userVoteType: votes.voteType,
 		})
 		.from(submissions)
@@ -226,7 +245,17 @@ export async function getSubmissionById(
 
 	if (!result) return null;
 
-	const { userVoteType, ...rest } = result;
+	if (result.stateMod !== "VISIBLE") {
+		return null;
+	}
+
+	if (result.stateUserDeletedUtc !== null) {
+		return null;
+	}
+
+	const { userVoteType, stateUserDeletedUtc, stateMod, ...rest } = result;
+	void stateUserDeletedUtc;
+	void stateMod;
 	return {
 		...rest,
 		score: rest.upvotes - rest.downvotes,
@@ -249,16 +278,19 @@ export async function createSubmission(data: {
 	isNsfw?: boolean;
 }): Promise<number> {
 	const createdUtc = Math.floor(Date.now() / 1000);
+	const title = normalizeRequiredText(data.title);
+	const url = normalizeOptionalText(data.url);
+	const body = normalizeOptionalText(data.body);
 
 	const [result] = await db
 		.insert(submissions)
 		.values({
 			authorId: data.authorId,
-			title: data.title,
-			titleHtml: data.title, // TODO: Implement HTML sanitization
-			url: data.url ?? null,
-			body: data.body ?? null,
-			bodyHtml: data.body ?? null, // TODO: Implement markdown parsing
+			title,
+			titleHtml: renderPostTitleHtml(title),
+			url,
+			body,
+			bodyHtml: body ? renderPostBodyMarkdown(body) : null,
 			createdUtc,
 			over18: data.isNsfw ?? false,
 			stateMod: "VISIBLE",
@@ -273,17 +305,25 @@ export async function updateSubmission(
 	id: number,
 	authorId: number,
 	data: {
+		title: string;
+		url?: string | null;
 		body?: string;
 		isNsfw?: boolean;
 	},
 ): Promise<boolean> {
 	const editedUtc = Math.floor(Date.now() / 1000);
+	const title = normalizeRequiredText(data.title);
+	const url = normalizeOptionalText(data.url);
+	const body = normalizeOptionalText(data.body);
 
 	const result = await db
 		.update(submissions)
 		.set({
-			body: data.body,
-			bodyHtml: data.body, // TODO: Implement markdown parsing
+			title,
+			titleHtml: renderPostTitleHtml(title),
+			url,
+			body,
+			bodyHtml: body ? renderPostBodyMarkdown(body) : null,
 			over18: data.isNsfw,
 			editedUtc,
 		})
@@ -301,7 +341,9 @@ export async function deleteSubmission(
 		.update(submissions)
 		.set({
 			stateUserDeletedUtc: new Date(),
-			stateMod: "REMOVED",
+			body: "[deleted]",
+			bodyHtml: "[deleted]",
+			editedUtc: Math.floor(Date.now() / 1000),
 		})
 		.where(and(eq(submissions.id, id), eq(submissions.authorId, authorId)))
 		.returning({ id: submissions.id });
@@ -313,7 +355,12 @@ export async function getRandomSubmissionId(): Promise<number | null> {
 	const [result] = await db
 		.select({ id: submissions.id })
 		.from(submissions)
-		.where(eq(submissions.stateMod, "VISIBLE"))
+		.where(
+			and(
+				eq(submissions.stateMod, "VISIBLE"),
+				isNull(submissions.stateUserDeletedUtc),
+			),
+		)
 		.orderBy(sql`RANDOM()`)
 		.limit(1);
 
