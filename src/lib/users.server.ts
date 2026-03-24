@@ -13,6 +13,7 @@ import type {
 	SortType,
 	TimeFilter,
 } from "@/lib/constants";
+import { renderCommentMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import type { SafeUser } from "./auth.server";
 
 const PAGE_SIZE = 25;
@@ -59,6 +60,52 @@ export type ProfilePageData = {
 	hasNextPage: boolean;
 };
 
+export type UserSettings = {
+	id: number;
+	username: string;
+	email: string | null;
+	createdUtc: number;
+	isBanned: number;
+	banReason: string | null;
+	coins: number;
+	proCoins: number;
+	bio: string;
+	customTitlePlain: string;
+	profileUrl: string;
+	bannerUrl: string;
+	defaultSorting: SortType;
+	defaultSortingComments: CommentFeedSortType;
+	defaultTime: TimeFilter;
+	isPrivate: boolean;
+	hideVotedOn: boolean;
+	cardView: boolean;
+	highlightComments: boolean;
+	newTabExternal: boolean;
+	newTab: boolean;
+	nameColor: string;
+	titleColor: string;
+	themeColor: string;
+};
+
+export type UpdateUserSettingsInput = {
+	bio: string;
+	customTitlePlain: string;
+	profileUrl: string;
+	bannerUrl: string;
+	defaultSorting: SortType;
+	defaultSortingComments: CommentFeedSortType;
+	defaultTime: TimeFilter;
+	isPrivate: boolean;
+	hideVotedOn: boolean;
+	cardView: boolean;
+	highlightComments: boolean;
+	newTabExternal: boolean;
+	newTab: boolean;
+	nameColor: string;
+	titleColor: string;
+	themeColor: string;
+};
+
 function getTimeCutoff(time: TimeFilter): number | null {
 	if (time === "all") return null;
 
@@ -90,6 +137,112 @@ export async function getUserByUsernameCanonical(
 		.limit(1);
 
 	return user ?? null;
+}
+
+export async function getUserSettingsById(
+	userId: number,
+): Promise<UserSettings | null> {
+	const [user] = await db
+		.select({
+			id: users.id,
+			username: users.username,
+			email: users.email,
+			createdUtc: users.createdUtc,
+			isBanned: users.isBanned,
+			banReason: users.banReason,
+			coins: users.coins,
+			proCoins: users.proCoins,
+			bio: users.bio,
+			customTitlePlain: users.customTitlePlain,
+			profileUrl: users.profileUrl,
+			bannerUrl: users.bannerUrl,
+			defaultSorting: users.defaultSorting,
+			defaultSortingComments: users.defaultSortingComments,
+			defaultTime: users.defaultTime,
+			isPrivate: users.isPrivate,
+			hideVotedOn: users.hideVotedOn,
+			cardView: users.cardView,
+			highlightComments: users.highlightComments,
+			newTabExternal: users.newTabExternal,
+			newTab: users.newTab,
+			nameColor: users.nameColor,
+			titleColor: users.titleColor,
+			themeColor: users.themeColor,
+		})
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+
+	if (!user) {
+		return null;
+	}
+
+	return {
+		id: user.id,
+		username: user.username,
+		email: user.email,
+		createdUtc: user.createdUtc,
+		isBanned: user.isBanned,
+		banReason: user.banReason,
+		coins: user.coins,
+		proCoins: user.proCoins,
+		bio: user.bio ?? "",
+		customTitlePlain: user.customTitlePlain ?? "",
+		profileUrl: user.profileUrl ?? "",
+		bannerUrl: user.bannerUrl ?? "",
+		defaultSorting: user.defaultSorting as SortType,
+		defaultSortingComments:
+			user.defaultSortingComments as CommentFeedSortType,
+		defaultTime: user.defaultTime as TimeFilter,
+		isPrivate: user.isPrivate,
+		hideVotedOn: user.hideVotedOn,
+		cardView: user.cardView,
+		highlightComments: user.highlightComments,
+		newTabExternal: user.newTabExternal,
+		newTab: user.newTab,
+		nameColor: user.nameColor,
+		titleColor: user.titleColor,
+		themeColor: user.themeColor,
+	};
+}
+
+export async function updateUserSettings(
+	userId: number,
+	input: UpdateUserSettingsInput,
+): Promise<void> {
+	const bio = input.bio.trim();
+	const customTitlePlain = input.customTitlePlain.trim();
+	const profileUrl = input.profileUrl.trim();
+	const bannerUrl = input.bannerUrl.trim();
+
+	const bioHtml = bio ? renderCommentMarkdown(bio) : null;
+	const customTitleHtml = customTitlePlain
+		? renderPostTitleHtml(customTitlePlain)
+		: null;
+
+	await db
+		.update(users)
+		.set({
+			bio: bio || null,
+			bioHtml,
+			customTitlePlain: customTitlePlain || null,
+			customTitle: customTitleHtml,
+			profileUrl: profileUrl || null,
+			bannerUrl: bannerUrl || null,
+			defaultSorting: input.defaultSorting,
+			defaultSortingComments: input.defaultSortingComments,
+			defaultTime: input.defaultTime,
+			isPrivate: input.isPrivate,
+			hideVotedOn: input.hideVotedOn,
+			cardView: input.cardView,
+			highlightComments: input.highlightComments,
+			newTabExternal: input.newTabExternal,
+			newTab: input.newTab,
+			nameColor: input.nameColor,
+			titleColor: input.titleColor,
+			themeColor: input.themeColor,
+		})
+		.where(eq(users.id, userId));
 }
 
 async function getFollowingCount(userId: number): Promise<number> {
