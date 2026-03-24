@@ -45,7 +45,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			<head>
 				<HeadContent />
 			</head>
-			<body className="min-h-screen">
+			<body className="min-h-screen bg-slate-950">
 				<Header />
 				{children}
 				<TanStackDevtools
