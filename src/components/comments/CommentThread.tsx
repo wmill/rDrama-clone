@@ -22,7 +22,7 @@ import type {
 import { withIdentity } from "../utils/withIdentity";
 
 const COMMENTS_PAGE_SIZE = Number(
-	import.meta.env.COMMENTS_PER_POST ?? 50,
+	import.meta.env.VITE_RESULTS_PER_PAGE_COMMENTS ?? 50,
 );
 
 const sortOptions: { value: CommentSortType; label: string }[] = [
