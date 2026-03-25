@@ -21,16 +21,16 @@ Guiding rule: preserve `rDrama` database compatibility unless a migration clearl
 - [x] Voting (upvote/downvote/toggle)
 - [x] Sorting (hot, new, top, controversial, comments)
 - [x] Time filters (hour, day, week, month, year, all)
-- [ ] Edit post
+- [x] Edit post
   - [ ] Add ownership/mod authorization checks.
   - [ ] Build edit route and form prefilled from existing submission data.
   - [ ] Update `edited_utc`, preserve legacy field behavior, and re-render derived HTML fields.
   - [ ] Add tests for link posts, text posts, and unauthorized edits.
-- [ ] Delete post
+- [x] Delete post
   - [ ] Match legacy semantics: delete vs remove vs ghost/state changes.
   - [ ] Update counters and visibility queries so deleted content behaves like `rDrama`.
   - [ ] Add tests for author delete, moderator remove, and deleted-post display.
-- [ ] Markdown parsing + HTML sanitization for post body/title
+- [x] Markdown parsing + HTML sanitization for post body/title
   - [ ] Replace the `TODO` placeholders in `src/lib/submissions.server.ts`.
   - [ ] Reuse the existing markdown pipeline where possible so posts and comments render consistently.
   - [ ] Sanitize stored `titleHtml`/`bodyHtml` to match legacy expectations and XSS constraints.
@@ -47,7 +47,7 @@ Guiding rule: preserve `rDrama` database compatibility unless a migration clearl
 ### User Profiles
 - [x] Profile page (bio, post/comment feeds, stats)
 - [x] Sorting + pagination on profile feeds
-- [ ] Edit profile / user settings page
+- [x] Edit profile / user settings page
   - [ ] Replace the disabled button in `src/routes/me.tsx` with a real settings route.
   - [ ] Support legacy profile fields first: bio, custom title, profile/banner URLs, display preferences.
   - [ ] Re-render stored profile HTML safely and validate length/format constraints against the DB schema.
