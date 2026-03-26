@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { distinguishSubmissionFn } from "@/lib/admin-actions.server";
 import {
 	type CommentSortType,
 	getCommentsBySubmissionFlat,
@@ -111,6 +112,7 @@ function PostPage() {
 					post={post}
 					commentCount={displayCommentCount}
 					currentUserId={user?.id}
+					currentUserAdminLevel={user?.adminLevel ?? 0}
 					userVote={post.userVote}
 				/>
 
@@ -121,6 +123,7 @@ function PostPage() {
 						commentCount={post.commentCount}
 						commentsLastFetchedAt={commentsLastFetchedAt}
 						currentUserId={user?.id}
+						currentUserAdminLevel={user?.adminLevel ?? 0}
 						initialSort={sort}
 						onCommentCountChange={setDisplayCommentCount}
 					/>
@@ -134,11 +137,13 @@ function PostContent({
 	post,
 	commentCount,
 	currentUserId,
+	currentUserAdminLevel = 0,
 	userVote = 0,
 }: {
 	post: SubmissionDetail;
 	commentCount: number;
 	currentUserId?: number;
+	currentUserAdminLevel?: number;
 	userVote?: VoteType;
 }) {
 	const router = useRouter();
@@ -157,10 +162,17 @@ function PostContent({
 	const [isReporting, setIsReporting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [reportMessage, setReportMessage] = useState<string | null>(null);
+	const [distinguishLevel, setDistinguishLevel] = useState(
+		post.distinguishLevel,
+	);
+	const [isDistinguishing, setIsDistinguishing] = useState(false);
 	const titleId = useId();
 	const urlId = useId();
 	const bodyId = useId();
 	const nsfwId = useId();
+
+	const canDistinguish =
+		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
 
 	const handleSave = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -243,6 +255,18 @@ function PostContent({
 		}
 	};
 
+	const handleDistinguish = async () => {
+		setIsDistinguishing(true);
+		try {
+			const result = await distinguishSubmissionFn({ data: { id: post.id } });
+			if (result.success) {
+				setDistinguishLevel(result.distinguishLevel);
+			}
+		} finally {
+			setIsDistinguishing(false);
+		}
+	};
+
 	return (
 		<article className="rounded-xl border border-slate-800 bg-slate-900/80 shadow-xl">
 			{/* Header with metadata */}
@@ -272,6 +296,11 @@ function PostContent({
 					{post.flair && (
 						<span className="rounded bg-slate-700 px-2 py-0.5 text-xs">
 							{post.flair}
+						</span>
+					)}
+					{distinguishLevel > 0 && (
+						<span className="rounded bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
+							MOD
 						</span>
 					)}
 				</div>
@@ -483,6 +512,19 @@ function PostContent({
 
 				{reportMessage && (
 					<span className="text-sm text-emerald-400">{reportMessage}</span>
+				)}
+
+				{canDistinguish && (
+					<button
+						type="button"
+						disabled={isDistinguishing}
+						onClick={handleDistinguish}
+						className={`rounded px-2 py-1 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 ${
+							distinguishLevel > 0 ? "text-green-400" : "text-slate-400"
+						}`}
+					>
+						{distinguishLevel > 0 ? "Undistinguish" : "Distinguish"}
+					</button>
 				)}
 
 				{isAuthor && (

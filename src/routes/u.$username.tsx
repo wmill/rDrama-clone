@@ -7,6 +7,7 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 
 import { UserPage } from "@/components/profile/user-page";
+import { getUserAdminDetails, type UserAdminDetails } from "@/lib/admin.server";
 import type { CommentFeedSortType, TimeFilter } from "@/lib/constants";
 import {
 	buildProfileCommentsHref,
@@ -51,7 +52,7 @@ const getUserCommentsPageFn = createServerFn({ method: "GET" })
 			};
 		}) => {
 			const viewer = await getCurrentUser();
-			return getProfilePageData({
+			const profileData = await getProfilePageData({
 				username: data.username,
 				tab: "comments",
 				sort: data.sort,
@@ -59,6 +60,19 @@ const getUserCommentsPageFn = createServerFn({ method: "GET" })
 				page: data.page,
 				viewer,
 			});
+
+			if (!profileData) return null;
+
+			let adminDetails: UserAdminDetails | null = null;
+			if (
+				viewer &&
+				viewer.adminLevel >= 2 &&
+				viewer.id !== profileData.profileUser.id
+			) {
+				adminDetails = await getUserAdminDetails(profileData.profileUser.id);
+			}
+
+			return { profileData, adminDetails };
 		},
 	);
 
@@ -72,7 +86,7 @@ export const Route = createFileRoute("/u/$username")({
 		page: search.page,
 	}),
 	loader: async ({ params, deps }) => {
-		const data = await getUserCommentsPageFn({
+		const result = await getUserCommentsPageFn({
 			data: {
 				username: params.username,
 				sort: deps.sort,
@@ -81,30 +95,32 @@ export const Route = createFileRoute("/u/$username")({
 			},
 		});
 
-		if (!data) throw notFound();
+		if (!result) throw notFound();
 
-		if (data.profileUser.username !== params.username) {
+		const { profileData, adminDetails } = result;
+
+		if (profileData.profileUser.username !== params.username) {
 			throw redirect({
-				href: buildProfileCommentsHref(data.profileUser.username, deps),
+				href: buildProfileCommentsHref(profileData.profileUser.username, deps),
 			});
 		}
 
-		return data;
+		return { data: profileData, adminDetails };
 	},
 	head: ({ loaderData, params }) => {
-		const username = loaderData?.profileUser.username ?? params.username;
+		const username = loaderData?.data.profileUser.username ?? params.username;
 		const description = loaderData
-			? buildDescription(loaderData)
+			? buildDescription(loaderData.data)
 			: `@${username}`;
 		const image =
-			loaderData?.profileUser.bannerUrl ||
-			loaderData?.profileUser.profileUrl ||
+			loaderData?.data.profileUser.bannerUrl ||
+			loaderData?.data.profileUser.profileUrl ||
 			"/tanstack-word-logo-white.svg";
 		const url = loaderData
 			? buildProfileCommentsHref(username, {
-					sort: parseCommentsProfileSort(loaderData.sort),
-					t: loaderData.t,
-					page: loaderData.page,
+					sort: parseCommentsProfileSort(loaderData.data.sort),
+					t: loaderData.data.t,
+					page: loaderData.data.page,
 				})
 			: `/u/${encodeURIComponent(username)}`;
 
@@ -127,11 +143,12 @@ export const Route = createFileRoute("/u/$username")({
 
 function UserCommentsPage() {
 	const router = useRouter();
-	const data = Route.useLoaderData();
+	const { data, adminDetails } = Route.useLoaderData();
 
 	return (
 		<UserPage
 			data={data}
+			adminDetails={adminDetails}
 			onSortChange={async (sort) => {
 				await router.navigate({
 					to: "/u/$username",

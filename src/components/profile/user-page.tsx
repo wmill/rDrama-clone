@@ -1,6 +1,17 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarDays, ShieldAlert, ShieldCheck, Star } from "lucide-react";
+import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import type { UserAdminDetails } from "@/lib/admin.server";
+import {
+	banUserFn,
+	createUserNoteFn,
+	shadowbanUserFn,
+	unbanUserFn,
+	unshadowbanUserFn,
+} from "@/lib/admin-actions.server";
 import type {
 	CommentFeedSortType,
 	SortType,
@@ -36,13 +47,26 @@ const timeOptions: { value: TimeFilter; label: string }[] = [
 	{ value: "all", label: "All Time" },
 ];
 
+const USER_TAG_OPTIONS = [
+	"Quality",
+	"Good",
+	"Comment",
+	"Warning",
+	"Tempban",
+	"Permban",
+	"Spam",
+	"Bot",
+] as const;
+
 export function UserPage({
 	data,
+	adminDetails,
 	onSortChange,
 	onTimeChange,
 	onPageChange,
 }: {
 	data: ProfilePageData;
+	adminDetails?: UserAdminDetails | null;
 	onSortChange: (value: SortType | CommentFeedSortType) => Promise<void>;
 	onTimeChange: (value: TimeFilter) => Promise<void>;
 	onPageChange: (page: number) => Promise<void>;
@@ -51,6 +75,8 @@ export function UserPage({
 	const avatarHref = user.highRes || user.profileUrl || undefined;
 	const sortOptions =
 		data.tab === "posts" ? postSortOptions : commentSortOptions;
+
+	const isAdmin = (data.viewer?.adminLevel ?? 0) >= 2 && !data.isOwner;
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
@@ -178,6 +204,15 @@ export function UserPage({
 						</div>
 					</div>
 				</section>
+
+				{isAdmin && adminDetails && (
+					<AdminControls
+						userId={user.id}
+						initialIsBanned={user.isBanned}
+						initialShadowBanned={user.shadowBanned}
+						notes={adminDetails.notes}
+					/>
+				)}
 
 				<section className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
 					<div className="mb-4 flex gap-2">
@@ -352,5 +387,272 @@ export function UserPage({
 				</section>
 			</div>
 		</div>
+	);
+}
+
+function AdminControls({
+	userId,
+	initialIsBanned,
+	initialShadowBanned,
+	notes: initialNotes,
+}: {
+	userId: number;
+	initialIsBanned: number;
+	initialShadowBanned: string | null;
+	notes: UserAdminDetails["notes"];
+}) {
+	const [isBanned, setIsBanned] = useState(initialIsBanned > 0);
+	const [isShadowBanned, setIsShadowBanned] = useState(!!initialShadowBanned);
+	const [showBanForm, setShowBanForm] = useState(false);
+	const [banReason, setBanReason] = useState("");
+	const [notes, setNotes] = useState(initialNotes);
+	const [noteText, setNoteText] = useState("");
+	const [noteTag, setNoteTag] = useState<string>("Warning");
+	const [isPending, setIsPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const handleBanSubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await banUserFn({
+				data: { userId, reason: banReason },
+			});
+			if (res.success) {
+				setIsBanned(true);
+				setShowBanForm(false);
+				setBanReason("");
+			} else {
+				setError(res.error);
+			}
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	const handleUnban = async () => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await unbanUserFn({ data: { userId } });
+			if (res.success) setIsBanned(false);
+			else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	const handleShadowban = async () => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await shadowbanUserFn({ data: { userId } });
+			if (res.success) setIsShadowBanned(true);
+			else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	const handleUnshadowban = async () => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await unshadowbanUserFn({ data: { userId } });
+			if (res.success) setIsShadowBanned(false);
+			else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	const handleAddNote = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!noteText.trim()) return;
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await createUserNoteFn({
+				data: { userId, note: noteText, tag: noteTag },
+			});
+			if (res.success) {
+				setNotes((prev) => [
+					...prev,
+					{
+						id: Date.now(),
+						note: noteText,
+						tag: noteTag,
+						authorName: "you",
+						createdDatetimez: new Date(),
+						referencePost: null,
+						referenceComment: null,
+					},
+				]);
+				setNoteText("");
+			} else {
+				setError(res.error);
+			}
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	return (
+		<section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 shadow-xl">
+			<h2 className="mb-4 text-lg font-semibold text-amber-300">
+				Admin Controls
+			</h2>
+
+			{error && (
+				<div className="mb-3 rounded-lg border border-red-500/50 bg-red-500/10 p-2 text-sm text-red-400">
+					{error}
+				</div>
+			)}
+
+			<div className="mb-4 flex flex-wrap gap-3">
+				<div className="flex items-center gap-2">
+					<span className="text-sm text-slate-400">
+						Status:{" "}
+						{isBanned ? (
+							<span className="text-red-400">Banned</span>
+						) : isShadowBanned ? (
+							<span className="text-amber-400">Shadowbanned</span>
+						) : (
+							<span className="text-emerald-400">Active</span>
+						)}
+					</span>
+				</div>
+
+				<div className="flex gap-2">
+					{isBanned ? (
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={isPending}
+							onClick={handleUnban}
+							className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30"
+						>
+							Unban
+						</Button>
+					) : (
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={isPending}
+							onClick={() => setShowBanForm((v) => !v)}
+							className="border-red-600 text-red-400 hover:bg-red-900/30"
+						>
+							{showBanForm ? "Cancel" : "Ban"}
+						</Button>
+					)}
+
+					{isShadowBanned ? (
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={isPending}
+							onClick={handleUnshadowban}
+							className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30"
+						>
+							Unshadowban
+						</Button>
+					) : (
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={isPending}
+							onClick={handleShadowban}
+							className="border-amber-600 text-amber-400 hover:bg-amber-900/30"
+						>
+							Shadowban
+						</Button>
+					)}
+				</div>
+			</div>
+
+			{showBanForm && (
+				<form onSubmit={handleBanSubmit} className="mb-4 flex gap-2">
+					<input
+						value={banReason}
+						onChange={(e) => setBanReason(e.target.value)}
+						placeholder="Ban reason (required)"
+						required
+						className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+					/>
+					<Button
+						type="submit"
+						disabled={isPending || !banReason.trim()}
+						className="shrink-0 bg-red-600 hover:bg-red-700"
+					>
+						Confirm Ban
+					</Button>
+				</form>
+			)}
+
+			<div className="border-t border-slate-700/50 pt-4">
+				<h3 className="mb-3 text-sm font-semibold text-slate-300">Add Note</h3>
+				<form onSubmit={handleAddNote} className="space-y-2">
+					<Textarea
+						value={noteText}
+						onChange={(e) => setNoteText(e.target.value)}
+						placeholder="Note about this user..."
+						rows={2}
+						className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+					/>
+					<div className="flex gap-2">
+						<select
+							value={noteTag}
+							onChange={(e) => setNoteTag(e.target.value)}
+							className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-300"
+						>
+							{USER_TAG_OPTIONS.map((tag) => (
+								<option key={tag} value={tag}>
+									{tag}
+								</option>
+							))}
+						</select>
+						<Button
+							type="submit"
+							disabled={isPending || !noteText.trim()}
+							size="sm"
+							className="bg-cyan-500 hover:bg-cyan-600"
+						>
+							Add Note
+						</Button>
+					</div>
+				</form>
+			</div>
+
+			{notes.length > 0 && (
+				<div className="mt-4 border-t border-slate-700/50 pt-4">
+					<h3 className="mb-3 text-sm font-semibold text-slate-300">
+						Notes ({notes.length})
+					</h3>
+					<div className="space-y-2">
+						{notes.map((note) => (
+							<div
+								key={note.id}
+								className="rounded-lg border border-slate-800 bg-slate-950/50 p-3"
+							>
+								<div className="flex items-center gap-2 text-xs text-slate-400">
+									<span className="rounded bg-slate-700 px-1.5 py-0.5 text-slate-300">
+										{note.tag}
+									</span>
+									<span>{note.authorName}</span>
+									<span>·</span>
+									<span>
+										{formatRelativeTime(
+											Math.floor(note.createdDatetimez.getTime() / 1000),
+										)}
+									</span>
+								</div>
+								<p className="mt-1 text-sm text-slate-300">{note.note}</p>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+		</section>
 	);
 }

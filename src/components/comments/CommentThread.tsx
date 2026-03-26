@@ -38,6 +38,7 @@ type CommentThreadProps = {
 	commentCount: number;
 	commentsLastFetchedAt: number;
 	currentUserId?: number;
+	currentUserAdminLevel?: number;
 	initialSort?: CommentSortType;
 	onCommentCountChange?: (count: number) => void;
 };
@@ -97,6 +98,7 @@ export function CommentThreadBase({
 	commentCount,
 	commentsLastFetchedAt,
 	currentUserId,
+	currentUserAdminLevel = 0,
 	initialSort = "top",
 	onCommentCountChange,
 }: CommentThreadProps) {
@@ -227,6 +229,7 @@ export function CommentThreadBase({
 			<ActualComments
 				submissionId={submissionId}
 				currentUserId={currentUserId}
+				currentUserAdminLevel={currentUserAdminLevel}
 				onReplyAdded={handleReplyAdded}
 				isLoading={isSyncing}
 				comments={commentTree}
@@ -243,6 +246,7 @@ type ActualCommentsProps = {
 	comments: CommentWithReplies[];
 	submissionId: number;
 	currentUserId?: number;
+	currentUserAdminLevel?: number;
 	onReplyAdded: (comment?: CommentFlat) => void;
 	visibleLimit: number;
 	onVisibleLimitChange: (updater: (prev: number) => number) => void;
@@ -255,6 +259,7 @@ function ActualComments({
 	comments,
 	submissionId,
 	currentUserId,
+	currentUserAdminLevel = 0,
 	onReplyAdded,
 	visibleLimit,
 	onVisibleLimitChange,
@@ -335,6 +340,7 @@ function ActualComments({
 					comment={comment}
 					submissionId={submissionId}
 					currentUserId={currentUserId}
+					currentUserAdminLevel={currentUserAdminLevel}
 					onReplyAdded={onReplyAdded}
 				/>
 			))}

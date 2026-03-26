@@ -8,6 +8,7 @@ import replyUrl from "lucide-static/icons/reply.svg?url";
 import trash2Url from "lucide-static/icons/trash-2.svg?url";
 import { memo, useMemo, useState } from "react";
 import { IconMask } from "@/components/ui/icon-mask";
+import { distinguishCommentFn } from "@/lib/admin-actions.server";
 import {
 	createCommentFn,
 	deleteCommentFn,
@@ -24,6 +25,7 @@ type CommentProps = {
 	comment: CommentWithReplies;
 	submissionId: number;
 	currentUserId?: number;
+	currentUserAdminLevel?: number;
 	depth?: number;
 	maxDepth?: number;
 	onReplyAdded?: (comment?: CommentFlat) => void;
@@ -33,6 +35,7 @@ export const Comment = memo(function Comment({
 	comment,
 	submissionId,
 	currentUserId,
+	currentUserAdminLevel = 0,
 	depth = 0,
 	maxDepth = 10,
 	onReplyAdded,
@@ -44,12 +47,19 @@ export const Comment = memo(function Comment({
 	const [currentBody, setCurrentBody] = useState(comment.bodyHtml);
 	const [reportMessage, setReportMessage] = useState<string | null>(null);
 	const [isReporting, setIsReporting] = useState(false);
+	const [distinguishLevel, setDistinguishLevel] = useState(
+		comment.distinguishLevel,
+	);
+	const [isDistinguishing, setIsDistinguishing] = useState(false);
 	const isModHidden = comment.isModHidden;
 	const isContentHidden = isDeleted || isModHidden;
 
 	const openReportModal = useModalsStore((s) => s.openReportModal);
 	const isAuthor = currentUserId === comment.authorId;
 	const userVote = comment.userVote;
+
+	const canDistinguish =
+		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
 
 	const handleDelete = async () => {
 		if (!confirm("Are you sure you want to delete this comment?")) return;
@@ -81,6 +91,18 @@ export const Comment = memo(function Comment({
 			}
 		} finally {
 			setIsReporting(false);
+		}
+	};
+
+	const handleDistinguish = async () => {
+		setIsDistinguishing(true);
+		try {
+			const result = await distinguishCommentFn({ data: { id: comment.id } });
+			if (result.success) {
+				setDistinguishLevel(result.distinguishLevel);
+			}
+		} finally {
+			setIsDistinguishing(false);
 		}
 	};
 
@@ -145,7 +167,7 @@ export const Comment = memo(function Comment({
 						</a>
 					)}
 
-					{comment.distinguishLevel > 0 && (
+					{distinguishLevel > 0 && (
 						<span className="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
 							MOD
 						</span>
@@ -280,6 +302,19 @@ export const Comment = memo(function Comment({
 												</button>
 											</>
 										)}
+
+										{canDistinguish && !isDeleted && !isModHidden && (
+											<button
+												type="button"
+												onClick={handleDistinguish}
+												disabled={isDistinguishing}
+												className={`text-slate-500 hover:text-green-400 disabled:cursor-not-allowed disabled:opacity-60 ${
+													distinguishLevel > 0 ? "text-green-400" : ""
+												}`}
+											>
+												{distinguishLevel > 0 ? "Undistinguish" : "Distinguish"}
+											</button>
+										)}
 									</div>
 								)}
 
@@ -323,6 +358,7 @@ export const Comment = memo(function Comment({
 										comment={reply}
 										submissionId={submissionId}
 										currentUserId={currentUserId}
+										currentUserAdminLevel={currentUserAdminLevel}
 										depth={depth + 1}
 										maxDepth={maxDepth}
 										onReplyAdded={onReplyAdded}

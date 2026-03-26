@@ -18,12 +18,17 @@ import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as CommentsRouteImport } from './routes/comments'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AtusernameRouteImport } from './routes/@$username'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as UMeRouteImport } from './routes/u.me'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as PostIdRouteImport } from './routes/post.$id'
 import { Route as CommentIdRouteImport } from './routes/comment.$id'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-posts'
+import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
 
@@ -72,6 +77,11 @@ const CommentsRoute = CommentsRouteImport.update({
   path: '/comments',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AtusernameRoute = AtusernameRouteImport.update({
   id: '/@$username',
   path: '/@$username',
@@ -81,6 +91,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const UMeRoute = UMeRouteImport.update({
   id: '/u/me',
@@ -102,6 +117,21 @@ const CommentIdRoute = CommentIdRouteImport.update({
   path: '/comment/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportedPostsRoute = AdminReportedPostsRouteImport.update({
+  id: '/reported-posts',
+  path: '/reported-posts',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportedCommentsRoute = AdminReportedCommentsRouteImport.update({
+  id: '/reported-comments',
+  path: '/reported-comments',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AtusernamePostsRoute = AtusernamePostsRouteImport.update({
   id: '/@$username_/posts',
   path: '/@$username/posts',
@@ -116,6 +146,7 @@ const UUsernamePostsRoute = UUsernamePostsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
+  '/admin': typeof AdminRouteWithChildren
   '/comments': typeof CommentsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -126,10 +157,14 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/reported-comments': typeof AdminReportedCommentsRoute
+  '/admin/reported-posts': typeof AdminReportedPostsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
   '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
+  '/admin/': typeof AdminIndexRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
 }
 export interface FileRoutesByTo {
@@ -145,16 +180,21 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/reported-comments': typeof AdminReportedCommentsRoute
+  '/admin/reported-posts': typeof AdminReportedPostsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
   '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
+  '/admin': typeof AdminIndexRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
+  '/admin': typeof AdminRouteWithChildren
   '/comments': typeof CommentsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -165,10 +205,14 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
+  '/admin/reported-comments': typeof AdminReportedCommentsRoute
+  '/admin/reported-posts': typeof AdminReportedPostsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
   '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
+  '/admin/': typeof AdminIndexRoute
   '/u/$username_/posts': typeof UUsernamePostsRoute
 }
 export interface FileRouteTypes {
@@ -176,6 +220,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/@$username'
+    | '/admin'
     | '/comments'
     | '/forgot-password'
     | '/login'
@@ -186,10 +231,14 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/reported-comments'
+    | '/admin/reported-posts'
+    | '/admin/users'
     | '/comment/$id'
     | '/post/$id'
     | '/u/$username'
     | '/u/me'
+    | '/admin/'
     | '/u/$username/posts'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -205,15 +254,20 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/reported-comments'
+    | '/admin/reported-posts'
+    | '/admin/users'
     | '/comment/$id'
     | '/post/$id'
     | '/u/$username'
     | '/u/me'
+    | '/admin'
     | '/u/$username/posts'
   id:
     | '__root__'
     | '/'
     | '/@$username'
+    | '/admin'
     | '/comments'
     | '/forgot-password'
     | '/login'
@@ -224,16 +278,21 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username_/posts'
+    | '/admin/reported-comments'
+    | '/admin/reported-posts'
+    | '/admin/users'
     | '/comment/$id'
     | '/post/$id'
     | '/u/$username'
     | '/u/me'
+    | '/admin/'
     | '/u/$username_/posts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AtusernameRoute: typeof AtusernameRoute
+  AdminRoute: typeof AdminRouteWithChildren
   CommentsRoute: typeof CommentsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
@@ -316,6 +375,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/@$username': {
       id: '/@$username'
       path: '/@$username'
@@ -329,6 +395,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/u/me': {
       id: '/u/me'
@@ -358,6 +431,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reported-posts': {
+      id: '/admin/reported-posts'
+      path: '/reported-posts'
+      fullPath: '/admin/reported-posts'
+      preLoaderRoute: typeof AdminReportedPostsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reported-comments': {
+      id: '/admin/reported-comments'
+      path: '/reported-comments'
+      fullPath: '/admin/reported-comments'
+      preLoaderRoute: typeof AdminReportedCommentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/@$username_/posts': {
       id: '/@$username_/posts'
       path: '/@$username/posts'
@@ -375,9 +469,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminReportedCommentsRoute: typeof AdminReportedCommentsRoute
+  AdminReportedPostsRoute: typeof AdminReportedPostsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminReportedCommentsRoute: AdminReportedCommentsRoute,
+  AdminReportedPostsRoute: AdminReportedPostsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtusernameRoute: AtusernameRoute,
+  AdminRoute: AdminRouteWithChildren,
   CommentsRoute: CommentsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,

@@ -1,11 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Home, Menu, X } from "lucide-react";
+import { Home, Menu, Shield, X } from "lucide-react";
 import { useState } from "react";
 
 import { AuthButton } from "@/components/auth-button";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Header() {
 	const [isOpen, setIsOpen] = useState(false);
+	const { user } = useAuth();
 
 	return (
 		<>
@@ -63,6 +65,21 @@ export default function Header() {
 						<Home size={20} />
 						<span className="font-medium">Home</span>
 					</Link>
+
+					{user && user.adminLevel >= 2 && (
+						<Link
+							to="/admin"
+							onClick={() => setIsOpen(false)}
+							className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+							activeProps={{
+								className:
+									"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
+							}}
+						>
+							<Shield size={20} />
+							<span className="font-medium">Admin</span>
+						</Link>
+					)}
 				</nav>
 			</aside>
 		</>

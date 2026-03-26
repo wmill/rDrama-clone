@@ -130,7 +130,7 @@ export const Route = createFileRoute("/me")({
 });
 
 function MePage() {
-	const router = useRouter();
+	const _router = useRouter();
 	const { user, settings } = Route.useLoaderData();
 
 	if (!user || !settings) {
