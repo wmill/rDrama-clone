@@ -23,6 +23,7 @@ import {
 	updateSubmissionFn,
 	type UpdateSubmissionInput,
 } from "@/lib/post-actions.server";
+import { reportSubmissionFn } from "@/lib/reporting-actions.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import {
 	getSubmissionById,
@@ -151,7 +152,9 @@ function PostContent({
 	);
 	const [isSaving, setIsSaving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isReporting, setIsReporting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [reportMessage, setReportMessage] = useState<string | null>(null);
 	const titleId = useId();
 	const urlId = useId();
 	const bodyId = useId();
@@ -206,6 +209,33 @@ function PostContent({
 			setError(err instanceof Error ? err.message : "Failed to delete post");
 		} finally {
 			setIsDeleting(false);
+		}
+	};
+
+	const handleReport = async () => {
+		const reason = prompt("Report reason (optional):", "") ?? null;
+		if (reason === null) {
+			return;
+		}
+
+		setError(null);
+		setReportMessage(null);
+		setIsReporting(true);
+
+		try {
+			const result = await reportSubmissionFn({
+				data: { id: post.id, reason },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setReportMessage(result.message);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to report post");
+		} finally {
+			setIsReporting(false);
 		}
 	};
 
@@ -435,6 +465,21 @@ function PostContent({
 					<Share2 className="h-4 w-4" />
 					<span>Share</span>
 				</button>
+
+				{currentUserId && (
+					<button
+						type="button"
+						disabled={isReporting}
+						onClick={handleReport}
+						className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						{isReporting ? "Reporting..." : "Report"}
+					</button>
+				)}
+
+				{reportMessage && (
+					<span className="text-sm text-emerald-400">{reportMessage}</span>
+				)}
 
 				{isAuthor && (
 					<div className="ml-auto flex gap-2">

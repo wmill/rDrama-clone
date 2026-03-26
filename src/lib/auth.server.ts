@@ -39,6 +39,8 @@ export type SafeUser = {
 	isActivated: boolean;
 	isBanned: number;
 	banReason: string | null;
+	unbanUtc: number;
+	shadowBanned: string | null;
 	coins: number;
 	proCoins: number;
 	profileUrl: string | null;
@@ -57,6 +59,8 @@ export function sanitizeUser(user: typeof users.$inferSelect): SafeUser {
 		isActivated: user.isActivated,
 		isBanned: user.isBanned,
 		banReason: user.banReason,
+		unbanUtc: user.unbanUtc,
+		shadowBanned: user.shadowBanned,
 		coins: user.coins,
 		proCoins: user.proCoins,
 		profileUrl: user.profileUrl,

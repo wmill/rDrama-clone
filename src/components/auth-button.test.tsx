@@ -42,6 +42,8 @@ describe("AuthButton", () => {
 		isActivated: true,
 		isBanned: 0,
 		banReason: null,
+		unbanUtc: 0,
+		shadowBanned: null,
 		coins: 0,
 		proCoins: 0,
 		profileUrl: null,

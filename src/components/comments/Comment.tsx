@@ -13,6 +13,7 @@ import {
 	deleteCommentFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
+import { reportCommentFn } from "@/lib/reporting-actions.server";
 import type { CommentFlat, CommentWithReplies } from "@/lib/comments.server";
 import { formatRelativeTime } from "@/lib/utils";
 import { CommentForm } from "./CommentForm";
@@ -40,6 +41,8 @@ export const Comment = memo(function Comment({
 	const [isEditing, setIsEditing] = useState(false);
 	const [isDeleted, setIsDeleted] = useState(comment.isDeleted);
 	const [currentBody, setCurrentBody] = useState(comment.bodyHtml);
+	const [reportMessage, setReportMessage] = useState<string | null>(null);
+	const [isReporting, setIsReporting] = useState(false);
 	const isModHidden = comment.isModHidden;
 	const isContentHidden = isDeleted || isModHidden;
 
@@ -53,6 +56,25 @@ export const Comment = memo(function Comment({
 		if (result.success) {
 			setIsDeleted(true);
 			setCurrentBody("[deleted]");
+		}
+	};
+
+	const handleReport = async () => {
+		const reason = prompt("Report reason (optional):", "") ?? null;
+		if (reason === null) {
+			return;
+		}
+
+		setReportMessage(null);
+		setIsReporting(true);
+
+		try {
+			const result = await reportCommentFn({ data: { id: comment.id, reason } });
+			if (result.success) {
+				setReportMessage(result.message);
+			}
+		} finally {
+			setIsReporting(false);
 		}
 	};
 
@@ -201,6 +223,17 @@ export const Comment = memo(function Comment({
 											</button>
 										)}
 
+										{currentUserId && !isDeleted && !isModHidden && (
+											<button
+												type="button"
+												onClick={handleReport}
+												disabled={isReporting}
+												className="text-slate-500 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{isReporting ? "Reporting..." : "Report"}
+											</button>
+										)}
+
 										<Link
 											to={`/comment/${comment.id}` as "/"}
 											className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
@@ -242,6 +275,10 @@ export const Comment = memo(function Comment({
 											</>
 										)}
 									</div>
+								)}
+
+								{reportMessage && (
+									<p className="mt-2 text-xs text-emerald-400">{reportMessage}</p>
 								)}
 
 								{/* Reply form */}
