@@ -13,9 +13,10 @@ import {
 	deleteCommentFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
-import { reportCommentFn } from "@/lib/reporting-actions.server";
 import type { CommentFlat, CommentWithReplies } from "@/lib/comments.server";
+import { reportCommentFn } from "@/lib/reporting-actions.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { useModalsStore } from "@/stores/modals";
 import { CommentForm } from "./CommentForm";
 import { VoteButtons } from "./VoteButtons";
 
@@ -46,6 +47,7 @@ export const Comment = memo(function Comment({
 	const isModHidden = comment.isModHidden;
 	const isContentHidden = isDeleted || isModHidden;
 
+	const openReportModal = useModalsStore((s) => s.openReportModal);
 	const isAuthor = currentUserId === comment.authorId;
 	const userVote = comment.userVote;
 
@@ -60,8 +62,10 @@ export const Comment = memo(function Comment({
 	};
 
 	const handleReport = async () => {
-		const reason = prompt("Report reason (optional):", "") ?? null;
-		if (reason === null) {
+		let reason: string;
+		try {
+			reason = await openReportModal();
+		} catch {
 			return;
 		}
 
@@ -69,7 +73,9 @@ export const Comment = memo(function Comment({
 		setIsReporting(true);
 
 		try {
-			const result = await reportCommentFn({ data: { id: comment.id, reason } });
+			const result = await reportCommentFn({
+				data: { id: comment.id, reason },
+			});
 			if (result.success) {
 				setReportMessage(result.message);
 			}
@@ -278,7 +284,9 @@ export const Comment = memo(function Comment({
 								)}
 
 								{reportMessage && (
-									<p className="mt-2 text-xs text-emerald-400">{reportMessage}</p>
+									<p className="mt-2 text-xs text-emerald-400">
+										{reportMessage}
+									</p>
 								)}
 
 								{/* Reply form */}

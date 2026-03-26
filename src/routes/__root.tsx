@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import Header from "../components/Header";
+import { Modals } from "../components/Modals";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -48,6 +49,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			<body className="min-h-screen bg-slate-950">
 				<Header />
 				{children}
+				<Modals />
 				<TanStackDevtools
 					config={{
 						position: "bottom-right",

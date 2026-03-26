@@ -191,8 +191,7 @@ export async function getUserSettingsById(
 		profileUrl: user.profileUrl ?? "",
 		bannerUrl: user.bannerUrl ?? "",
 		defaultSorting: user.defaultSorting as SortType,
-		defaultSortingComments:
-			user.defaultSortingComments as CommentFeedSortType,
+		defaultSortingComments: user.defaultSortingComments as CommentFeedSortType,
 		defaultTime: user.defaultTime as TimeFilter,
 		isPrivate: user.isPrivate,
 		hideVotedOn: user.hideVotedOn,

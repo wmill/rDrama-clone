@@ -2,8 +2,8 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
-	comments,
 	commentFlags,
+	comments,
 	flags,
 	modActions,
 	submissions,
@@ -29,7 +29,9 @@ export function normalizeReportReason(reason: string): string {
 		.slice(0, MAX_REASON_LENGTH);
 }
 
-export function isSuspendedPermanently(user: Pick<SafeUser, "isBanned" | "unbanUtc">): boolean {
+export function isSuspendedPermanently(
+	user: Pick<SafeUser, "isBanned" | "unbanUtc">,
+): boolean {
 	return user.isBanned > 0 && user.unbanUtc === 0;
 }
 

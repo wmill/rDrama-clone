@@ -10,9 +10,9 @@ import { db } from "@/db";
 import {
 	isSuspendedPermanently,
 	normalizeReportReason,
+	ReportTargetNotFoundError,
 	reportComment,
 	reportSubmission,
-	ReportTargetNotFoundError,
 } from "@/lib/reporting.server";
 
 function createSelectChain<T>(result: T) {
@@ -39,7 +39,9 @@ function createUpdateChain() {
 
 describe("reporting helpers", () => {
 	it("normalizes report reasons like legacy title sanitization", () => {
-		expect(normalizeReportReason("  hello \u200b  world  ")).toBe("hello world");
+		expect(normalizeReportReason("  hello \u200b  world  ")).toBe(
+			"hello world",
+		);
 		expect(normalizeReportReason("x".repeat(120))).toHaveLength(100);
 	});
 
@@ -63,7 +65,9 @@ describe("reportSubmission", () => {
 	});
 
 	it("creates a flag and marks the post reported", async () => {
-		const selectChain = createSelectChain([{ id: 10, stateReport: "UNREPORTED" }]);
+		const selectChain = createSelectChain([
+			{ id: 10, stateReport: "UNREPORTED" },
+		]);
 		const insertChain = createInsertChain();
 		const updateChain = createUpdateChain();
 		const tx = {
@@ -72,7 +76,9 @@ describe("reportSubmission", () => {
 			update: vi.fn(() => updateChain),
 		};
 
-		vi.mocked(db.transaction).mockImplementation(async (callback) => callback(tx));
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback(tx),
+		);
 
 		const result = await reportSubmission({
 			submissionId: 10,
@@ -90,7 +96,9 @@ describe("reportSubmission", () => {
 	});
 
 	it("uses !reason as admin flair and logs a mod action", async () => {
-		const selectChain = createSelectChain([{ id: 11, stateReport: "UNREPORTED" }]);
+		const selectChain = createSelectChain([
+			{ id: 11, stateReport: "UNREPORTED" },
+		]);
 		const updateChain = createUpdateChain();
 		const modActionInsertChain = createInsertChain();
 		const tx = {
@@ -99,7 +107,9 @@ describe("reportSubmission", () => {
 			update: vi.fn(() => updateChain),
 		};
 
-		vi.mocked(db.transaction).mockImplementation(async (callback) => callback(tx));
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback(tx),
+		);
 
 		await reportSubmission({
 			submissionId: 11,
@@ -123,7 +133,9 @@ describe("reportSubmission", () => {
 			update: vi.fn(),
 		};
 
-		vi.mocked(db.transaction).mockImplementation(async (callback) => callback(tx));
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback(tx),
+		);
 
 		await expect(
 			reportSubmission({
@@ -149,7 +161,9 @@ describe("reportComment", () => {
 	});
 
 	it("creates a comment flag and marks the comment reported", async () => {
-		const selectChain = createSelectChain([{ id: 21, stateReport: "UNREPORTED" }]);
+		const selectChain = createSelectChain([
+			{ id: 21, stateReport: "UNREPORTED" },
+		]);
 		const insertChain = createInsertChain();
 		const updateChain = createUpdateChain();
 		const tx = {
@@ -158,7 +172,9 @@ describe("reportComment", () => {
 			update: vi.fn(() => updateChain),
 		};
 
-		vi.mocked(db.transaction).mockImplementation(async (callback) => callback(tx));
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback(tx),
+		);
 
 		const result = await reportComment({
 			commentId: 21,

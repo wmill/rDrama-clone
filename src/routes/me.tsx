@@ -9,19 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
-	CommentSortTypes,
-	SortTypes,
-	TimeFilters,
 	type CommentFeedSortType,
+	CommentSortTypes,
 	type SortType,
+	SortTypes,
 	type TimeFilter,
+	TimeFilters,
 } from "@/lib/constants";
+import { getCurrentUser } from "@/lib/sessions.server";
 import {
 	getUserSettingsById,
-	updateUserSettings,
 	type UserSettings,
+	updateUserSettings,
 } from "@/lib/users.server";
-import { getCurrentUser } from "@/lib/sessions.server";
 
 const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
 	return getCurrentUser();
@@ -88,9 +88,7 @@ const updateSettingsFn = createServerFn({ method: "POST" })
 		}
 
 		const bioHtmlLength = data.bio
-			? (
-					await import("@/lib/markdown")
-				).renderCommentMarkdown(data.bio).length
+			? (await import("@/lib/markdown")).renderCommentMarkdown(data.bio).length
 			: 0;
 		if (bioHtmlLength > 10000) {
 			return {
@@ -100,9 +98,9 @@ const updateSettingsFn = createServerFn({ method: "POST" })
 		}
 
 		const customTitleHtmlLength = data.customTitlePlain
-			? (
-					await import("@/lib/markdown")
-				).renderPostTitleHtml(data.customTitlePlain).length
+			? (await import("@/lib/markdown")).renderPostTitleHtml(
+					data.customTitlePlain,
+				).length
 			: 0;
 		if (customTitleHtmlLength > 1000) {
 			return {
@@ -529,7 +527,9 @@ function SettingsForm({ settings }: { settings: UserSettings }) {
 function InfoCard({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
-			<div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+			<div className="text-xs uppercase tracking-wide text-slate-500">
+				{label}
+			</div>
 			<div className="mt-1 text-sm text-white">{value}</div>
 		</div>
 	);

@@ -20,8 +20,8 @@ import {
 } from "@/lib/comments.server";
 import {
 	deleteSubmissionFn,
-	updateSubmissionFn,
 	type UpdateSubmissionInput,
+	updateSubmissionFn,
 } from "@/lib/post-actions.server";
 import { reportSubmissionFn } from "@/lib/reporting-actions.server";
 import { getCurrentUser } from "@/lib/sessions.server";
@@ -31,6 +31,7 @@ import {
 } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
 import type { VoteType } from "@/lib/votes.server";
+import { useModalsStore } from "@/stores/modals";
 
 const getPostFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { id: number }) => data)
@@ -141,6 +142,7 @@ function PostContent({
 	userVote?: VoteType;
 }) {
 	const router = useRouter();
+	const openReportModal = useModalsStore((s) => s.openReportModal);
 	const isAuthor = currentUserId === post.authorId;
 	const [isEditing, setIsEditing] = useState(false);
 	const [title, setTitle] = useState(post.title);
@@ -213,8 +215,10 @@ function PostContent({
 	};
 
 	const handleReport = async () => {
-		const reason = prompt("Report reason (optional):", "") ?? null;
-		if (reason === null) {
+		let reason: string;
+		try {
+			reason = await openReportModal();
+		} catch {
 			return;
 		}
 

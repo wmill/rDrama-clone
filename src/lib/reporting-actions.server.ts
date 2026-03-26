@@ -1,12 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
-import { getCurrentUser } from "@/lib/sessions.server";
 import {
+	ReportTargetNotFoundError,
 	reportComment,
 	reportSubmission,
-	ReportTargetNotFoundError,
 } from "@/lib/reporting.server";
+import { getCurrentUser } from "@/lib/sessions.server";
 
 const reportSchema = z.object({
 	id: z.number().int().positive(),
@@ -66,7 +65,8 @@ export const reportCommentFn = createServerFn({ method: "POST" })
 
 			return {
 				success: false as const,
-				error: error instanceof Error ? error.message : "Failed to report comment",
+				error:
+					error instanceof Error ? error.message : "Failed to report comment",
 			};
 		}
 	});
