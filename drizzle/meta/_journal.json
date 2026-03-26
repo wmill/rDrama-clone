@@ -22,6 +22,13 @@
       "when": 1772750553341,
       "tag": "0002_handy_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774488419531,
+      "tag": "0003_stale_gorgon",
+      "breakpoints": true
     }
   ]
 }
