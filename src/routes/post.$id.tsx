@@ -148,6 +148,7 @@ function PostContent({
 }) {
 	const router = useRouter();
 	const openReportModal = useModalsStore((s) => s.openReportModal);
+	const openDeletePostModal = useModalsStore((s) => s.openDeletePostModal);
 	const isAuthor = currentUserId === post.authorId;
 	const [isEditing, setIsEditing] = useState(false);
 	const [title, setTitle] = useState(post.title);
@@ -204,7 +205,9 @@ function PostContent({
 	};
 
 	const handleDelete = async () => {
-		if (!confirm("Are you sure you want to delete this post?")) {
+		try {
+			await openDeletePostModal();
+		} catch {
 			return;
 		}
 

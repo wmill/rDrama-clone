@@ -55,6 +55,9 @@ export const Comment = memo(function Comment({
 	const isContentHidden = isDeleted || isModHidden;
 
 	const openReportModal = useModalsStore((s) => s.openReportModal);
+	const openDeleteCommentModal = useModalsStore(
+		(s) => s.openDeleteCommentModal,
+	);
 	const isAuthor = currentUserId === comment.authorId;
 	const userVote = comment.userVote;
 
@@ -62,7 +65,11 @@ export const Comment = memo(function Comment({
 		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
 
 	const handleDelete = async () => {
-		if (!confirm("Are you sure you want to delete this comment?")) return;
+		try {
+			await openDeleteCommentModal();
+		} catch {
+			return;
+		}
 
 		const result = await deleteCommentFn({ data: { id: comment.id } });
 		if (result.success) {
