@@ -6,8 +6,13 @@ import {
 	commentVotes,
 	follows,
 	submissions,
+	userBlocks,
 	users,
 } from "@/db/schema";
+import {
+	getCommentViewerContext,
+	shouldIncludeCommentInFeed,
+} from "@/lib/comment-visibility.server";
 import type {
 	CommentFeedSortType,
 	SortType,
@@ -354,6 +359,7 @@ async function getProfileComments(options: {
 	const limit = PAGE_SIZE;
 	const offset = (options.page - 1) * limit;
 	const timeCutoff = getTimeCutoff(options.t);
+	const viewer = await getCommentViewerContext(options.viewerId);
 
 	const conditions: SQL[] = [
 		eq(comments.authorId, options.authorId),
@@ -368,20 +374,40 @@ async function getProfileComments(options: {
 			id: comments.id,
 			parentSubmissionId: comments.parentSubmission,
 			submissionTitle: submissions.title,
+			authorName: users.username,
+			authorShadowBanned: users.shadowBanned,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
 			upvotes: comments.upvotes,
 			downvotes: comments.downvotes,
+			distinguishLevel: comments.distinguishLevel,
+			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
+			stateModSetBy: comments.stateModSetBy,
+			parentSubmissionPrivate: submissions.private,
+			parentSubmissionDeletedUtc: submissions.stateUserDeletedUtc,
+			parentSubmissionStateMod: submissions.stateMod,
 			userVoteType: commentVotes.voteType,
+			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
 		.innerJoin(submissions, eq(comments.parentSubmission, submissions.id))
+		.innerJoin(users, eq(comments.authorId, users.id))
 		.leftJoin(
 			commentVotes,
 			options.viewerId
 				? and(
 						eq(commentVotes.commentId, comments.id),
 						eq(commentVotes.userId, options.viewerId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			userBlocks,
+			options.viewerId
+				? and(
+						eq(userBlocks.userId, options.viewerId),
+						eq(userBlocks.targetId, comments.authorId),
 					)
 				: sql`false`,
 		)
@@ -392,6 +418,25 @@ async function getProfileComments(options: {
 
 	const rows = results
 		.slice(0, limit)
+		.filter((row) =>
+			shouldIncludeCommentInFeed(
+				{
+					authorId: options.authorId,
+					authorName: row.authorName,
+					distinguishLevel: row.distinguishLevel,
+					stateMod: row.stateMod,
+					stateModSetBy: row.stateModSetBy,
+					stateUserDeletedUtc: row.stateUserDeletedUtc,
+					authorShadowBanned: row.authorShadowBanned,
+					isBlocking: row.blockedTargetId !== null,
+					parentSubmissionId: row.parentSubmissionId,
+					parentSubmissionPrivate: row.parentSubmissionPrivate,
+					parentSubmissionDeletedUtc: row.parentSubmissionDeletedUtc,
+					parentSubmissionStateMod: row.parentSubmissionStateMod,
+				},
+				viewer,
+			),
+		)
 		.filter((row) => row.parentSubmissionId !== null)
 		.map((row) => ({
 			id: row.id,

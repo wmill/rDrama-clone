@@ -101,11 +101,13 @@ function AncestorCommentCard({
 					<span>{formatRelativeTime(comment.createdUtc)}</span>
 				</div>
 				<p className="text-sm text-slate-400 line-clamp-2">
-					{comment.isModHidden
-						? "[removed by moderator]"
-						: comment.isDeleted
-							? "[deleted]"
-							: (comment.body ?? comment.bodyHtml.replace(/<[^>]+>/g, ""))}
+					{comment.visibilityMessage
+						? comment.visibilityMessage
+						: comment.isModHidden
+							? "[removed by moderator]"
+							: comment.isDeleted
+								? "[deleted]"
+								: (comment.body ?? comment.bodyHtml.replace(/<[^>]+>/g, ""))}
 				</p>
 			</div>
 		</Link>

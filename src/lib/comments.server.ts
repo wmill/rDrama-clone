@@ -1,7 +1,29 @@
-import { and, asc, desc, eq, gte, inArray, type SQL, sql } from "drizzle-orm";
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gte,
+	inArray,
+	isNull,
+	type SQL,
+	sql,
+} from "drizzle-orm";
 
 import { db } from "@/db";
-import { comments, commentVotes, submissions, users } from "@/db/schema";
+import {
+	comments,
+	commentVotes,
+	submissions,
+	userBlocks,
+	users,
+} from "@/db/schema";
+import {
+	type CommentViewerContext,
+	getCommentViewerContext,
+	getCommentVisibility,
+	shouldIncludeCommentInFeed,
+} from "@/lib/comment-visibility.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
 import type { VoteType } from "@/lib/votes.server";
 import type { CommentFeedSortType, TimeFilter } from "./constants";
@@ -12,6 +34,7 @@ export type CommentFeedItem = {
 	authorName: string;
 	body: string | null;
 	bodyHtml: string;
+	visibilityMessage?: string | null;
 	createdUtc: number;
 	editedUtc: number;
 	upvotes: number;
@@ -44,6 +67,7 @@ export type CommentSummary = {
 	distinguishLevel: number;
 	isDeleted: boolean;
 	isModHidden: boolean;
+	visibilityMessage?: string | null;
 	userVote: VoteType;
 };
 
@@ -57,172 +81,11 @@ export type CommentSortType = (typeof CommentSortTypes)[number];
 
 const MOD_HIDDEN_PLACEHOLDER = "[removed by moderator]";
 
-function isModeratorHiddenState(stateMod: string | null | undefined): boolean {
-	return stateMod === "FILTERED" || stateMod === "REMOVED";
-}
-
-function applyCommentVisibilityState(params: {
-	authorName: string;
-	body: string | null;
-	bodyHtml: string;
-	stateUserDeletedUtc: Date | null;
-	stateMod?: string | null;
-}): {
-	authorName: string;
-	body: string | null;
-	bodyHtml: string;
-	isDeleted: boolean;
-	isModHidden: boolean;
-} {
-	const isDeleted = params.stateUserDeletedUtc !== null;
-	const isModHidden = isModeratorHiddenState(params.stateMod);
-
-	if (isModHidden) {
-		return {
-			authorName: "[deleted]",
-			body: MOD_HIDDEN_PLACEHOLDER,
-			bodyHtml: MOD_HIDDEN_PLACEHOLDER,
-			isDeleted,
-			isModHidden,
-		};
-	}
-
-	return {
-		authorName: params.authorName,
-		body: params.body,
-		bodyHtml: params.bodyHtml,
-		isDeleted,
-		isModHidden,
-	};
-}
-
-export async function getCommentsBySubmission(
-	submissionId: number,
-	sort: CommentSortType = "top",
-	userId?: number,
-): Promise<CommentWithReplies[]> {
-	let orderBy: SQL[];
-	switch (sort) {
-		case "new":
-			orderBy = [desc(comments.createdUtc)];
-			break;
-		case "old":
-			orderBy = [asc(comments.createdUtc)];
-			break;
-		case "controversial":
-			orderBy = [
-				desc(
-					sql`CASE WHEN ${comments.upvotes} + ${comments.downvotes} = 0 THEN 0
-              ELSE (${comments.upvotes} + ${comments.downvotes}) *
-                   (1 - ABS(${comments.upvotes} - ${comments.downvotes})::float /
-                   (${comments.upvotes} + ${comments.downvotes})) END`,
-				),
-			];
-			break;
-		default:
-			orderBy = [desc(sql`${comments.upvotes} - ${comments.downvotes}`)];
-			break;
-	}
-
-	const results = await db
-		.select({
-			id: comments.id,
-			authorId: comments.authorId,
-			authorName: users.username,
-			body: comments.body,
-			bodyHtml: comments.bodyHtml,
-			createdUtc: comments.createdUtc,
-			editedUtc: comments.editedUtc,
-			upvotes: comments.upvotes,
-			downvotes: comments.downvotes,
-			level: comments.level,
-			parentCommentId: comments.parentCommentId,
-			parentSubmissionId: comments.parentSubmission,
-			descendantCount: comments.descendantCount,
-			isPinned: comments.isPinned,
-			distinguishLevel: comments.distinguishLevel,
-			stateUserDeletedUtc: comments.stateUserDeletedUtc,
-			stateMod: comments.stateMod,
-			userVoteType: commentVotes.voteType,
-		})
-		.from(comments)
-		.innerJoin(users, eq(comments.authorId, users.id))
-		.leftJoin(
-			commentVotes,
-			userId
-				? and(
-						eq(commentVotes.commentId, comments.id),
-						eq(commentVotes.userId, userId),
-					)
-				: sql`false`,
-		)
-		.where(
-			and(
-				eq(comments.parentSubmission, submissionId),
-				eq(comments.stateMod, "VISIBLE"),
-			),
-		)
-		.orderBy(...orderBy);
-
-	const commentMap = new Map<number, CommentWithReplies>();
-	const rootComments: CommentWithReplies[] = [];
-
-	// First pass: create all comment objects
-	for (const row of results) {
-		const comment: CommentWithReplies = {
-			...mapCommentRow({
-				...row,
-				parentSubmissionId: row.parentSubmissionId,
-			}),
-			replies: [],
-		};
-		commentMap.set(row.id, comment);
-	}
-
-	// Second pass: build tree structure
-	for (const comment of commentMap.values()) {
-		if (comment.parentCommentId === null) {
-			rootComments.push(comment);
-		} else {
-			const parent = commentMap.get(comment.parentCommentId);
-			if (parent) {
-				parent.replies.push(comment);
-			} else {
-				// Orphan comment (parent was deleted/hidden), treat as root
-				rootComments.push(comment);
-			}
-		}
-	}
-
-	// Sort replies within each level
-	const sortReplies = (commentList: CommentWithReplies[]) => {
-		for (const comment of commentList) {
-			if (comment.replies.length > 0) {
-				switch (sort) {
-					case "new":
-						comment.replies.sort((a, b) => b.createdUtc - a.createdUtc);
-						break;
-					case "old":
-						comment.replies.sort((a, b) => a.createdUtc - b.createdUtc);
-						break;
-					default:
-						comment.replies.sort((a, b) => b.score - a.score);
-						break;
-				}
-				sortReplies(comment.replies);
-			}
-		}
-	};
-
-	sortReplies(rootComments);
-
-	return rootComments;
-}
-
-function mapCommentRow(row: {
+export type RawCommentRow = {
 	id: number;
 	authorId: number;
 	authorName: string;
+	authorShadowBanned: string | null;
 	body: string | null;
 	bodyHtml: string;
 	createdUtc: number;
@@ -236,23 +99,74 @@ function mapCommentRow(row: {
 	isPinned: string | null;
 	distinguishLevel: number;
 	stateUserDeletedUtc: Date | null;
-	stateMod?: string | null;
-	userVoteType?: number | null;
-}): CommentFlat {
-	const visibility = applyCommentVisibilityState({
-		authorName: row.authorName,
-		body: row.body,
-		bodyHtml: row.bodyHtml,
-		stateUserDeletedUtc: row.stateUserDeletedUtc,
-		stateMod: row.stateMod,
-	});
+	stateMod: string | null;
+	stateModSetBy: string | null;
+	userVoteType: number | null;
+	isBlocking: boolean;
+	parentSubmissionPrivate?: boolean | null;
+	parentSubmissionDeletedUtc?: Date | null;
+	parentSubmissionStateMod?: string | null;
+};
 
+export async function getCommentsBySubmission(
+	submissionId: number,
+	sort: CommentSortType = "top",
+	userId?: number,
+): Promise<CommentWithReplies[]> {
+	const flatComments = await getCommentsBySubmissionFlat(submissionId, userId);
+	const commentMap = new Map<number, CommentWithReplies>();
+	const rootComments: CommentWithReplies[] = [];
+
+	for (const comment of flatComments) {
+		commentMap.set(comment.id, { ...comment, replies: [] });
+	}
+
+	for (const comment of commentMap.values()) {
+		if (comment.parentCommentId === null) {
+			rootComments.push(comment);
+			continue;
+		}
+
+		const parent = commentMap.get(comment.parentCommentId);
+		if (parent) {
+			parent.replies.push(comment);
+		} else {
+			rootComments.push(comment);
+		}
+	}
+
+	const sortReplies = (commentList: CommentWithReplies[]) => {
+		for (const comment of commentList) {
+			if (comment.replies.length === 0) continue;
+
+			switch (sort) {
+				case "new":
+					comment.replies.sort((a, b) => b.createdUtc - a.createdUtc);
+					break;
+				case "old":
+					comment.replies.sort((a, b) => a.createdUtc - b.createdUtc);
+					break;
+				default:
+					comment.replies.sort((a, b) => b.score - a.score);
+					break;
+			}
+
+			sortReplies(comment.replies);
+		}
+	};
+
+	sortReplies(rootComments);
+
+	return rootComments;
+}
+
+function mapCommentRow(row: RawCommentRow): CommentFlat {
 	return {
 		id: row.id,
 		authorId: row.authorId,
-		authorName: visibility.authorName,
-		body: visibility.body,
-		bodyHtml: visibility.bodyHtml,
+		authorName: row.authorName,
+		body: row.body,
+		bodyHtml: row.bodyHtml,
 		createdUtc: row.createdUtc,
 		editedUtc: row.editedUtc,
 		upvotes: row.upvotes,
@@ -264,72 +178,113 @@ function mapCommentRow(row: {
 		descendantCount: row.descendantCount,
 		isPinned: row.isPinned,
 		distinguishLevel: row.distinguishLevel,
-		isDeleted: visibility.isDeleted,
-		isModHidden: visibility.isModHidden,
+		isDeleted: row.stateUserDeletedUtc !== null,
+		isModHidden: false,
 		userVote: (row.userVoteType as VoteType) ?? 0,
 	};
 }
 
-function mapCommentSqlRow(row: {
-	id: number;
-	author_id: number;
-	author_name: string;
-	body: string | null;
-	body_html: string;
-	created_utc: number;
-	edited_utc: number;
-	upvotes: number;
-	downvotes: number;
-	level: number;
-	parent_comment_id: number | null;
-	parent_submission: number | null;
-	descendant_count: number;
-	is_pinned: string | null;
-	distinguish_level: number;
-	state_user_deleted_utc: Date | null;
-	state_mod?: string | null;
-	user_vote_type: number | null;
-}): CommentFlat {
-	const visibility = applyCommentVisibilityState({
-		authorName: row.author_name,
-		body: row.body,
-		bodyHtml: row.body_html,
-		stateUserDeletedUtc: row.state_user_deleted_utc,
-		stateMod: row.state_mod,
-	});
+function mapThreadCommentRow(
+	row: RawCommentRow,
+	viewer: CommentViewerContext,
+	includeAsPlaceholder: boolean,
+): CommentFlat | null {
+	const visibility = getCommentVisibility(
+		{
+			authorId: row.authorId,
+			authorName: row.authorName,
+			distinguishLevel: row.distinguishLevel,
+			stateMod: row.stateMod,
+			stateModSetBy: row.stateModSetBy,
+			stateUserDeletedUtc: row.stateUserDeletedUtc,
+			authorShadowBanned: row.authorShadowBanned,
+			isBlocking: row.isBlocking,
+		},
+		viewer,
+	);
+
+	if (!visibility.isVisible && !includeAsPlaceholder) {
+		return null;
+	}
+
+	if (!visibility.isVisible) {
+		return {
+			...mapCommentRow(row),
+			authorName: "[deleted]",
+			body: visibility.message ?? MOD_HIDDEN_PLACEHOLDER,
+			bodyHtml: visibility.message ?? MOD_HIDDEN_PLACEHOLDER,
+			isModHidden: true,
+			visibilityMessage: visibility.message,
+		};
+	}
 
 	return {
-		id: row.id,
-		authorId: row.author_id,
-		authorName: visibility.authorName,
-		body: visibility.body,
-		bodyHtml: visibility.bodyHtml,
-		createdUtc: row.created_utc,
-		editedUtc: row.edited_utc,
-		upvotes: row.upvotes,
-		downvotes: row.downvotes,
-		score: row.upvotes - row.downvotes,
-		level: row.level,
-		parentCommentId: row.parent_comment_id,
-		parentSubmissionId: row.parent_submission,
-		descendantCount: row.descendant_count,
-		isPinned: row.is_pinned,
-		distinguishLevel: row.distinguish_level,
-		isDeleted: visibility.isDeleted,
-		isModHidden: visibility.isModHidden,
-		userVote: (row.user_vote_type as VoteType) ?? 0,
+		...mapCommentRow(row),
+		visibilityMessage: visibility.message,
 	};
 }
 
-export async function getCommentsBySubmissionFlat(
+export function filterThreadComments(
+	rows: RawCommentRow[],
+	viewer: CommentViewerContext,
+): CommentFlat[] {
+	const childrenByParent = new Map<number | null, RawCommentRow[]>();
+	const rowIds = new Set(rows.map((row) => row.id));
+	for (const row of rows) {
+		const siblings = childrenByParent.get(row.parentCommentId) ?? [];
+		siblings.push(row);
+		childrenByParent.set(row.parentCommentId, siblings);
+	}
+
+	const includedIds = new Set<number>();
+
+	const visit = (row: RawCommentRow): boolean => {
+		const visibility = getCommentVisibility(
+			{
+				authorId: row.authorId,
+				authorName: row.authorName,
+				distinguishLevel: row.distinguishLevel,
+				stateMod: row.stateMod,
+				stateModSetBy: row.stateModSetBy,
+				stateUserDeletedUtc: row.stateUserDeletedUtc,
+				authorShadowBanned: row.authorShadowBanned,
+				isBlocking: row.isBlocking,
+			},
+			viewer,
+		);
+		const childRows = childrenByParent.get(row.id) ?? [];
+		const hasIncludedChild = childRows.some((child) => visit(child));
+		const shouldInclude = visibility.isVisible || hasIncludedChild;
+
+		if (shouldInclude) {
+			includedIds.add(row.id);
+		}
+
+		return shouldInclude;
+	};
+
+	for (const rootRow of rows.filter(
+		(row) => row.parentCommentId === null || !rowIds.has(row.parentCommentId),
+	)) {
+		visit(rootRow);
+	}
+
+	return rows
+		.filter((row) => includedIds.has(row.id))
+		.map((row) => mapThreadCommentRow(row, viewer, true))
+		.filter((row): row is CommentFlat => row !== null);
+}
+
+async function getSubmissionCommentRows(
 	submissionId: number,
 	userId?: number,
-): Promise<CommentFlat[]> {
+): Promise<RawCommentRow[]> {
 	const results = await db
 		.select({
 			id: comments.id,
 			authorId: comments.authorId,
 			authorName: users.username,
+			authorShadowBanned: users.shadowBanned,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -344,7 +299,9 @@ export async function getCommentsBySubmissionFlat(
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
+			stateModSetBy: comments.stateModSetBy,
 			userVoteType: commentVotes.voteType,
+			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
@@ -357,20 +314,194 @@ export async function getCommentsBySubmissionFlat(
 					)
 				: sql`false`,
 		)
-		.where(
-			and(
-				eq(comments.parentSubmission, submissionId),
-				eq(comments.stateMod, "VISIBLE"),
-			),
+		.leftJoin(
+			userBlocks,
+			userId
+				? and(
+						eq(userBlocks.userId, userId),
+						eq(userBlocks.targetId, comments.authorId),
+					)
+				: sql`false`,
 		)
-		.orderBy(desc(comments.createdUtc));
+		.where(eq(comments.parentSubmission, submissionId))
+		.orderBy(desc(comments.createdUtc), asc(comments.id));
 
-	return results.map((row) =>
-		mapCommentRow({
-			...row,
-			parentSubmissionId: row.parentSubmissionId,
-		}),
+	return results.map((row) => ({
+		...row,
+		isBlocking: row.blockedTargetId !== null,
+	}));
+}
+
+async function getThreadRowsSince(
+	submissionId: number,
+	since: number,
+	userId?: number,
+): Promise<CommentFlat[]> {
+	const viewer = await getCommentViewerContext(userId);
+	const rows = await getSubmissionCommentRows(submissionId, userId);
+	const filteredRows = filterThreadComments(rows, viewer);
+	const includedIds = new Set(
+		filteredRows
+			.filter((row) => row.createdUtc >= since)
+			.flatMap((row) =>
+				row.parentCommentId === null ? [row.id] : [row.id, row.parentCommentId],
+			),
 	);
+
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const row of filteredRows) {
+			if (
+				includedIds.has(row.id) &&
+				row.parentCommentId !== null &&
+				!includedIds.has(row.parentCommentId)
+			) {
+				includedIds.add(row.parentCommentId);
+				changed = true;
+			}
+		}
+	}
+
+	return filteredRows.filter(
+		(row) => row.createdUtc >= since || includedIds.has(row.id),
+	);
+}
+
+async function getRawCommentRowById(
+	id: number,
+	userId?: number,
+): Promise<RawCommentRow | null> {
+	const [result] = await db
+		.select({
+			id: comments.id,
+			authorId: comments.authorId,
+			authorName: users.username,
+			authorShadowBanned: users.shadowBanned,
+			body: comments.body,
+			bodyHtml: comments.bodyHtml,
+			createdUtc: comments.createdUtc,
+			editedUtc: comments.editedUtc,
+			upvotes: comments.upvotes,
+			downvotes: comments.downvotes,
+			level: comments.level,
+			parentCommentId: comments.parentCommentId,
+			parentSubmissionId: comments.parentSubmission,
+			descendantCount: comments.descendantCount,
+			isPinned: comments.isPinned,
+			distinguishLevel: comments.distinguishLevel,
+			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
+			stateModSetBy: comments.stateModSetBy,
+			userVoteType: commentVotes.voteType,
+			blockedTargetId: userBlocks.targetId,
+		})
+		.from(comments)
+		.innerJoin(users, eq(comments.authorId, users.id))
+		.leftJoin(
+			commentVotes,
+			userId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			userBlocks,
+			userId
+				? and(
+						eq(userBlocks.userId, userId),
+						eq(userBlocks.targetId, comments.authorId),
+					)
+				: sql`false`,
+		)
+		.where(eq(comments.id, id))
+		.limit(1);
+
+	if (!result) {
+		return null;
+	}
+
+	return {
+		...result,
+		isBlocking: result.blockedTargetId !== null,
+	};
+}
+
+async function getRawCommentSubtreeRows(
+	id: number,
+	userId?: number,
+): Promise<RawCommentRow[]> {
+	const userIdParam = userId ?? null;
+	const result = await db.execute(
+		sql`WITH target AS (
+			SELECT path FROM comments WHERE id = ${id}
+		)
+		SELECT
+			c.id,
+			c.author_id,
+			u.username AS author_name,
+			u.shadowbanned AS author_shadow_banned,
+			c.body,
+			c.body_html,
+			c.created_utc,
+			c.edited_utc,
+			c.upvotes,
+			c.downvotes,
+			c.level,
+			c.parent_comment_id,
+			c.parent_submission,
+			c.descendant_count,
+			c.is_pinned,
+			c.distinguish_level,
+			c.state_user_deleted_utc,
+			c.state_mod,
+			c.state_mod_set_by,
+			cv.vote_type AS user_vote_type,
+			ub.target_id AS blocked_target_id
+		FROM comments c
+		INNER JOIN target t ON c.path <@ t.path
+		INNER JOIN users u ON c.author_id = u.id
+		LEFT JOIN commentvotes cv
+			ON cv.comment_id = c.id AND cv.user_id = ${userIdParam}
+		LEFT JOIN userblocks ub
+			ON ub.user_id = ${userIdParam} AND ub.target_id = c.author_id
+		ORDER BY c.level ASC, c.created_utc DESC, c.id DESC`,
+	);
+
+	return (result.rows as Array<Record<string, unknown>>).map((row) => ({
+		id: row.id as number,
+		authorId: row.author_id as number,
+		authorName: row.author_name as string,
+		authorShadowBanned: row.author_shadow_banned as string | null,
+		body: row.body as string | null,
+		bodyHtml: row.body_html as string,
+		createdUtc: row.created_utc as number,
+		editedUtc: row.edited_utc as number,
+		upvotes: row.upvotes as number,
+		downvotes: row.downvotes as number,
+		level: row.level as number,
+		parentCommentId: row.parent_comment_id as number | null,
+		parentSubmissionId: row.parent_submission as number | null,
+		descendantCount: row.descendant_count as number,
+		isPinned: row.is_pinned as string | null,
+		distinguishLevel: row.distinguish_level as number,
+		stateUserDeletedUtc: row.state_user_deleted_utc as Date | null,
+		stateMod: row.state_mod as string | null,
+		stateModSetBy: row.state_mod_set_by as string | null,
+		userVoteType: row.user_vote_type as number | null,
+		isBlocking: row.blocked_target_id !== null,
+	}));
+}
+
+export async function getCommentsBySubmissionFlat(
+	submissionId: number,
+	userId?: number,
+): Promise<CommentFlat[]> {
+	const viewer = await getCommentViewerContext(userId);
+	const rows = await getSubmissionCommentRows(submissionId, userId);
+	return filterThreadComments(rows, viewer);
 }
 
 export async function getCommentsBySubmissionSince(
@@ -378,150 +509,31 @@ export async function getCommentsBySubmissionSince(
 	since: number,
 	userId?: number,
 ): Promise<CommentFlat[]> {
-	const results = await db
-		.select({
-			id: comments.id,
-			authorId: comments.authorId,
-			authorName: users.username,
-			body: comments.body,
-			bodyHtml: comments.bodyHtml,
-			createdUtc: comments.createdUtc,
-			editedUtc: comments.editedUtc,
-			upvotes: comments.upvotes,
-			downvotes: comments.downvotes,
-			level: comments.level,
-			parentCommentId: comments.parentCommentId,
-			parentSubmissionId: comments.parentSubmission,
-			descendantCount: comments.descendantCount,
-			isPinned: comments.isPinned,
-			distinguishLevel: comments.distinguishLevel,
-			stateUserDeletedUtc: comments.stateUserDeletedUtc,
-			stateMod: comments.stateMod,
-			userVoteType: commentVotes.voteType,
-		})
-		.from(comments)
-		.innerJoin(users, eq(comments.authorId, users.id))
-		.leftJoin(
-			commentVotes,
-			userId
-				? and(
-						eq(commentVotes.commentId, comments.id),
-						eq(commentVotes.userId, userId),
-					)
-				: sql`false`,
-		)
-		.where(
-			and(
-				eq(comments.parentSubmission, submissionId),
-				eq(comments.stateMod, "VISIBLE"),
-				gte(comments.createdUtc, since),
-			),
-		)
-		.orderBy(desc(comments.createdUtc));
-
-	return results.map((row) =>
-		mapCommentRow({
-			...row,
-			parentSubmissionId: row.parentSubmissionId,
-		}),
-	);
+	return getThreadRowsSince(submissionId, since, userId);
 }
 
 export async function getCommentThreadFlat(
 	id: number,
 	userId?: number,
 ): Promise<CommentFlat[] | null> {
-	const target = await getCommentById(id, userId);
-	if (!target) return null;
+	const viewer = await getCommentViewerContext(userId);
+	const rows = await getRawCommentSubtreeRows(id, userId);
+	if (rows.length === 0) return null;
 
-	const userIdParam = userId ?? null;
-	const result = await db.execute(
-		sql`WITH target AS (
-			SELECT path FROM comments WHERE id = ${id}
-		)
-		SELECT c.id, c.author_id, c.body, c.body_html, c.created_utc, c.edited_utc,
-			   c.upvotes, c.downvotes, c.level, c.parent_comment_id, c.parent_submission,
-			   c.descendant_count, c.is_pinned, c.distinguish_level, c.state_user_deleted_utc,
-			   c.state_mod, u.username as author_name, cv.vote_type as user_vote_type
-		FROM comments c
-		INNER JOIN target t ON c.path <@ t.path
-		INNER JOIN users u ON c.author_id = u.id
-		LEFT JOIN commentvotes cv ON cv.comment_id = c.id AND cv.user_id = ${userIdParam}
-		WHERE c.id <> ${id}
-		ORDER BY c.upvotes - c.downvotes DESC`,
-	);
-
-	const descendants = (
-		result.rows as Array<{
-			id: number;
-			author_id: number;
-			author_name: string;
-			body: string | null;
-			body_html: string;
-			created_utc: number;
-			edited_utc: number;
-			upvotes: number;
-			downvotes: number;
-			level: number;
-			parent_comment_id: number | null;
-			parent_submission: number | null;
-			descendant_count: number;
-			is_pinned: string | null;
-			distinguish_level: number;
-			state_user_deleted_utc: Date | null;
-			state_mod: string;
-			user_vote_type: number | null;
-		}>
-	).map((row) => mapCommentSqlRow(row));
-
-	return [target, ...descendants];
+	const filtered = filterThreadComments(rows, viewer);
+	return filtered.some((row) => row.id === id) ? filtered : null;
 }
 
 export async function getCommentById(
 	id: number,
 	userId?: number,
 ): Promise<CommentSummary | null> {
-	const [result] = await db
-		.select({
-			id: comments.id,
-			authorId: comments.authorId,
-			authorName: users.username,
-			body: comments.body,
-			bodyHtml: comments.bodyHtml,
-			createdUtc: comments.createdUtc,
-			editedUtc: comments.editedUtc,
-			upvotes: comments.upvotes,
-			downvotes: comments.downvotes,
-			level: comments.level,
-			parentCommentId: comments.parentCommentId,
-			parentSubmissionId: comments.parentSubmission,
-			descendantCount: comments.descendantCount,
-			isPinned: comments.isPinned,
-			distinguishLevel: comments.distinguishLevel,
-			stateUserDeletedUtc: comments.stateUserDeletedUtc,
-			stateMod: comments.stateMod,
-			userVoteType: commentVotes.voteType,
-		})
-		.from(comments)
-		.innerJoin(users, eq(comments.authorId, users.id))
-		.leftJoin(
-			commentVotes,
-			userId
-				? and(
-						eq(commentVotes.commentId, comments.id),
-						eq(commentVotes.userId, userId),
-					)
-				: sql`false`,
-		)
-		.where(eq(comments.id, id))
-		.limit(1);
+	const viewer = await getCommentViewerContext(userId);
+	const row = await getRawCommentRowById(id, userId);
+	if (!row) return null;
 
-	if (!result) return null;
-	return mapCommentRow({
-		...result,
-		parentSubmissionId: result.parentSubmissionId,
-		stateMod: result.stateMod,
-	});
+	const mapped = mapThreadCommentRow(row, viewer, false);
+	return mapped;
 }
 
 export async function getRecentComments(
@@ -546,10 +558,16 @@ export async function getRecentComments(
 			isPinned: comments.isPinned,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
-		.where(eq(comments.stateMod, "VISIBLE"))
+		.where(
+			and(
+				eq(comments.stateMod, "VISIBLE"),
+				isNull(comments.stateUserDeletedUtc),
+			),
+		)
 		.orderBy(desc(comments.createdUtc))
 		.limit(limit)
 		.offset(offset);
@@ -571,7 +589,7 @@ export async function getRecentComments(
 		descendantCount: row.descendantCount,
 		isPinned: row.isPinned,
 		distinguishLevel: row.distinguishLevel,
-		isDeleted: row.stateUserDeletedUtc !== null,
+		isDeleted: false,
 		isModHidden: false,
 		userVote: 0 as VoteType,
 	}));
@@ -584,7 +602,14 @@ export async function getCommentsFeed(
 	offset = 0,
 	userId?: number,
 ): Promise<CommentFeedItem[]> {
-	const conditions: SQL[] = [eq(comments.stateMod, "VISIBLE")];
+	const viewer = await getCommentViewerContext(userId);
+	const conditions: SQL[] = [
+		eq(comments.stateMod, "VISIBLE"),
+		isNull(comments.stateUserDeletedUtc),
+		eq(submissions.stateMod, "VISIBLE"),
+		isNull(submissions.stateUserDeletedUtc),
+		eq(submissions.private, false),
+	];
 
 	// Time filter
 	if (time !== "all") {
@@ -637,6 +662,7 @@ export async function getCommentsFeed(
 			id: comments.id,
 			authorId: comments.authorId,
 			authorName: users.username,
+			authorShadowBanned: users.shadowBanned,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -646,10 +672,15 @@ export async function getCommentsFeed(
 			level: comments.level,
 			parentSubmissionId: comments.parentSubmission,
 			submissionTitle: submissions.title,
+			parentSubmissionPrivate: submissions.private,
+			parentSubmissionDeletedUtc: submissions.stateUserDeletedUtc,
+			parentSubmissionStateMod: submissions.stateMod,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
+			stateModSetBy: comments.stateModSetBy,
 			userVoteType: commentVotes.voteType,
+			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
@@ -663,35 +694,69 @@ export async function getCommentsFeed(
 					)
 				: sql`false`,
 		)
+		.leftJoin(
+			userBlocks,
+			userId
+				? and(
+						eq(userBlocks.userId, userId),
+						eq(userBlocks.targetId, comments.authorId),
+					)
+				: sql`false`,
+		)
 		.where(and(...conditions))
 		.orderBy(...orderBy)
 		.limit(limit)
 		.offset(offset);
 
-	return results.map((row) => ({
-		id: row.id,
-		authorId: row.authorId,
-		authorName: row.authorName,
-		body: row.body,
-		bodyHtml: row.bodyHtml,
-		createdUtc: row.createdUtc,
-		editedUtc: row.editedUtc,
-		upvotes: row.upvotes,
-		downvotes: row.downvotes,
-		score: row.upvotes - row.downvotes,
-		level: row.level,
-		parentSubmissionId: row.parentSubmissionId,
-		submissionTitle: row.submissionTitle,
-		distinguishLevel: row.distinguishLevel,
-		isDeleted: row.stateUserDeletedUtc !== null,
-		userVote: (row.userVoteType as VoteType) ?? 0,
-	}));
+	return results
+		.map((row) => ({
+			...row,
+			isBlocking: row.blockedTargetId !== null,
+		}))
+		.filter((row) =>
+			shouldIncludeCommentInFeed(
+				{
+					authorId: row.authorId,
+					authorName: row.authorName,
+					distinguishLevel: row.distinguishLevel,
+					stateMod: row.stateMod,
+					stateModSetBy: row.stateModSetBy,
+					stateUserDeletedUtc: row.stateUserDeletedUtc,
+					authorShadowBanned: row.authorShadowBanned,
+					isBlocking: row.isBlocking,
+					parentSubmissionId: row.parentSubmissionId,
+					parentSubmissionPrivate: row.parentSubmissionPrivate,
+					parentSubmissionDeletedUtc: row.parentSubmissionDeletedUtc,
+					parentSubmissionStateMod: row.parentSubmissionStateMod,
+				},
+				viewer,
+			),
+		)
+		.map((row) => ({
+			id: row.id,
+			authorId: row.authorId,
+			authorName: row.authorName,
+			body: row.body,
+			bodyHtml: row.bodyHtml,
+			createdUtc: row.createdUtc,
+			editedUtc: row.editedUtc,
+			upvotes: row.upvotes,
+			downvotes: row.downvotes,
+			score: row.upvotes - row.downvotes,
+			level: row.level,
+			parentSubmissionId: row.parentSubmissionId,
+			submissionTitle: row.submissionTitle,
+			distinguishLevel: row.distinguishLevel,
+			isDeleted: false,
+			userVote: (row.userVoteType as VoteType) ?? 0,
+		}));
 }
 
 export async function getCommentAncestors(
 	id: number,
 	userId?: number,
 ): Promise<CommentSummary[]> {
+	const viewer = await getCommentViewerContext(userId);
 	const rows = await db.execute(
 		sql`SELECT path::text FROM comments WHERE id = ${id}`,
 	);
@@ -709,6 +774,7 @@ export async function getCommentAncestors(
 			id: comments.id,
 			authorId: comments.authorId,
 			authorName: users.username,
+			authorShadowBanned: users.shadowBanned,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -723,7 +789,9 @@ export async function getCommentAncestors(
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
+			stateModSetBy: comments.stateModSetBy,
 			userVoteType: commentVotes.voteType,
+			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
@@ -736,40 +804,29 @@ export async function getCommentAncestors(
 					)
 				: sql`false`,
 		)
+		.leftJoin(
+			userBlocks,
+			userId
+				? and(
+						eq(userBlocks.userId, userId),
+						eq(userBlocks.targetId, comments.authorId),
+					)
+				: sql`false`,
+		)
 		.where(inArray(comments.id, recentAncestors));
 
 	return recentAncestors
 		.map((aid) => {
 			const r = results.find((c) => c.id === aid);
 			if (!r) return null;
-			const visibility = applyCommentVisibilityState({
-				authorName: r.authorName,
-				body: r.body,
-				bodyHtml: r.bodyHtml,
-				stateUserDeletedUtc: r.stateUserDeletedUtc,
-				stateMod: r.stateMod,
-			});
-			return {
-				id: r.id,
-				authorId: r.authorId,
-				authorName: visibility.authorName,
-				body: visibility.body,
-				bodyHtml: visibility.bodyHtml,
-				createdUtc: r.createdUtc,
-				editedUtc: r.editedUtc,
-				upvotes: r.upvotes,
-				downvotes: r.downvotes,
-				score: r.upvotes - r.downvotes,
-				level: r.level,
-				parentCommentId: r.parentCommentId,
-				parentSubmissionId: r.parentSubmissionId,
-				descendantCount: r.descendantCount,
-				isPinned: r.isPinned,
-				distinguishLevel: r.distinguishLevel,
-				isDeleted: visibility.isDeleted,
-				isModHidden: visibility.isModHidden,
-				userVote: (r.userVoteType as VoteType) ?? 0,
-			} satisfies CommentSummary;
+			return mapThreadCommentRow(
+				{
+					...r,
+					isBlocking: r.blockedTargetId !== null,
+				},
+				viewer,
+				true,
+			);
 		})
 		.filter((c): c is CommentSummary => c !== null);
 }
@@ -911,87 +968,38 @@ export async function getCommentWithReplies(
 	id: number,
 	userId?: number,
 ): Promise<CommentWithReplies | null> {
-	// Get the target comment
-	const targetComment = await getCommentById(id, userId);
-	if (!targetComment) return null;
-
-	// Ltree query to get all descendants, with optional user vote join
-	const userIdParam = userId ?? null;
-	const result = await db.execute(
-		sql`WITH target AS (
-			SELECT path FROM comments WHERE id = ${id}
-		)
-		SELECT c.id, c.author_id, c.body, c.body_html, c.created_utc, c.edited_utc,
-			   c.upvotes, c.downvotes, c.level, c.parent_comment_id, c.parent_submission,
-			   c.descendant_count, c.is_pinned, c.distinguish_level, c.state_user_deleted_utc,
-			   c.state_mod, u.username as author_name, cv.vote_type as user_vote_type
-		FROM comments c
-		INNER JOIN target t ON c.path <@ t.path
-		INNER JOIN users u ON c.author_id = u.id
-		LEFT JOIN commentvotes cv ON cv.comment_id = c.id AND cv.user_id = ${userIdParam}
-		WHERE c.id <> ${id}
-		ORDER BY c.upvotes - c.downvotes DESC`,
-	);
-	const allDescendants = result.rows;
+	const flatComments = await getCommentThreadFlat(id, userId);
+	if (!flatComments || flatComments.length === 0) return null;
 
 	const commentMap = new Map<number, CommentWithReplies>();
-
-	// Add target comment
-	const targetWithReplies: CommentWithReplies = {
-		...targetComment,
-		replies: [],
-	};
-	commentMap.set(id, targetWithReplies);
-
-	// Add all descendants
-	for (const row of allDescendants as Array<{
-		id: number;
-		author_id: number;
-		author_name: string;
-		body: string | null;
-		body_html: string;
-		created_utc: number;
-		edited_utc: number;
-		upvotes: number;
-		downvotes: number;
-		level: number;
-		parent_comment_id: number | null;
-		parent_submission: number | null;
-		descendant_count: number;
-		is_pinned: string | null;
-		distinguish_level: number;
-		state_user_deleted_utc: Date | null;
-		state_mod: string;
-		user_vote_type: number | null;
-	}>) {
-		const mapped = mapCommentSqlRow(row);
-		const comment: CommentWithReplies = {
-			...mapped,
-			replies: [],
-		};
-		commentMap.set(row.id, comment);
+	for (const comment of flatComments) {
+		commentMap.set(comment.id, { ...comment, replies: [] });
 	}
 
-	// Build tree structure
 	for (const comment of commentMap.values()) {
-		if (comment.id === id) continue;
-		if (comment.parentCommentId === null) continue;
+		if (comment.id === id || comment.parentCommentId === null) {
+			continue;
+		}
+
 		const parent = commentMap.get(comment.parentCommentId);
 		if (parent) {
 			parent.replies.push(comment);
 		}
 	}
 
-	// Sort replies by score
+	const targetComment = commentMap.get(id);
+	if (!targetComment) {
+		return null;
+	}
+
 	const sortReplies = (commentList: CommentWithReplies[]) => {
 		for (const comment of commentList) {
-			if (comment.replies.length > 0) {
-				comment.replies.sort((a, b) => b.score - a.score);
-				sortReplies(comment.replies);
-			}
+			if (comment.replies.length === 0) continue;
+			comment.replies.sort((a, b) => b.score - a.score);
+			sortReplies(comment.replies);
 		}
 	};
-	sortReplies([targetWithReplies]);
+	sortReplies([targetComment]);
 
-	return targetWithReplies;
+	return targetComment;
 }

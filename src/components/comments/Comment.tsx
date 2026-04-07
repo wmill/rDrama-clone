@@ -53,6 +53,7 @@ export const Comment = memo(function Comment({
 	const [isDistinguishing, setIsDistinguishing] = useState(false);
 	const isModHidden = comment.isModHidden;
 	const isContentHidden = isDeleted || isModHidden;
+	const visibilityMessage = comment.visibilityMessage;
 
 	const openReportModal = useModalsStore((s) => s.openReportModal);
 	const openDeleteCommentModal = useModalsStore(
@@ -233,11 +234,18 @@ export const Comment = memo(function Comment({
 										onCancel={() => setIsEditing(false)}
 									/>
 								) : (
-									<div
-										className="prose prose-invert prose-sm max-w-none text-slate-300"
-										// biome-ignore lint/security/noDangerouslySetInnerHtml: Content sanitized server-side
-										dangerouslySetInnerHTML={{ __html: currentBody }}
-									/>
+									<>
+										{visibilityMessage && (
+											<p className="mb-2 text-xs text-slate-500">
+												{visibilityMessage}
+											</p>
+										)}
+										<div
+											className="prose prose-invert prose-sm max-w-none text-slate-300"
+											// biome-ignore lint/security/noDangerouslySetInnerHtml: Content sanitized server-side
+											dangerouslySetInnerHTML={{ __html: currentBody }}
+										/>
+									</>
 								)}
 
 								{/* Actions */}
