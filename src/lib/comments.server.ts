@@ -63,7 +63,7 @@ export type CommentSummary = {
 	parentCommentId: number | null;
 	parentSubmissionId: number | null;
 	descendantCount: number;
-	isPinned: string | null;
+	pinnedBy: string | null;
 	distinguishLevel: number;
 	isDeleted: boolean;
 	isModHidden: boolean;
@@ -96,7 +96,7 @@ export type RawCommentRow = {
 	parentCommentId: number | null;
 	parentSubmissionId: number | null;
 	descendantCount: number;
-	isPinned: string | null;
+	pinnedBy: string | null;
 	distinguishLevel: number;
 	stateUserDeletedUtc: Date | null;
 	stateMod: string | null;
@@ -176,7 +176,7 @@ function mapCommentRow(row: RawCommentRow): CommentFlat {
 		parentCommentId: row.parentCommentId,
 		parentSubmissionId: row.parentSubmissionId,
 		descendantCount: row.descendantCount,
-		isPinned: row.isPinned,
+		pinnedBy: row.pinnedBy,
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: row.stateUserDeletedUtc !== null,
 		isModHidden: false,
@@ -295,7 +295,7 @@ async function getSubmissionCommentRows(
 			parentCommentId: comments.parentCommentId,
 			parentSubmissionId: comments.parentSubmission,
 			descendantCount: comments.descendantCount,
-			isPinned: comments.isPinned,
+			pinnedBy: comments.pinnedBy,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
@@ -388,7 +388,7 @@ async function getRawCommentRowById(
 			parentCommentId: comments.parentCommentId,
 			parentSubmissionId: comments.parentSubmission,
 			descendantCount: comments.descendantCount,
-			isPinned: comments.isPinned,
+			pinnedBy: comments.pinnedBy,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
@@ -485,7 +485,7 @@ async function getRawCommentSubtreeRows(
 		parentCommentId: row.parent_comment_id as number | null,
 		parentSubmissionId: row.parent_submission as number | null,
 		descendantCount: row.descendant_count as number,
-		isPinned: row.is_pinned as string | null,
+		pinnedBy: row.is_pinned as string | null,
 		distinguishLevel: row.distinguish_level as number,
 		stateUserDeletedUtc: row.state_user_deleted_utc as Date | null,
 		stateMod: row.state_mod as string | null,
@@ -555,7 +555,7 @@ export async function getRecentComments(
 			parentCommentId: comments.parentCommentId,
 			parentSubmissionId: comments.parentSubmission,
 			descendantCount: comments.descendantCount,
-			isPinned: comments.isPinned,
+			pinnedBy: comments.pinnedBy,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
@@ -587,7 +587,7 @@ export async function getRecentComments(
 		parentCommentId: row.parentCommentId,
 		parentSubmissionId: row.parentSubmissionId,
 		descendantCount: row.descendantCount,
-		isPinned: row.isPinned,
+		pinnedBy: row.pinnedBy,
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: false,
 		isModHidden: false,
@@ -785,7 +785,7 @@ export async function getCommentAncestors(
 			parentCommentId: comments.parentCommentId,
 			parentSubmissionId: comments.parentSubmission,
 			descendantCount: comments.descendantCount,
-			isPinned: comments.isPinned,
+			pinnedBy: comments.pinnedBy,
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
