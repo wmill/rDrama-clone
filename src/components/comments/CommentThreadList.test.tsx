@@ -26,7 +26,7 @@ function makeCommentTree(id: number): CommentWithReplies {
 		parentCommentId: null,
 		parentSubmissionId: 42,
 		descendantCount: 0,
-		isPinned: null,
+		pinnedBy: null,
 		distinguishLevel: 0,
 		isDeleted: false,
 		isModHidden: false,

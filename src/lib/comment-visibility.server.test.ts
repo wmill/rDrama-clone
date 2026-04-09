@@ -31,7 +31,7 @@ function makeRow(overrides: Partial<RawCommentRow>): RawCommentRow {
 		parentCommentId: null,
 		parentSubmissionId: 1,
 		descendantCount: 0,
-		isPinned: null,
+		pinnedBy: null,
 		distinguishLevel: 0,
 		stateUserDeletedUtc: null,
 		stateMod: "VISIBLE",

@@ -214,7 +214,8 @@ export const comments = pgTable("comments", {
 	appId: integer("app_id"),
 	sentTo: integer("sentto"),
 	bannedFor: boolean("bannedfor"),
-	isPinned: varchar("is_pinned", { length: 40 }),
+	// Legacy DB column name; stores the pin label / who pinned the comment.
+	pinnedBy: varchar("is_pinned", { length: 40 }),
 	body: text("body"),
 	bodyHtml: text("body_html").notNull(),
 	realUpvotes: integer("realupvotes").notNull().default(1),

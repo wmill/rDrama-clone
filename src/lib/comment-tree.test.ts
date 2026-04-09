@@ -23,9 +23,9 @@ function makeComment(
 		descendantCount: 0,
 		isDeleted: false,
 		isModHidden: false,
-		isPinned: false,
+		pinnedBy: null,
 		distinguishLevel: 0,
-		userVoteType: 0,
+		userVote: 0,
 		visibilityMessage: null,
 		...overrides,
 	};

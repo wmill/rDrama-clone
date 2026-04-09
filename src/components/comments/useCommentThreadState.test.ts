@@ -21,7 +21,7 @@ function makeComment(overrides: Partial<CommentFlat> = {}): CommentFlat {
 		parentCommentId: null,
 		parentSubmissionId: 99,
 		descendantCount: 0,
-		isPinned: null,
+		pinnedBy: null,
 		distinguishLevel: 0,
 		isDeleted: false,
 		isModHidden: false,
