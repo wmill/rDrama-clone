@@ -6,6 +6,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	useTransition,
 } from "react";
 import { getCommentsSinceFn } from "@/lib/comment-actions.server";
 import { buildCommentTree } from "@/lib/comment-tree";
@@ -81,15 +82,13 @@ export function mergeCommentState(
 export type UseCommentThreadStateResult = {
 	sort: CommentSortType;
 	visibleLimit: number;
-	isSyncing: boolean;
-	rootRenderedCount: number;
+	isPending: boolean;
 	flatComments: CommentFlat[];
 	commentTree: CommentWithReplies[];
 	localCommentCount: number;
 	handleReplyAdded: (comment?: CommentFlat) => void;
 	handleSortChange: (nextSort: CommentSortType) => Promise<void>;
 	setVisibleLimit: Dispatch<SetStateAction<number>>;
-	setRootRenderedCount: Dispatch<SetStateAction<number>>;
 };
 
 export function useCommentThreadState({
@@ -106,7 +105,7 @@ export function useCommentThreadState({
 	const [commentState, setCommentState] = useState<CommentThreadState>(() =>
 		buildInitialCommentState(comments, commentCount, commentsLastFetchedAt),
 	);
-	const [rootRenderedCount, setRootRenderedCount] = useState(0);
+	const [isPendingTransition, startTransition] = useTransition();
 	const commentStateRef = useRef(commentState);
 
 	useEffect(() => {
@@ -133,12 +132,14 @@ export function useCommentThreadState({
 			);
 
 			commentStateRef.current = nextState;
-			setCommentState(nextState);
-			onCommentCountChange?.(nextState.commentCount);
+			startTransition(() => {
+				setCommentState(nextState);
+				onCommentCountChange?.(nextState.commentCount);
 
-			if (newCount > 0) {
-				setVisibleLimit((prev) => prev + newCount);
-			}
+				if (newCount > 0) {
+					setVisibleLimit((prev) => prev + newCount);
+				}
+			});
 		},
 		[onCommentCountChange],
 	);
@@ -153,8 +154,11 @@ export function useCommentThreadState({
 
 	const handleSortChange = useCallback(
 		async (nextSort: CommentSortType) => {
-			setSort(nextSort);
-			setRootRenderedCount(0);
+			if (nextSort === sort) return;
+
+			startTransition(() => {
+				setSort(nextSort);
+			});
 			setIsSyncing(true);
 
 			try {
@@ -169,20 +173,18 @@ export function useCommentThreadState({
 				setIsSyncing(false);
 			}
 		},
-		[handleMerge, submissionId],
+		[handleMerge, sort, submissionId],
 	);
 
 	return {
 		sort,
 		visibleLimit,
-		isSyncing,
-		rootRenderedCount,
+		isPending: isSyncing || isPendingTransition,
 		flatComments,
 		commentTree,
 		localCommentCount: commentState.commentCount,
 		handleReplyAdded,
 		handleSortChange,
 		setVisibleLimit,
-		setRootRenderedCount,
 	};
 }

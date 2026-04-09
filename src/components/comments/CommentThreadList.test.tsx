@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { SetStateAction } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CommentWithReplies } from "@/lib/comments.server";
 import { CommentThreadList } from "./CommentThreadList";
 
@@ -36,14 +36,6 @@ function makeCommentTree(id: number): CommentWithReplies {
 }
 
 describe("CommentThreadList", () => {
-	beforeEach(() => {
-		vi.useFakeTimers();
-	});
-
-	afterEach(() => {
-		vi.useRealTimers();
-	});
-
 	it("renders the empty state when there are no comments", () => {
 		render(
 			<CommentThreadList
@@ -52,54 +44,29 @@ describe("CommentThreadList", () => {
 				onReplyAdded={() => {}}
 				visibleLimit={50}
 				onVisibleLimitChange={vi.fn()}
-				rootRenderedCount={0}
-				setRootRenderedCount={vi.fn()}
 			/>,
 		);
 
 		expect(screen.getByText(/No comments yet/i)).toBeTruthy();
 	});
 
-	it("stages root comments in batches and exposes load more", () => {
+	it("renders all visible comments and exposes load more", () => {
 		const comments = Array.from({ length: 7 }, (_, index) =>
 			makeCommentTree(index + 1),
 		);
 		let visibleLimit = 5;
-		let rootRenderedCount = 0;
 		const setVisibleLimit = vi.fn((updater: SetStateAction<number>) => {
 			visibleLimit =
 				typeof updater === "function" ? updater(visibleLimit) : updater;
 		});
-		const setRootRenderedCount = vi.fn((updater: SetStateAction<number>) => {
-			rootRenderedCount =
-				typeof updater === "function" ? updater(rootRenderedCount) : updater;
-		});
 
-		const { rerender } = render(
+		render(
 			<CommentThreadList
 				comments={comments}
 				submissionId={42}
 				onReplyAdded={() => {}}
 				visibleLimit={visibleLimit}
 				onVisibleLimitChange={setVisibleLimit}
-				rootRenderedCount={rootRenderedCount}
-				setRootRenderedCount={setRootRenderedCount}
-			/>,
-		);
-
-		act(() => {
-			vi.advanceTimersByTime(10);
-		});
-
-		rerender(
-			<CommentThreadList
-				comments={comments}
-				submissionId={42}
-				onReplyAdded={() => {}}
-				visibleLimit={visibleLimit}
-				onVisibleLimitChange={setVisibleLimit}
-				rootRenderedCount={rootRenderedCount}
-				setRootRenderedCount={setRootRenderedCount}
 			/>,
 		);
 

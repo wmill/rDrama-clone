@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { type Dispatch, type SetStateAction, useEffect, useMemo } from "react";
+import { type Dispatch, type SetStateAction, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	filterCommentTree,
@@ -10,7 +10,6 @@ import { Comment } from "./Comment";
 
 const COMMENTS_PAGE_SIZE =
 	Number(import.meta.env.VITE_RESULTS_PER_PAGE_COMMENTS) ?? 50;
-const ROOT_BATCH_SIZE = 5;
 
 type CommentThreadListProps = {
 	comments: CommentWithReplies[];
@@ -21,8 +20,6 @@ type CommentThreadListProps = {
 	visibleLimit: number;
 	onVisibleLimitChange: Dispatch<SetStateAction<number>>;
 	isLoading?: boolean;
-	rootRenderedCount: number;
-	setRootRenderedCount: Dispatch<SetStateAction<number>>;
 };
 
 export function CommentThreadList({
@@ -34,8 +31,6 @@ export function CommentThreadList({
 	visibleLimit,
 	onVisibleLimitChange,
 	isLoading,
-	rootRenderedCount,
-	setRootRenderedCount,
 }: CommentThreadListProps) {
 	const { visibleIds, totalCount } = useMemo(
 		() => getVisibleCommentIds(comments, visibleLimit),
@@ -45,34 +40,6 @@ export function CommentThreadList({
 	const filteredComments = useMemo(
 		() => filterCommentTree(comments, visibleIds),
 		[comments, visibleIds],
-	);
-	const rootTarget = filteredComments.length;
-
-	useEffect(() => {
-		if (rootRenderedCount > rootTarget) {
-			setRootRenderedCount(rootTarget);
-		}
-	}, [rootRenderedCount, rootTarget, setRootRenderedCount]);
-
-	useEffect(() => {
-		if (rootRenderedCount >= rootTarget) return;
-
-		const intervalId = window.setInterval(() => {
-			setRootRenderedCount((prev) => {
-				const next = Math.min(prev + ROOT_BATCH_SIZE, rootTarget);
-				if (next >= rootTarget) {
-					window.clearInterval(intervalId);
-				}
-				return next;
-			});
-		}, 10);
-
-		return () => window.clearInterval(intervalId);
-	}, [rootRenderedCount, rootTarget, setRootRenderedCount]);
-
-	const stagedComments = useMemo(
-		() => filteredComments.slice(0, rootRenderedCount),
-		[filteredComments, rootRenderedCount],
 	);
 
 	if (comments.length === 0) {
@@ -96,7 +63,7 @@ export function CommentThreadList({
 				</div>
 			)}
 
-			{stagedComments.map((comment) => (
+			{filteredComments.map((comment) => (
 				<Comment
 					key={comment.id}
 					comment={comment}

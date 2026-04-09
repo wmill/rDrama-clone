@@ -38,15 +38,13 @@ export function CommentThreadBase({
 	const {
 		sort,
 		visibleLimit,
-		isSyncing,
-		rootRenderedCount,
+		isPending,
 		flatComments,
 		commentTree,
 		localCommentCount,
 		handleReplyAdded,
 		handleSortChange,
 		setVisibleLimit,
-		setRootRenderedCount,
 	} = useCommentThreadState({
 		submissionId,
 		comments,
@@ -78,7 +76,7 @@ export function CommentThreadBase({
 				sort={sort}
 				onSortChange={handleSortChange}
 				showSortControls={flatComments.length > 0}
-				isSyncing={isSyncing}
+				isPending={isPending}
 			/>
 
 			<CommentThreadList
@@ -86,12 +84,10 @@ export function CommentThreadBase({
 				currentUserId={currentUserId}
 				currentUserAdminLevel={currentUserAdminLevel}
 				onReplyAdded={handleReplyAdded}
-				isLoading={isSyncing}
+				isLoading={isPending}
 				comments={commentTree}
 				visibleLimit={visibleLimit}
 				onVisibleLimitChange={setVisibleLimit}
-				rootRenderedCount={rootRenderedCount}
-				setRootRenderedCount={setRootRenderedCount}
 			/>
 		</div>
 	);
@@ -106,7 +102,7 @@ type CommentThreadHeaderProps = {
 	sort: CommentSortType;
 	onSortChange: (sort: CommentSortType) => Promise<void>;
 	showSortControls: boolean;
-	isSyncing: boolean;
+	isPending: boolean;
 };
 
 function CommentThreadHeader({
@@ -116,7 +112,7 @@ function CommentThreadHeader({
 	sort,
 	onSortChange,
 	showSortControls,
-	isSyncing,
+	isPending,
 }: CommentThreadHeaderProps) {
 	return (
 		<>
@@ -148,7 +144,7 @@ function CommentThreadHeader({
 								key={option.value}
 								option={option}
 								sort={sort}
-								isSyncing={isSyncing}
+								isPending={isPending}
 								onSortChange={onSortChange}
 							/>
 						))}
@@ -163,14 +159,14 @@ type SortButtonProps = {
 	option: { value: CommentSortType; label: string };
 	onSortChange: (sort: CommentSortType) => Promise<void>;
 	sort: CommentSortType;
-	isSyncing: boolean;
+	isPending: boolean;
 };
 
 function SortButton({
 	option,
 	onSortChange,
 	sort,
-	isSyncing,
+	isPending,
 }: SortButtonProps) {
 	const isActive = sort === option.value;
 
@@ -178,7 +174,7 @@ function SortButton({
 		<button
 			type="button"
 			onClick={() => void onSortChange(option.value)}
-			disabled={isSyncing}
+			disabled={isPending}
 			className={`rounded-md px-3 py-1 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
 				isActive ? "bg-cyan-500 text-white" : "text-slate-400 hover:text-white"
 			}`}
