@@ -2,99 +2,99 @@
 
 Guiding rule: preserve `rDrama` database compatibility unless a migration clearly simplifies the code or unlocks a major feature.
 
-## P1 — Core (must-have)
+## Re-baselined status
 
-### Authentication
-- [x] Signup
-- [x] Login / logout
-- [x] Session management
-- [ ] Password recovery (forgot password flow)
-  - [ ] Decide whether to reuse the legacy token/reset table flow or add a small compatible migration.
-  - [ ] Add request-reset route and form linked from `src/routes/login.tsx`.
-  - [ ] Add reset-password route that validates token, updates `users.passhash`, and invalidates old sessions.
-  - [ ] Add mail delivery plumbing or a development-only reset-link fallback.
-  - [ ] Cover happy path, expired token, invalid token, and reused token cases with tests.
+These core features already exist and should no longer be tracked as missing:
 
-### Posts
-- [x] Create post (link + text, NSFW toggle)
-- [x] View post with metadata (score, views, author, time)
-- [x] Voting (upvote/downvote/toggle)
-- [x] Sorting (hot, new, top, controversial, comments)
-- [x] Time filters (hour, day, week, month, year, all)
-- [x] Edit post
-  - [ ] Add ownership/mod authorization checks.
-  - [ ] Build edit route and form prefilled from existing submission data.
-  - [ ] Update `edited_utc`, preserve legacy field behavior, and re-render derived HTML fields.
-  - [ ] Add tests for link posts, text posts, and unauthorized edits.
-- [x] Delete post
-  - [ ] Match legacy semantics: delete vs remove vs ghost/state changes.
-  - [ ] Update counters and visibility queries so deleted content behaves like `rDrama`.
-  - [ ] Add tests for author delete, moderator remove, and deleted-post display.
-- [x] Markdown parsing + HTML sanitization for post body/title
-  - [ ] Replace the `TODO` placeholders in `src/lib/submissions.server.ts`.
-  - [ ] Reuse the existing markdown pipeline where possible so posts and comments render consistently.
-  - [ ] Sanitize stored `titleHtml`/`bodyHtml` to match legacy expectations and XSS constraints.
-  - [ ] Add regression tests for markdown, mentions, spoilers, and unsafe HTML.
+- [x] Signup, login, logout, and session management
+- [x] Password reset request + reset-token flow
+- [x] Post creation, editing, deletion, voting, sorting, and post pages
+- [x] Nested comments, comment editing/deletion, voting, and comment feeds
+- [x] Profile pages plus user settings that write legacy-compatible fields
+- [x] Reporting for posts and comments
+- [x] Basic moderator/admin surface for reported posts, reported comments, and user actions
 
-### Comments
-- [x] Create comment (nested replies)
-- [x] Edit comment
-- [x] Delete comment
-- [x] Comment voting
-- [x] Comment thread view with ancestor context
-- [x] Comment feed (all comments, paginated, sorted)
+## P1 — Production-core replacement gaps
 
-### User Profiles
-- [x] Profile page (bio, post/comment feeds, stats)
-- [x] Sorting + pagination on profile feeds
-- [x] Edit profile / user settings page
-  - [ ] Replace the disabled button in `src/routes/me.tsx` with a real settings route.
-  - [ ] Support legacy profile fields first: bio, custom title, profile/banner URLs, display preferences.
-  - [ ] Re-render stored profile HTML safely and validate length/format constraints against the DB schema.
-  - [ ] Add tests for authorized updates and rejected invalid values.
+These are the main blockers to replacing `rDrama` for normal site use.
 
-## P2 — Important
+### Post lifecycle parity
 
-- [ ] Post and comment reporting (flag system — DB ready)
-  - [ ] Add report actions for submissions/comments and write to `flags` / `commentflags`.
-  - [ ] Prevent duplicate reports from the same user if legacy behavior expects that.
-  - [ ] Expose report state in moderator-facing queries later.
-- [ ] Notifications (comment replies — DB ready)
-  - [ ] Create notification records on reply/mention events.
-  - [ ] Add unread count and basic notifications UI before deeper preference controls.
-- [ ] User following / followers (DB ready)
-  - [ ] Add follow/unfollow actions and buttons on profile pages.
-  - [ ] Recalculate or maintain follower/following counters in a legacy-compatible way.
-- [ ] Search (posts and users)
-  - [ ] Start with server-side keyword search over titles, bodies, and usernames.
-  - [ ] Match legacy visibility rules so banned/removed/private content does not leak.
-- [ ] User blocking (DB ready)
-  - [ ] Add block/unblock actions backed by `userblocks`.
-  - [ ] Filter blocked users from feeds, threads, notifications, and profile interactions.
-  - [ ] Moderation panel (flags, mod actions, bans — DB ready)
-  - [ ] Add moderator-only routes, layout, and authorization guards based on legacy admin levels.
-  - [ ] Build queues for reported posts and comments from `flags` and `commentflags`.
-  - [ ] Support core actions first: remove, unremove, ignore report, resolve report, sticky, pin, and lock-equivalent behavior if needed.
-  - [ ] Add ban and unban flows with reason capture, expiry support, and audit logging to `modactions`.
-  - [ ] Expose user moderation context: prior notes, recent posts/comments, report history, and linked alt/account signals where safe.
-  - [ ] Record every moderation action in a way that matches or cleanly migrates legacy `modactions` behavior.
-  - [ ] Add tests for permission boundaries, action logging, and queue state transitions.
-- [ ] Admin panel
-  - [ ] Define the split between moderator tools and true admin tools before building UI.
-  - [ ] Add admin-only routes with stricter guards than the moderation panel.
-  - [ ] Start with operational controls that already map to the schema: user role changes, site configuration toggles that live in DB, and maintenance tooling.
-  - [ ] Add CRUD screens for DB-backed resources already present in the legacy app such as badges, marseys, banned domains, and OAuth apps.
-  - [ ] Add safe background-task management views for repeatable tasks and task runs if those systems are kept in the rewrite.
-  - [ ] Add search/filtering and audit visibility so admin changes are attributable and reversible where possible.
-  - [ ] Add tests for admin-only access, destructive-action confirmation, and persistence of configuration changes.
+- [ ] Match legacy post state transitions instead of treating edit/delete as author-only CRUD.
+- [ ] Add moderator remove/unremove flows for submissions and comments.
+- [ ] Add sticky/pin behavior and remaining distinguish/staff-state parity.
+- [ ] Add save/unsave behavior and saved-content surfaces.
+- [ ] Tighten deleted/removed visibility and counters so content matches `rDrama` semantics instead of disappearing outright.
+- [ ] Add tests for author delete, moderator remove/unremove, deleted-post visibility, and permission boundaries.
 
-## P3 — Someday
+### Notifications
 
-- [ ] Awards on posts and comments (DB ready)
-- [ ] User badges (DB ready)
+- [ ] Create notifications for replies, mentions, and subscriptions.
+- [ ] Add unread count in shared navigation/header UI.
+- [ ] Add a notifications listing route.
+- [ ] Add mark-read / clear actions.
+- [ ] Add server tests for notification creation and unread-count behavior.
 
-## P4 - Probably skip
+### Search
 
-- [ ] Chat / messaging (DB ready)
-- [ ] OAuth apps (DB ready)
+- [ ] Add public search routes for posts, comments, and users.
+- [ ] Implement legacy-aware visibility filtering so removed/private/shadowbanned content does not leak.
+- [ ] Add tests for search visibility boundaries.
 
+### Social actions
+
+- [ ] Add follow/unfollow actions and follower/following pages.
+- [ ] Add block/unblock actions backed by `userblocks`.
+- [ ] Apply block filtering consistently across feeds, threads, profiles, and notifications.
+- [ ] Add tests covering follow/block effects on visibility and counts.
+
+### Account security parity
+
+- [ ] Add log-out-other-sessions / session management controls.
+- [ ] Add 2FA and remaining security settings parity if still required for replacement.
+- [ ] Add banned-user login and password-reset/session-invalidation coverage.
+
+## P2 — Moderation/admin expansion
+
+Current admin/moderation support exists, but it is still a narrow subset of `rDrama`.
+
+### Moderation actions
+
+- [ ] Expand beyond reported-content triage to include unremove flows, filter-state transitions, sticky/unsticky, title/flair/verification actions, and richer audit logging parity.
+- [ ] Add moderation actions for comments where legacy behavior supports the same lifecycle controls.
+
+### Moderation views
+
+- [ ] Add filtered/removed/shadowbanned queues.
+- [ ] Add mod log visibility.
+- [ ] Add richer user investigation context: notes, recent activity, report history, and related-account signals where appropriate.
+
+### Admin tools
+
+- [ ] Add banned-domain management.
+- [ ] Add badges/awards management.
+- [ ] Add site settings / config toggles that still belong in the rewrite.
+- [ ] Add OAuth app review and operational/task views only if those systems remain in scope.
+
+## P3 — Lower-priority parity gaps
+
+- [ ] Notifications subpages and subscriptions
+- [ ] Static/community pages: rules, support, API, badges, banned, formatting, admins, patrons, contact, sidebar, mod log, charts/stats
+- [ ] RSS/feed endpoints
+- [ ] Volunteer flows
+- [ ] OAuth app flows
+- [ ] Awards/badges UI and actions
+- [ ] Messaging/chat
+- [ ] Misc profile utilities: saved pages, vote-analysis pages, views page, profile CSS/image endpoints, availability checks
+
+## Test plan
+
+Current baseline: `pnpm test --run` passes with 13 test files and 53 tests, but coverage is still concentrated in utilities and component behavior.
+
+Priority additions:
+
+- [ ] Auth/account integration coverage: signup, login, logout, password-reset request/consume, banned-user login behavior, session invalidation after reset
+- [ ] Post lifecycle coverage: edit/delete/remove/unremove, sticky/distinguish permissions, save/unsave
+- [ ] Comment lifecycle coverage: create/edit/delete/remove/unremove, blocked/shadowbanned visibility cases
+- [ ] Notifications/search/social coverage: reply notifications, unread count, search filtering, follow/unfollow/block behavior
+- [ ] Admin/mod coverage: permission boundaries, queue transitions, mod action logging, audit correctness
