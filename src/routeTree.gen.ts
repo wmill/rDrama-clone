@@ -13,6 +13,7 @@ import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as Random_postRouteImport } from './routes/random_post'
+import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
@@ -54,6 +55,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const Random_postRoute = Random_postRouteImport.update({
   id: '/random_post',
   path: '/random_post',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeRoute = MeRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
+  '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
+  '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
+  '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -262,6 +271,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/logout'
     | '/me'
+    | '/notifications'
     | '/random_post'
     | '/reset-password'
     | '/signup'
@@ -289,6 +299,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/logout'
     | '/me'
+    | '/notifications'
     | '/random_post'
     | '/reset-password'
     | '/signup'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/logout'
     | '/me'
+    | '/notifications'
     | '/random_post'
     | '/reset-password'
     | '/signup'
@@ -346,6 +358,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
   MeRoute: typeof MeRoute
+  NotificationsRoute: typeof NotificationsRoute
   Random_postRoute: typeof Random_postRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       path: '/random_post'
       fullPath: '/random_post'
       preLoaderRoute: typeof Random_postRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me': {
@@ -574,6 +594,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
   MeRoute: MeRoute,
+  NotificationsRoute: NotificationsRoute,
   Random_postRoute: Random_postRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,

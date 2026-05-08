@@ -1,13 +1,20 @@
 import { and, desc, eq, isNull, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { saveRelationship, submissions, users, votes } from "@/db/schema";
+import {
+	saveRelationship,
+	submissions,
+	subscriptions,
+	users,
+	votes,
+} from "@/db/schema";
 import {
 	authorDeleteSubmission,
 	DELETED_BY_AUTHOR_MESSAGE,
 	REMOVED_BY_MODERATOR_MESSAGE,
 } from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
+import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
 import type { VoteType } from "@/lib/votes.server";
 import type { SortType, TimeFilter } from "./constants";
 
@@ -44,6 +51,7 @@ export type SubmissionDetail = SubmissionSummary & {
 	views: number;
 	distinguishLevel: number;
 	userVote: VoteType;
+	isSubscribed: boolean;
 };
 
 type SubmissionRow = {
@@ -72,6 +80,7 @@ type SubmissionRow = {
 	stateMod: string;
 	userVoteType: number | null;
 	savedSubmissionId: number | null;
+	subscribedSubmissionId?: number | null;
 };
 
 function mapSubmissionRow<T extends SubmissionRow>(row: T) {
@@ -96,6 +105,7 @@ function mapSubmissionRow<T extends SubmissionRow>(row: T) {
 		isRemoved,
 		visibilityMessage,
 		isSaved: row.savedSubmissionId !== null,
+		isSubscribed: row.subscribedSubmissionId !== null,
 	};
 }
 
@@ -303,6 +313,7 @@ export async function getSubmissionById(
 			stateMod: submissions.stateMod,
 			userVoteType: votes.voteType,
 			savedSubmissionId: saveRelationship.submissionId,
+			subscribedSubmissionId: subscriptions.submissionId,
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
@@ -318,6 +329,15 @@ export async function getSubmissionById(
 				? and(
 						eq(saveRelationship.submissionId, submissions.id),
 						eq(saveRelationship.userId, userId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			subscriptions,
+			userId
+				? and(
+						eq(subscriptions.submissionId, submissions.id),
+						eq(subscriptions.userId, userId),
 					)
 				: sql`false`,
 		)
@@ -371,6 +391,13 @@ export async function createSubmission(data: {
 			submissionId: createdSubmission.id,
 			voteType: 1,
 			createdDatetimez: new Date(),
+		});
+
+		await setSubmissionSubscriptionState({
+			userId: data.authorId,
+			submissionId: createdSubmission.id,
+			subscribed: true,
+			tx,
 		});
 
 		return createdSubmission;

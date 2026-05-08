@@ -1,7 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { dbMock } = vi.hoisted(() => ({
+	dbMock: {
+		select: vi.fn(),
+	},
+}));
+
+vi.mock("@/db", () => ({
+	db: dbMock,
+}));
 
 import {
 	type CommentViewerContext,
+	getCommentViewerContext,
 	getCommentVisibility,
 	shouldIncludeCommentInFeed,
 } from "./comment-visibility.server";
@@ -47,6 +58,10 @@ function makeRow(overrides: Partial<RawCommentRow>): RawCommentRow {
 }
 
 describe("comment visibility", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
 	it("hides blocked comments for normal viewers", () => {
 		const result = getCommentVisibility(
 			{
@@ -85,6 +100,170 @@ describe("comment visibility", () => {
 
 		expect(result.isVisible).toBe(true);
 		expect(result.message).toContain("official post");
+	});
+
+	it("keeps self-authored comments visible regardless of state", () => {
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 100,
+					authorName: "self",
+					distinguishLevel: 0,
+					stateMod: "REMOVED",
+					stateModSetBy: "mod",
+					stateUserDeletedUtc: new Date(),
+					authorShadowBanned: "AutoJanny",
+					isBlocking: true,
+				},
+				baseViewer,
+			),
+		).toEqual({
+			isVisible: true,
+			message: null,
+		});
+	});
+
+	it("hides removed, filtered, deleted, and shadowbanned comments for normal viewers", () => {
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 2,
+					authorName: "removed",
+					distinguishLevel: 0,
+					stateMod: "REMOVED",
+					stateModSetBy: "mod",
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+				},
+				baseViewer,
+			),
+		).toEqual({
+			isVisible: false,
+			message: "Removed by @mod",
+		});
+
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 2,
+					authorName: "removed",
+					distinguishLevel: 0,
+					stateMod: "REMOVED",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+				},
+				baseViewer,
+			),
+		).toEqual({
+			isVisible: false,
+			message: "Removed",
+		});
+
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 2,
+					authorName: "filtered",
+					distinguishLevel: 0,
+					stateMod: "FILTERED",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+				},
+				baseViewer,
+			),
+		).toEqual({
+			isVisible: false,
+			message: "Filtered",
+		});
+
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 2,
+					authorName: "deleted",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: new Date(),
+					authorShadowBanned: null,
+					isBlocking: false,
+				},
+				baseViewer,
+			),
+		).toEqual({
+			isVisible: false,
+			message: "Deleted by author",
+		});
+
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 2,
+					authorName: "shadow",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: "AutoJanny",
+					isBlocking: false,
+				},
+				baseViewer,
+			),
+		).toEqual({
+			isVisible: false,
+			message: "Removed",
+		});
+	});
+
+	it("keeps moderator-visible removed and shadowbanned comments visible", () => {
+		const moderatorViewer: CommentViewerContext = {
+			...baseViewer,
+			canModerate: true,
+			canSeeShadowbanned: true,
+		};
+
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 2,
+					authorName: "mod-visible",
+					distinguishLevel: 0,
+					stateMod: "REMOVED",
+					stateModSetBy: "mod",
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+				},
+				moderatorViewer,
+			),
+		).toEqual({
+			isVisible: true,
+			message: null,
+		});
+
+		expect(
+			getCommentVisibility(
+				{
+					authorId: 2,
+					authorName: "shadow",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: "AutoJanny",
+					isBlocking: false,
+				},
+				moderatorViewer,
+			),
+		).toEqual({
+			isVisible: true,
+			message: null,
+		});
 	});
 
 	it("keeps hidden parents as placeholders when a visible descendant exists", () => {
@@ -127,6 +306,86 @@ describe("comment visibility", () => {
 		);
 
 		expect(rows).toEqual([]);
+	});
+
+	it("builds viewer context for anonymous, missing, normal, moderator, and shadowbanned viewers", async () => {
+		expect(await getCommentViewerContext()).toEqual({
+			viewerId: null,
+			adminLevel: 0,
+			canModerate: false,
+			canSeeShadowbanned: false,
+			blockedAuthorIds: new Set<number>(),
+		});
+
+		const createSelectChain = <T,>(result: T) => ({
+			from: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue(result),
+		});
+
+		dbMock.select
+			.mockReturnValueOnce(createSelectChain([]))
+			.mockReturnValueOnce({
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([{ targetId: 9 }]),
+			});
+		expect(await getCommentViewerContext(5)).toEqual({
+			viewerId: null,
+			adminLevel: 0,
+			canModerate: false,
+			canSeeShadowbanned: false,
+			blockedAuthorIds: new Set([9]),
+		});
+
+		dbMock.select
+			.mockReturnValueOnce(
+				createSelectChain([{ id: 7, adminLevel: 0, shadowBanned: null }]),
+			)
+			.mockReturnValueOnce({
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([{ targetId: 3 }, { targetId: 4 }]),
+			});
+		expect(await getCommentViewerContext(7)).toEqual({
+			viewerId: 7,
+			adminLevel: 0,
+			canModerate: false,
+			canSeeShadowbanned: false,
+			blockedAuthorIds: new Set([3, 4]),
+		});
+
+		dbMock.select
+			.mockReturnValueOnce(
+				createSelectChain([{ id: 8, adminLevel: 2, shadowBanned: null }]),
+			)
+			.mockReturnValueOnce({
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([]),
+			});
+		expect(await getCommentViewerContext(8)).toEqual({
+			viewerId: 8,
+			adminLevel: 2,
+			canModerate: true,
+			canSeeShadowbanned: true,
+			blockedAuthorIds: new Set<number>(),
+		});
+
+		dbMock.select
+			.mockReturnValueOnce(
+				createSelectChain([
+					{ id: 9, adminLevel: 0, shadowBanned: "AutoJanny" },
+				]),
+			)
+			.mockReturnValueOnce({
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([]),
+			});
+		expect(await getCommentViewerContext(9)).toEqual({
+			viewerId: 9,
+			adminLevel: 0,
+			canModerate: false,
+			canSeeShadowbanned: true,
+			blockedAuthorIds: new Set<number>(),
+		});
 	});
 
 	it("excludes blocked and deleted comments from feed surfaces", () => {
@@ -174,5 +433,150 @@ describe("comment visibility", () => {
 				viewer,
 			),
 		).toBe(false);
+	});
+
+	it("excludes feed comments with hidden parents or non-visible state and allows moderator shadowban visibility", () => {
+		const moderatorViewer: CommentViewerContext = {
+			...baseViewer,
+			canModerate: true,
+			canSeeShadowbanned: true,
+		};
+
+		expect(
+			shouldIncludeCommentInFeed(
+				{
+					authorId: 3,
+					authorName: "orphaned",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+					parentSubmissionId: null,
+				},
+				baseViewer,
+			),
+		).toBe(false);
+
+		expect(
+			shouldIncludeCommentInFeed(
+				{
+					authorId: 3,
+					authorName: "private-post",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+					parentSubmissionId: 1,
+					parentSubmissionPrivate: true,
+					parentSubmissionDeletedUtc: null,
+					parentSubmissionStateMod: "VISIBLE",
+				},
+				baseViewer,
+			),
+		).toBe(false);
+
+		expect(
+			shouldIncludeCommentInFeed(
+				{
+					authorId: 3,
+					authorName: "removed-post",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+					parentSubmissionId: 1,
+					parentSubmissionPrivate: false,
+					parentSubmissionDeletedUtc: new Date(),
+					parentSubmissionStateMod: "VISIBLE",
+				},
+				baseViewer,
+			),
+		).toBe(false);
+
+		expect(
+			shouldIncludeCommentInFeed(
+				{
+					authorId: 3,
+					authorName: "removed-comment",
+					distinguishLevel: 0,
+					stateMod: "REMOVED",
+					stateModSetBy: "mod",
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+					parentSubmissionId: 1,
+					parentSubmissionPrivate: false,
+					parentSubmissionDeletedUtc: null,
+					parentSubmissionStateMod: "VISIBLE",
+				},
+				baseViewer,
+			),
+		).toBe(false);
+
+		expect(
+			shouldIncludeCommentInFeed(
+				{
+					authorId: 3,
+					authorName: "filtered-post",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: null,
+					isBlocking: false,
+					parentSubmissionId: 1,
+					parentSubmissionPrivate: false,
+					parentSubmissionDeletedUtc: null,
+					parentSubmissionStateMod: "REMOVED",
+				},
+				baseViewer,
+			),
+		).toBe(false);
+
+		expect(
+			shouldIncludeCommentInFeed(
+				{
+					authorId: 3,
+					authorName: "shadow",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: "AutoJanny",
+					isBlocking: false,
+					parentSubmissionId: 1,
+					parentSubmissionPrivate: false,
+					parentSubmissionDeletedUtc: null,
+					parentSubmissionStateMod: "VISIBLE",
+				},
+				baseViewer,
+			),
+		).toBe(false);
+
+		expect(
+			shouldIncludeCommentInFeed(
+				{
+					authorId: 3,
+					authorName: "shadow",
+					distinguishLevel: 0,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					stateUserDeletedUtc: null,
+					authorShadowBanned: "AutoJanny",
+					isBlocking: false,
+					parentSubmissionId: 1,
+					parentSubmissionPrivate: false,
+					parentSubmissionDeletedUtc: null,
+					parentSubmissionStateMod: "VISIBLE",
+				},
+				moderatorViewer,
+			),
+		).toBe(true);
 	});
 });

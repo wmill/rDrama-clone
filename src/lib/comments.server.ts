@@ -12,8 +12,8 @@ import {
 
 import { db } from "@/db";
 import {
-	comments,
 	commentSaveRelationship,
+	comments,
 	commentVotes,
 	submissions,
 	userBlocks,
@@ -25,10 +25,9 @@ import {
 	getCommentVisibility,
 	shouldIncludeCommentInFeed,
 } from "@/lib/comment-visibility.server";
-import {
-	authorDeleteComment,
-} from "@/lib/lifecycle.server";
+import { authorDeleteComment } from "@/lib/lifecycle.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
+import { createNotificationsForComment } from "@/lib/notifications.server";
 import type { VoteType } from "@/lib/votes.server";
 import type { CommentFeedSortType, TimeFilter } from "./constants";
 
@@ -979,6 +978,8 @@ export async function createComment(data: {
 		await tx.execute(
 			sql`UPDATE submissions SET comment_count = comment_count + 1 WHERE id = ${data.parentSubmissionId}`,
 		);
+
+		await createNotificationsForComment(createdComment.id, tx);
 
 		return createdComment;
 	});

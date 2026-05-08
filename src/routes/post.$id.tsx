@@ -26,6 +26,7 @@ import {
 import {
 	deleteSubmissionFn,
 	saveSubmissionFn,
+	setSubmissionSubscriptionFn,
 	type UpdateSubmissionInput,
 	updateSubmissionFn,
 } from "@/lib/post-actions.server";
@@ -179,6 +180,8 @@ function PostContent({
 		post.visibilityMessage,
 	);
 	const [isSavingPost, setIsSavingPost] = useState(false);
+	const [isSubscribed, setIsSubscribed] = useState(post.isSubscribed);
+	const [isTogglingSubscription, setIsTogglingSubscription] = useState(false);
 	const [isRemoving, setIsRemoving] = useState(false);
 	const [isTogglingSticky, setIsTogglingSticky] = useState(false);
 	const titleId = useId();
@@ -295,6 +298,31 @@ function PostContent({
 			setError(err instanceof Error ? err.message : "Failed to update post");
 		} finally {
 			setIsRemoving(false);
+		}
+	};
+
+	const handleToggleSubscription = async () => {
+		setIsTogglingSubscription(true);
+		setError(null);
+
+		try {
+			const nextSubscribed = !isSubscribed;
+			const result = await setSubmissionSubscriptionFn({
+				data: { id: post.id, subscribed: nextSubscribed },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setIsSubscribed(nextSubscribed);
+			await router.invalidate();
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "Failed to update subscription",
+			);
+		} finally {
+			setIsTogglingSubscription(false);
 		}
 	};
 
@@ -616,6 +644,21 @@ function PostContent({
 					</button>
 				)}
 
+				{currentUserId && (
+					<button
+						type="button"
+						disabled={isTogglingSubscription}
+						onClick={handleToggleSubscription}
+						className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						{isTogglingSubscription
+							? "Updating..."
+							: isSubscribed
+								? "Unsubscribe"
+								: "Subscribe"}
+					</button>
+				)}
+
 				{currentUserId && !isLifecycleHidden && (
 					<button
 						type="button"
@@ -652,11 +695,7 @@ function PostContent({
 							onClick={handleToggleRemoved}
 							className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
 						>
-							{isRemoving
-								? "Updating..."
-								: isRemoved
-									? "Unremove"
-									: "Remove"}
+							{isRemoving ? "Updating..." : isRemoved ? "Unremove" : "Remove"}
 						</button>
 						<button
 							type="button"

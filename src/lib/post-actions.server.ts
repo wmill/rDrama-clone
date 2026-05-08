@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { setSubmissionSavedState } from "@/lib/lifecycle.server";
+import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { deleteSubmission, updateSubmission } from "@/lib/submissions.server";
 
@@ -88,6 +89,23 @@ export const saveSubmissionFn = createServerFn({ method: "POST" })
 			submissionId: data.id,
 			userId: user.id,
 			saved: data.saved,
+		});
+
+		return { success: true as const };
+	});
+
+export const setSubmissionSubscriptionFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; subscribed: boolean }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user) {
+			return { success: false as const, error: "Not logged in" };
+		}
+
+		await setSubmissionSubscriptionState({
+			userId: user.id,
+			submissionId: data.id,
+			subscribed: data.subscribed,
 		});
 
 		return { success: true as const };

@@ -1,9 +1,9 @@
 import type MarkdownIt from "markdown-it";
 
+import { USER_MENTION_REGEX } from "@/lib/user-mentions";
+
 function markdownItUserMentions(md: MarkdownIt): void {
 	md.core.ruler.after("inline", "user_mentions", (state) => {
-		const mentionRegex = /(^|[^\w/])@([A-Za-z0-9_]{3,25})\b/g;
-
 		for (const blockToken of state.tokens) {
 			if (blockToken.type !== "inline" || !blockToken.children?.length) {
 				continue;
@@ -32,8 +32,8 @@ function markdownItUserMentions(md: MarkdownIt): void {
 
 				const source = child.content;
 				let lastIndex = 0;
-				mentionRegex.lastIndex = 0;
-				let match = mentionRegex.exec(source);
+				USER_MENTION_REGEX.lastIndex = 0;
+				let match = USER_MENTION_REGEX.exec(source);
 
 				while (match !== null) {
 					const matchIndex = match.index;
@@ -60,7 +60,7 @@ function markdownItUserMentions(md: MarkdownIt): void {
 					transformedChildren.push(linkClose);
 
 					lastIndex = matchIndex + fullMatch.length;
-					match = mentionRegex.exec(source);
+					match = USER_MENTION_REGEX.exec(source);
 				}
 
 				if (lastIndex === 0) {

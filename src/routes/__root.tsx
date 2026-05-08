@@ -6,14 +6,28 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { createServerFn } from "@tanstack/react-start";
 import Header from "../components/Header";
 import { Modals } from "../components/Modals";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { getUnreadNotificationCount } from "../lib/notifications.server";
+import { getCurrentUser } from "../lib/sessions.server";
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
 }
+
+const getRootDataFn = createServerFn({ method: "GET" }).handler(async () => {
+	const user = await getCurrentUser();
+
+	return {
+		user,
+		unreadNotificationCount: user
+			? await getUnreadNotificationCount(user.id)
+			: 0,
+	};
+});
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	head: () => ({
@@ -37,17 +51,20 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		],
 	}),
 
+	loader: async () => getRootDataFn(),
 	shellComponent: RootDocument,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+	const { user, unreadNotificationCount } = Route.useLoaderData();
+
 	return (
 		<html lang="en">
 			<head>
 				<HeadContent />
 			</head>
 			<body className="min-h-screen bg-slate-950">
-				<Header />
+				<Header user={user} unreadNotificationCount={unreadNotificationCount} />
 				{children}
 				<Modals />
 				<TanStackDevtools

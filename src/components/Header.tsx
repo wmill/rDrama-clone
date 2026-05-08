@@ -1,13 +1,18 @@
 import { Link } from "@tanstack/react-router";
-import { Home, Menu, Shield, X } from "lucide-react";
+import { Bell, Home, Menu, Shield, X } from "lucide-react";
 import { useState } from "react";
 
 import { AuthButton } from "@/components/auth-button";
-import { useAuth } from "@/hooks/use-auth";
+import type { SafeUser } from "@/lib/auth.server";
 
-export default function Header() {
+export default function Header({
+	user,
+	unreadNotificationCount,
+}: {
+	user: SafeUser | null;
+	unreadNotificationCount: number;
+}) {
 	const [isOpen, setIsOpen] = useState(false);
-	const { user } = useAuth();
 
 	return (
 		<>
@@ -65,6 +70,28 @@ export default function Header() {
 						<Home size={20} />
 						<span className="font-medium">Home</span>
 					</Link>
+
+					{user && (
+						<Link
+							to="/notifications"
+							onClick={() => setIsOpen(false)}
+							className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+							activeProps={{
+								className:
+									"flex items-center justify-between gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
+							}}
+						>
+							<div className="flex items-center gap-3">
+								<Bell size={20} />
+								<span className="font-medium">Notifications</span>
+							</div>
+							{unreadNotificationCount > 0 && (
+								<span className="min-w-6 rounded-full bg-rose-500 px-2 py-0.5 text-center text-xs font-semibold text-white">
+									{unreadNotificationCount}
+								</span>
+							)}
+						</Link>
+					)}
 
 					{user && user.adminLevel >= 2 && (
 						<Link

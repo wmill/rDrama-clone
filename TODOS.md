@@ -29,11 +29,11 @@ These are the main blockers to replacing `rDrama` for normal site use.
 
 ### Notifications
 
-- [ ] Create notifications for replies, mentions, and subscriptions.
-- [ ] Add unread count in shared navigation/header UI.
-- [ ] Add a notifications listing route.
-- [ ] Add mark-read / clear actions.
-- [ ] Add server tests for notification creation and unread-count behavior.
+- [x] Create notifications for replies, mentions, and subscriptions.
+- [x] Add unread count in shared navigation/header UI.
+- [x] Add a notifications listing route.
+- [x] Add mark-read / clear actions.
+- [x] Add server tests for notification creation and unread-count behavior.
 
 ### Search
 
@@ -78,7 +78,7 @@ Current admin/moderation support exists, but it is still a narrow subset of `rDr
 
 ## P3 — Lower-priority parity gaps
 
-- [ ] Notifications subpages and subscriptions
+- [ ] Add notification subpages/filters for replies, mentions, and subscriptions using the existing comment-backed notification rows.
 - [ ] Static/community pages: rules, support, API, badges, banned, formatting, admins, patrons, contact, sidebar, mod log, charts/stats
 - [ ] RSS/feed endpoints
 - [ ] Volunteer flows
