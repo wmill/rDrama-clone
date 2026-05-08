@@ -43,10 +43,10 @@ These are the main blockers to replacing `rDrama` for normal site use.
 
 ### Social actions
 
-- [ ] Add follow/unfollow actions and follower/following pages.
-- [ ] Add block/unblock actions backed by `userblocks`.
-- [ ] Apply block filtering consistently across feeds, threads, profiles, and notifications.
-- [ ] Add tests covering follow/block effects on visibility and counts.
+- [x] Add follow/unfollow actions and follower/following pages.
+- [x] Add block/unblock actions backed by `userblocks`.
+- [x] Apply block filtering consistently across feeds, threads, profiles, and notifications.
+- [x] Add tests covering follow/block effects on visibility and counts.
 
 ### Account security parity
 
@@ -89,7 +89,7 @@ Current admin/moderation support exists, but it is still a narrow subset of `rDr
 
 ## Test plan
 
-Current baseline: `pnpm test --run` passes with 14 test files and 58 tests, but coverage is still concentrated in utilities and component behavior.
+Current baseline: `pnpm test --run` passes with 24 test files and 104 tests, but coverage is still concentrated in utilities and component behavior.
 
 Priority additions:
 

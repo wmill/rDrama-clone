@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { userBlocks, users } from "@/db/schema";
+import { users } from "@/db/schema";
+import { getSocialViewerContext } from "@/lib/social.server";
 
 export type CommentViewerContext = {
 	viewerId: number | null;
@@ -40,7 +41,7 @@ export async function getCommentViewerContext(
 		};
 	}
 
-	const [viewerRows, blockRows] = await Promise.all([
+	const [viewerRows, socialViewer] = await Promise.all([
 		db
 			.select({
 				id: users.id,
@@ -50,14 +51,9 @@ export async function getCommentViewerContext(
 			.from(users)
 			.where(eq(users.id, userId))
 			.limit(1),
-		db
-			.select({ targetId: userBlocks.targetId })
-			.from(userBlocks)
-			.where(eq(userBlocks.userId, userId)),
+		getSocialViewerContext(userId),
 	]);
 	const viewer = viewerRows[0];
-
-	const blockedAuthorIds = new Set(blockRows.map((row) => row.targetId));
 
 	if (!viewer) {
 		return {
@@ -65,7 +61,7 @@ export async function getCommentViewerContext(
 			adminLevel: 0,
 			canModerate: false,
 			canSeeShadowbanned: false,
-			blockedAuthorIds,
+			blockedAuthorIds: socialViewer.blockedUserIds,
 		};
 	}
 
@@ -74,7 +70,7 @@ export async function getCommentViewerContext(
 		adminLevel: viewer.adminLevel,
 		canModerate: viewer.adminLevel >= 2,
 		canSeeShadowbanned: viewer.adminLevel >= 2 || viewer.shadowBanned !== null,
-		blockedAuthorIds,
+		blockedAuthorIds: socialViewer.blockedUserIds,
 	};
 }
 

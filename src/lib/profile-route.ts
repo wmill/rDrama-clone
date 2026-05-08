@@ -19,6 +19,10 @@ export type ProfilePostsSearch = {
 	page: number;
 };
 
+export type ProfileRelationshipSearch = {
+	page: number;
+};
+
 export const DEFAULT_COMMENTS_PROFILE_SEARCH: ProfileCommentsSearch = {
 	sort: "new",
 	t: "all",
@@ -28,6 +32,10 @@ export const DEFAULT_COMMENTS_PROFILE_SEARCH: ProfileCommentsSearch = {
 export const DEFAULT_POSTS_PROFILE_SEARCH: ProfilePostsSearch = {
 	sort: "hot",
 	t: "all",
+	page: 1,
+};
+
+export const DEFAULT_RELATIONSHIP_PROFILE_SEARCH: ProfileRelationshipSearch = {
 	page: 1,
 };
 
@@ -83,6 +91,14 @@ export function parsePostsProfileSearch(
 	};
 }
 
+export function parseRelationshipProfileSearch(
+	search: Record<string, unknown>,
+): ProfileRelationshipSearch {
+	return {
+		page: parseProfilePage(search.page),
+	};
+}
+
 function buildSearchParams(search: {
 	sort: string;
 	t: TimeFilter;
@@ -121,4 +137,18 @@ export function buildProfileSavedPostsHref(
 	search: ProfilePostsSearch,
 ): string {
 	return `/u/${encodeURIComponent(username)}/saved/posts?${buildSearchParams(search).toString()}`;
+}
+
+export function buildProfileFollowersHref(
+	username: string,
+	search: ProfileRelationshipSearch,
+): string {
+	return `/u/${encodeURIComponent(username)}/followers?page=${search.page}`;
+}
+
+export function buildProfileFollowingHref(
+	username: string,
+	search: ProfileRelationshipSearch,
+): string {
+	return `/u/${encodeURIComponent(username)}/following?page=${search.page}`;
 }

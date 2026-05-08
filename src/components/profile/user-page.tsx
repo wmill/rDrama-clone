@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { CalendarDays, ShieldAlert, ShieldCheck, Star } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,9 @@ import type {
 import {
 	DEFAULT_COMMENTS_PROFILE_SEARCH,
 	DEFAULT_POSTS_PROFILE_SEARCH,
+	DEFAULT_RELATIONSHIP_PROFILE_SEARCH,
 } from "@/lib/profile-route";
+import { setBlockStateFn, setFollowStateFn } from "@/lib/social-actions.server";
 import type { ProfilePageData } from "@/lib/users.server";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -71,6 +73,7 @@ export function UserPage({
 	onTimeChange: (value: TimeFilter) => Promise<void>;
 	onPageChange: (page: number) => Promise<void>;
 }) {
+	const router = useRouter();
 	const user = data.profileUser;
 	const avatarHref = user.highRes || user.profileUrl || undefined;
 	const sortOptions =
@@ -82,6 +85,76 @@ export function UserPage({
 	const canSeeSavedTabs = data.isOwner || (data.viewer?.adminLevel ?? 0) >= 2;
 	const isSavedTab =
 		data.tab === "saved-comments" || data.tab === "saved-posts";
+	const [isFollowing, setIsFollowing] = useState(data.isFollowing);
+	const [isBlocking, setIsBlocking] = useState(data.isBlocking);
+	const [relationshipError, setRelationshipError] = useState<string | null>(
+		null,
+	);
+	const [isFollowPending, setIsFollowPending] = useState(false);
+	const [isBlockPending, setIsBlockPending] = useState(false);
+
+	useEffect(() => {
+		setIsFollowing(data.isFollowing);
+		setIsBlocking(data.isBlocking);
+	}, [data.isFollowing, data.isBlocking]);
+
+	const handleToggleFollow = async () => {
+		setIsFollowPending(true);
+		setRelationshipError(null);
+
+		try {
+			const nextFollowing = !isFollowing;
+			const result = await setFollowStateFn({
+				data: {
+					targetUserId: user.id,
+					following: nextFollowing,
+				},
+			});
+			if (!result.success) {
+				setRelationshipError(result.error);
+				return;
+			}
+
+			setIsFollowing(nextFollowing);
+			await router.invalidate();
+		} catch (error) {
+			setRelationshipError(
+				error instanceof Error
+					? error.message
+					: "Failed to update follow state",
+			);
+		} finally {
+			setIsFollowPending(false);
+		}
+	};
+
+	const handleToggleBlock = async () => {
+		setIsBlockPending(true);
+		setRelationshipError(null);
+
+		try {
+			const nextBlocking = !isBlocking;
+			const result = await setBlockStateFn({
+				data: {
+					targetUserId: user.id,
+					blocked: nextBlocking,
+				},
+			});
+			if (!result.success) {
+				setRelationshipError(result.error);
+				return;
+			}
+
+			setIsBlocking(nextBlocking);
+			await router.invalidate();
+		} catch (error) {
+			setRelationshipError(
+				error instanceof Error ? error.message : "Failed to update block state",
+			);
+		} finally {
+			setIsBlockPending(false);
+		}
+	};
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
@@ -164,21 +237,72 @@ export function UserPage({
 									</span>
 								</div>
 								<div className="mt-2 flex gap-4">
-									<span>
+									<Link
+										to="/u/$username/followers"
+										params={{ username: user.username }}
+										search={DEFAULT_RELATIONSHIP_PROFILE_SEARCH}
+										className="hover:text-cyan-300"
+									>
 										<strong className="text-white">
 											{user.storedSubscriberCount.toLocaleString()}
 										</strong>{" "}
 										followers
-									</span>
-									<span>
+									</Link>
+									<Link
+										to="/u/$username/following"
+										params={{ username: user.username }}
+										search={DEFAULT_RELATIONSHIP_PROFILE_SEARCH}
+										className="hover:text-cyan-300"
+									>
 										<strong className="text-white">
 											{data.followingCount.toLocaleString()}
 										</strong>{" "}
 										following
-									</span>
+									</Link>
 								</div>
+								{data.viewer && !data.isOwner && (
+									<div className="mt-3 flex flex-wrap gap-2">
+										<Button
+											type="button"
+											size="sm"
+											disabled={isFollowPending}
+											onClick={handleToggleFollow}
+											className="bg-cyan-500 hover:bg-cyan-600"
+										>
+											{isFollowPending
+												? "Updating..."
+												: isFollowing
+													? "Unfollow"
+													: "Follow"}
+										</Button>
+										<Button
+											type="button"
+											size="sm"
+											variant="outline"
+											disabled={isBlockPending}
+											onClick={handleToggleBlock}
+											className={
+												isBlocking
+													? "border-emerald-600 text-emerald-300 hover:bg-emerald-950/50"
+													: "border-rose-700 text-rose-300 hover:bg-rose-950/50"
+											}
+										>
+											{isBlockPending
+												? "Updating..."
+												: isBlocking
+													? "Unblock"
+													: "Block"}
+										</Button>
+									</div>
+								)}
 							</div>
 						</div>
+
+						{relationshipError && (
+							<div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+								{relationshipError}
+							</div>
+						)}
 
 						{user.isBanned > 0 && (
 							<div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
@@ -280,6 +404,11 @@ export function UserPage({
 							{isSavedTab
 								? "Saved content is private. Only the account owner or admins can view it."
 								: "This profile is private. Only the account owner or admins can view posts and comments."}
+						</div>
+					) : isBlocking ? (
+						<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-6 text-center text-amber-100">
+							You are blocking @{user.username}. Unblock this user to view their
+							profile content.
 						</div>
 					) : (
 						<>

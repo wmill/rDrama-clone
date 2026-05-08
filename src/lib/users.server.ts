@@ -2,6 +2,7 @@ import { and, desc, eq, gte, isNull, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+	commentSaveRelationship,
 	comments,
 	commentVotes,
 	follows,
@@ -9,7 +10,6 @@ import {
 	submissions,
 	userBlocks,
 	users,
-	commentSaveRelationship,
 } from "@/db/schema";
 import {
 	getCommentViewerContext,
@@ -21,6 +21,7 @@ import type {
 	TimeFilter,
 } from "@/lib/constants";
 import { renderCommentMarkdown, renderPostTitleHtml } from "@/lib/markdown";
+import { getUserRelationship } from "@/lib/social.server";
 import type { SafeUser } from "./auth.server";
 
 const PAGE_SIZE = 25;
@@ -66,6 +67,8 @@ export type ProfilePageData = {
 	page: number;
 	isOwner: boolean;
 	isPrivateRestricted: boolean;
+	isFollowing: boolean;
+	isBlocking: boolean;
 	comments: ProfileCommentItem[];
 	posts: ProfilePostItem[];
 	hasNextPage: boolean;
@@ -360,6 +363,7 @@ async function getSavedProfilePosts(options: {
 	sort: SortType;
 	t: TimeFilter;
 	page: number;
+	viewerId?: number;
 }): Promise<{ rows: ProfilePostItem[]; hasNextPage: boolean }> {
 	const limit = PAGE_SIZE;
 	const offset = (options.page - 1) * limit;
@@ -385,18 +389,31 @@ async function getSavedProfilePosts(options: {
 			upvotes: submissions.upvotes,
 			downvotes: submissions.downvotes,
 			commentCount: submissions.commentCount,
+			blockedTargetId: userBlocks.targetId,
 		})
 		.from(saveRelationship)
 		.innerJoin(submissions, eq(saveRelationship.submissionId, submissions.id))
+		.leftJoin(
+			userBlocks,
+			options.viewerId
+				? and(
+						eq(userBlocks.userId, options.viewerId),
+						eq(userBlocks.targetId, submissions.authorId),
+					)
+				: sql`false`,
+		)
 		.where(and(...conditions))
 		.orderBy(...buildPostOrderBy(options.sort))
 		.limit(limit + 1)
 		.offset(offset);
 
-	const rows = results.slice(0, limit).map((row) => ({
-		...row,
-		score: row.upvotes - row.downvotes,
-	}));
+	const rows = results
+		.filter((row) => row.blockedTargetId === null)
+		.slice(0, limit)
+		.map((row) => ({
+			...row,
+			score: row.upvotes - row.downvotes,
+		}));
 
 	return { rows, hasNextPage: results.length > limit };
 }
@@ -634,12 +651,18 @@ export async function getProfilePageData(options: {
 		? !isOwner && !isAdmin
 		: profileUser.isPrivate && !isOwner && !isAdmin;
 	const followingCount = await getFollowingCount(profileUser.id);
+	const relationship = await getUserRelationship(
+		options.viewer?.id,
+		profileUser.id,
+	);
+	const isBlocking = relationship.isBlocking;
+	const isFollowing = relationship.isFollowing;
 
 	let comments: ProfileCommentItem[] = [];
 	let posts: ProfilePostItem[] = [];
 	let hasNextPage = false;
 
-	if (!isPrivateRestricted) {
+	if (!isPrivateRestricted && !isBlocking) {
 		if (options.tab === "posts") {
 			const result = await getProfilePosts({
 				authorId: profileUser.id,
@@ -655,6 +678,7 @@ export async function getProfilePageData(options: {
 				sort: options.sort as SortType,
 				t: options.t,
 				page: options.page,
+				viewerId: options.viewer?.id,
 			});
 			posts = result.rows;
 			hasNextPage = result.hasNextPage;
@@ -691,6 +715,8 @@ export async function getProfilePageData(options: {
 		page: options.page,
 		isOwner,
 		isPrivateRestricted,
+		isFollowing,
+		isBlocking,
 		comments,
 		posts,
 		hasNextPage,

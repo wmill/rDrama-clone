@@ -32,6 +32,8 @@ import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-
 import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
+import { Route as UUsernameFollowingRouteImport } from './routes/u.$username_.following'
+import { Route as UUsernameFollowersRouteImport } from './routes/u.$username_.followers'
 import { Route as AtusernameSavedPostsRouteImport } from './routes/@$username_.saved.posts'
 import { Route as AtusernameSavedCommentsRouteImport } from './routes/@$username_.saved.comments'
 import { Route as UUsernameSavedPostsRouteImport } from './routes/u.$username_.saved.posts'
@@ -152,6 +154,16 @@ const UUsernamePostsRoute = UUsernamePostsRouteImport.update({
   path: '/u/$username/posts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UUsernameFollowingRoute = UUsernameFollowingRouteImport.update({
+  id: '/u/$username_/following',
+  path: '/u/$username/following',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UUsernameFollowersRoute = UUsernameFollowersRouteImport.update({
+  id: '/u/$username_/followers',
+  path: '/u/$username/followers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AtusernameSavedPostsRoute = AtusernameSavedPostsRouteImport.update({
   id: '/@$username_/saved/posts',
   path: '/@$username/saved/posts',
@@ -198,6 +210,8 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/@$username/saved/comments': typeof AtusernameSavedCommentsRoute
   '/@$username/saved/posts': typeof AtusernameSavedPostsRoute
+  '/u/$username/followers': typeof UUsernameFollowersRoute
+  '/u/$username/following': typeof UUsernameFollowingRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
   '/u/$username/saved/comments': typeof UUsernameSavedCommentsRoute
   '/u/$username/saved/posts': typeof UUsernameSavedPostsRoute
@@ -226,6 +240,8 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/@$username/saved/comments': typeof AtusernameSavedCommentsRoute
   '/@$username/saved/posts': typeof AtusernameSavedPostsRoute
+  '/u/$username/followers': typeof UUsernameFollowersRoute
+  '/u/$username/following': typeof UUsernameFollowingRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
   '/u/$username/saved/comments': typeof UUsernameSavedCommentsRoute
   '/u/$username/saved/posts': typeof UUsernameSavedPostsRoute
@@ -256,6 +272,8 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/@$username_/saved/comments': typeof AtusernameSavedCommentsRoute
   '/@$username_/saved/posts': typeof AtusernameSavedPostsRoute
+  '/u/$username_/followers': typeof UUsernameFollowersRoute
+  '/u/$username_/following': typeof UUsernameFollowingRoute
   '/u/$username_/posts': typeof UUsernamePostsRoute
   '/u/$username_/saved/comments': typeof UUsernameSavedCommentsRoute
   '/u/$username_/saved/posts': typeof UUsernameSavedPostsRoute
@@ -287,6 +305,8 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/@$username/saved/comments'
     | '/@$username/saved/posts'
+    | '/u/$username/followers'
+    | '/u/$username/following'
     | '/u/$username/posts'
     | '/u/$username/saved/comments'
     | '/u/$username/saved/posts'
@@ -315,6 +335,8 @@ export interface FileRouteTypes {
     | '/admin'
     | '/@$username/saved/comments'
     | '/@$username/saved/posts'
+    | '/u/$username/followers'
+    | '/u/$username/following'
     | '/u/$username/posts'
     | '/u/$username/saved/comments'
     | '/u/$username/saved/posts'
@@ -344,6 +366,8 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/@$username_/saved/comments'
     | '/@$username_/saved/posts'
+    | '/u/$username_/followers'
+    | '/u/$username_/following'
     | '/u/$username_/posts'
     | '/u/$username_/saved/comments'
     | '/u/$username_/saved/posts'
@@ -370,6 +394,8 @@ export interface RootRouteChildren {
   UMeRoute: typeof UMeRoute
   AtusernameSavedCommentsRoute: typeof AtusernameSavedCommentsRoute
   AtusernameSavedPostsRoute: typeof AtusernameSavedPostsRoute
+  UUsernameFollowersRoute: typeof UUsernameFollowersRoute
+  UUsernameFollowingRoute: typeof UUsernameFollowingRoute
   UUsernamePostsRoute: typeof UUsernamePostsRoute
   UUsernameSavedCommentsRoute: typeof UUsernameSavedCommentsRoute
   UUsernameSavedPostsRoute: typeof UUsernameSavedPostsRoute
@@ -538,6 +564,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UUsernamePostsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/u/$username_/following': {
+      id: '/u/$username_/following'
+      path: '/u/$username/following'
+      fullPath: '/u/$username/following'
+      preLoaderRoute: typeof UUsernameFollowingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$username_/followers': {
+      id: '/u/$username_/followers'
+      path: '/u/$username/followers'
+      fullPath: '/u/$username/followers'
+      preLoaderRoute: typeof UUsernameFollowersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/@$username_/saved/posts': {
       id: '/@$username_/saved/posts'
       path: '/@$username/saved/posts'
@@ -606,6 +646,8 @@ const rootRouteChildren: RootRouteChildren = {
   UMeRoute: UMeRoute,
   AtusernameSavedCommentsRoute: AtusernameSavedCommentsRoute,
   AtusernameSavedPostsRoute: AtusernameSavedPostsRoute,
+  UUsernameFollowersRoute: UUsernameFollowersRoute,
+  UUsernameFollowingRoute: UUsernameFollowingRoute,
   UUsernamePostsRoute: UUsernamePostsRoute,
   UUsernameSavedCommentsRoute: UUsernameSavedCommentsRoute,
   UUsernameSavedPostsRoute: UUsernameSavedPostsRoute,

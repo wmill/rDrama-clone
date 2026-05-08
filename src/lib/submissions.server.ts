@@ -5,6 +5,7 @@ import {
 	saveRelationship,
 	submissions,
 	subscriptions,
+	userBlocks,
 	users,
 	votes,
 } from "@/db/schema";
@@ -42,6 +43,7 @@ export type SubmissionSummary = {
 	isRemoved: boolean;
 	visibilityMessage: string | null;
 	isSaved: boolean;
+	isBlockedAuthor: boolean;
 	userVote: VoteType;
 };
 
@@ -52,6 +54,7 @@ export type SubmissionDetail = SubmissionSummary & {
 	distinguishLevel: number;
 	userVote: VoteType;
 	isSubscribed: boolean;
+	isBlockedAuthor: boolean;
 };
 
 type SubmissionRow = {
@@ -81,23 +84,44 @@ type SubmissionRow = {
 	userVoteType: number | null;
 	savedSubmissionId: number | null;
 	subscribedSubmissionId?: number | null;
+	blockedTargetId?: number | null;
 };
 
-function mapSubmissionRow<T extends SubmissionRow>(row: T) {
+function mapSubmissionRow<T extends SubmissionRow>(
+	row: T,
+	options?: { includeBlockedPlaceholder?: boolean },
+) {
 	const isDeleted = row.stateUserDeletedUtc !== null;
 	const isRemoved = row.stateMod !== "VISIBLE";
+	const isBlockedAuthor = row.blockedTargetId !== null;
 	const visibilityMessage = isDeleted
 		? DELETED_BY_AUTHOR_MESSAGE
 		: isRemoved
 			? REMOVED_BY_MODERATOR_MESSAGE
-			: null;
+			: options?.includeBlockedPlaceholder && isBlockedAuthor
+				? `You are blocking @${row.authorName}`
+				: null;
+	const blockedTitle = `[blocked post by @${row.authorName}]`;
 
 	return {
 		...row,
+		title:
+			options?.includeBlockedPlaceholder && isBlockedAuthor
+				? blockedTitle
+				: row.title,
+		titleHtml:
+			options?.includeBlockedPlaceholder && isBlockedAuthor
+				? blockedTitle
+				: row.titleHtml,
+		url: options?.includeBlockedPlaceholder && isBlockedAuthor ? null : row.url,
 		body: visibilityMessage ? `[${visibilityMessage.toLowerCase()}]` : row.body,
 		bodyHtml: visibilityMessage
 			? `<p>[${visibilityMessage.toLowerCase()}]</p>`
 			: row.bodyHtml,
+		embedUrl:
+			options?.includeBlockedPlaceholder && isBlockedAuthor
+				? null
+				: row.embedUrl,
 		score: row.upvotes - row.downvotes,
 		userVote: (row.userVoteType as VoteType) ?? 0,
 		isStickied: row.stickied !== null,
@@ -106,6 +130,7 @@ function mapSubmissionRow<T extends SubmissionRow>(row: T) {
 		visibilityMessage,
 		isSaved: row.savedSubmissionId !== null,
 		isSubscribed: row.subscribedSubmissionId !== null,
+		isBlockedAuthor,
 	};
 }
 
@@ -256,6 +281,7 @@ export async function getSubmissions(options: {
 			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
 			stateMod: submissions.stateMod,
 			savedSubmissionId: saveRelationship.submissionId,
+			blockedTargetId: userBlocks.targetId,
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
@@ -274,12 +300,23 @@ export async function getSubmissions(options: {
 					)
 				: sql`false`,
 		)
+		.leftJoin(
+			userBlocks,
+			userId
+				? and(
+						eq(userBlocks.userId, userId),
+						eq(userBlocks.targetId, submissions.authorId),
+					)
+				: sql`false`,
+		)
 		.where(and(...conditions))
 		.orderBy(...orderBy)
 		.limit(limit)
 		.offset(offset);
 
-	return results.map((row) => mapSubmissionRow(row));
+	return results
+		.filter((row) => row.blockedTargetId === null)
+		.map((row) => mapSubmissionRow(row));
 }
 
 export async function getSubmissionById(
@@ -314,6 +351,7 @@ export async function getSubmissionById(
 			userVoteType: votes.voteType,
 			savedSubmissionId: saveRelationship.submissionId,
 			subscribedSubmissionId: subscriptions.submissionId,
+			blockedTargetId: userBlocks.targetId,
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
@@ -341,12 +379,21 @@ export async function getSubmissionById(
 					)
 				: sql`false`,
 		)
+		.leftJoin(
+			userBlocks,
+			userId
+				? and(
+						eq(userBlocks.userId, userId),
+						eq(userBlocks.targetId, submissions.authorId),
+					)
+				: sql`false`,
+		)
 		.where(eq(submissions.id, id))
 		.limit(1);
 
 	if (!result) return null;
 
-	const mapped = mapSubmissionRow(result);
+	const mapped = mapSubmissionRow(result, { includeBlockedPlaceholder: true });
 	return mapped;
 }
 
