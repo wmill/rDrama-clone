@@ -988,6 +988,11 @@ export async function createComment(data: {
 			sql`UPDATE submissions SET comment_count = comment_count + 1 WHERE id = ${data.parentSubmissionId}`,
 		);
 
+		await tx
+			.update(users)
+			.set({ commentCount: sql`${users.commentCount} + 1` })
+			.where(eq(users.id, data.authorId));
+
 		await createNotificationsForComment(createdComment.id, tx);
 
 		return createdComment;

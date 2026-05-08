@@ -476,6 +476,11 @@ export async function createSubmission(data: {
 			tx,
 		});
 
+		await tx
+			.update(users)
+			.set({ postCount: sql`${users.postCount} + 1` })
+			.where(eq(users.id, data.authorId));
+
 		return createdSubmission;
 	});
 
