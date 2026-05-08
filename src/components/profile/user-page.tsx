@@ -11,6 +11,7 @@ import {
 	shadowbanUserFn,
 	unbanUserFn,
 	unshadowbanUserFn,
+	updateUserModerationProfileFn,
 } from "@/lib/admin-actions.server";
 import type {
 	CommentFeedSortType,
@@ -195,7 +196,15 @@ export function UserPage({
 										{user.verified && (
 											<span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-300">
 												<ShieldCheck className="h-3 w-3" />
-												{user.verified}
+												<span
+													style={
+														user.verifiedColor
+															? { color: `#${user.verifiedColor}` }
+															: undefined
+													}
+												>
+													{user.verified}
+												</span>
 											</span>
 										)}
 										{user.adminLevel > 0 && (
@@ -339,6 +348,9 @@ export function UserPage({
 						userId={user.id}
 						initialIsBanned={user.isBanned}
 						initialShadowBanned={user.shadowBanned}
+						initialVerified={user.verified}
+						initialVerifiedColor={user.verifiedColor}
+						initialCustomTitlePlain={user.customTitlePlain}
 						notes={adminDetails.notes}
 					/>
 				)}
@@ -561,17 +573,30 @@ function AdminControls({
 	userId,
 	initialIsBanned,
 	initialShadowBanned,
+	initialVerified,
+	initialVerifiedColor,
+	initialCustomTitlePlain,
 	notes: initialNotes,
 }: {
 	userId: number;
 	initialIsBanned: number;
 	initialShadowBanned: string | null;
+	initialVerified: string | null;
+	initialVerifiedColor: string | null;
+	initialCustomTitlePlain: string | null;
 	notes: UserAdminDetails["notes"];
 }) {
 	const [isBanned, setIsBanned] = useState(initialIsBanned > 0);
 	const [isShadowBanned, setIsShadowBanned] = useState(!!initialShadowBanned);
 	const [showBanForm, setShowBanForm] = useState(false);
 	const [banReason, setBanReason] = useState("");
+	const [verified, setVerified] = useState(initialVerified ?? "");
+	const [verifiedColor, setVerifiedColor] = useState(
+		initialVerifiedColor ?? "",
+	);
+	const [customTitlePlain, setCustomTitlePlain] = useState(
+		initialCustomTitlePlain ?? "",
+	);
 	const [notes, setNotes] = useState(initialNotes);
 	const [noteText, setNoteText] = useState("");
 	const [noteTag, setNoteTag] = useState<string>("Warning");
@@ -660,6 +685,32 @@ function AdminControls({
 			} else {
 				setError(res.error);
 			}
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	const handleSavePresentation = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await updateUserModerationProfileFn({
+				data: {
+					userId,
+					verified,
+					verifiedColor,
+					customTitlePlain,
+				},
+			});
+			if (!res.success) {
+				setError(res.error);
+				return;
+			}
+
+			setVerified(res.verified ?? "");
+			setVerifiedColor(res.verifiedColor ?? "");
+			setCustomTitlePlain(res.customTitlePlain ?? "");
 		} finally {
 			setIsPending(false);
 		}
@@ -756,6 +807,45 @@ function AdminControls({
 					</Button>
 				</form>
 			)}
+
+			<div className="mb-4 border-t border-slate-700/50 pt-4">
+				<h3 className="mb-3 text-sm font-semibold text-slate-300">
+					Presentation
+				</h3>
+				<form onSubmit={handleSavePresentation} className="space-y-3">
+					<div className="grid gap-3 md:grid-cols-3">
+						<input
+							value={verified}
+							onChange={(e) => setVerified(e.target.value)}
+							placeholder="Verified label"
+							maxLength={20}
+							className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+						/>
+						<input
+							value={verifiedColor}
+							onChange={(e) => setVerifiedColor(e.target.value)}
+							placeholder="Verified color (hex)"
+							maxLength={7}
+							className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+						/>
+						<input
+							value={customTitlePlain}
+							onChange={(e) => setCustomTitlePlain(e.target.value)}
+							placeholder="Custom title"
+							maxLength={100}
+							className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+						/>
+					</div>
+					<Button
+						type="submit"
+						disabled={isPending}
+						size="sm"
+						className="bg-cyan-500 hover:bg-cyan-600"
+					>
+						Save Presentation
+					</Button>
+				</form>
+			</div>
 
 			<div className="border-t border-slate-700/50 pt-4">
 				<h3 className="mb-3 text-sm font-semibold text-slate-300">Add Note</h3>

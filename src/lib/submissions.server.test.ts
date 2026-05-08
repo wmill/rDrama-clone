@@ -68,6 +68,7 @@ describe("submissions.server", () => {
 					userVoteType: null,
 					stateUserDeletedUtc: null,
 					stateMod: "VISIBLE",
+					stateModSetBy: null,
 					savedSubmissionId: null,
 					blockedTargetId: null,
 				},
@@ -92,6 +93,7 @@ describe("submissions.server", () => {
 					userVoteType: null,
 					stateUserDeletedUtc: null,
 					stateMod: "VISIBLE",
+					stateModSetBy: null,
 					savedSubmissionId: null,
 					blockedTargetId: 3,
 				},
@@ -131,6 +133,7 @@ describe("submissions.server", () => {
 					distinguishLevel: 0,
 					stateUserDeletedUtc: null,
 					stateMod: "VISIBLE",
+					stateModSetBy: null,
 					userVoteType: null,
 					savedSubmissionId: null,
 					subscribedSubmissionId: null,
@@ -146,5 +149,51 @@ describe("submissions.server", () => {
 		expect(result?.visibilityMessage).toBe("You are blocking @blocked");
 		expect(result?.title).toContain("blocked post");
 		expect(result?.url).toBeNull();
+	});
+
+	it("shows filtered placeholders to normal viewers but not moderators", async () => {
+		const filteredRow = {
+			id: 8,
+			title: "Filtered title",
+			titleHtml: "Filtered title",
+			createdUtc: 1,
+			authorId: 4,
+			authorName: "filtered",
+			url: null,
+			body: "body",
+			bodyHtml: "<p>body</p>",
+			upvotes: 1,
+			downvotes: 0,
+			commentCount: 0,
+			thumbUrl: null,
+			flair: null,
+			isPinned: false,
+			isNsfw: false,
+			stickied: null,
+			embedUrl: null,
+			editedUtc: 0,
+			views: 0,
+			distinguishLevel: 0,
+			stateUserDeletedUtc: null,
+			stateMod: "FILTERED",
+			stateModSetBy: "mod",
+			userVoteType: null,
+			savedSubmissionId: null,
+			subscribedSubmissionId: null,
+			blockedTargetId: null,
+		};
+		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectLimitChain([filteredRow]) as never)
+			.mockReturnValueOnce(createSelectLimitChain([filteredRow]) as never);
+
+		const viewerResult = await getSubmissionById(8, 9, false);
+		const moderatorResult = await getSubmissionById(8, 9, true);
+
+		expect(viewerResult?.isFiltered).toBe(true);
+		expect(viewerResult?.visibilityMessage).toBe("Filtered by moderator");
+		expect(viewerResult?.bodyHtml).toContain("filtered by moderator");
+		expect(moderatorResult?.isFiltered).toBe(true);
+		expect(moderatorResult?.visibilityMessage).toBeNull();
+		expect(moderatorResult?.bodyHtml).toBe("<p>body</p>");
 	});
 });

@@ -16,8 +16,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	distinguishSubmissionFn,
-	removeSubmissionFn,
+	setSubmissionModerationStateFn,
 	stickySubmissionFn,
+	updateSubmissionModerationDetailsFn,
 } from "@/lib/admin-actions.server";
 import {
 	type CommentSortType,
@@ -47,7 +48,7 @@ const getPostFn = createServerFn({ method: "GET" })
 		const userId = user?.id;
 
 		const [post, comments] = await Promise.all([
-			getSubmissionById(data.id, userId),
+			getSubmissionById(data.id, userId, (user?.adminLevel ?? 0) >= 2),
 			getCommentsBySubmissionFlat(data.id, userId),
 		]);
 		if (!post) return null;
@@ -174,25 +175,37 @@ function PostContent({
 	);
 	const [isDistinguishing, setIsDistinguishing] = useState(false);
 	const [isSaved, setIsSaved] = useState(post.isSaved);
-	const [isRemoved, setIsRemoved] = useState(post.isRemoved);
+	const [stateMod, setStateMod] = useState(post.stateMod);
 	const [isStickied, setIsStickied] = useState(post.isStickied);
 	const [visibilityMessage, setVisibilityMessage] = useState(
 		post.visibilityMessage,
 	);
+	const [modTitle, setModTitle] = useState(post.title);
+	const [modFlair, setModFlair] = useState(post.flair ?? "");
+	const [isEditingModerationDetails, setIsEditingModerationDetails] =
+		useState(false);
 	const [isSavingPost, setIsSavingPost] = useState(false);
 	const [isSubscribed, setIsSubscribed] = useState(post.isSubscribed);
 	const [isTogglingSubscription, setIsTogglingSubscription] = useState(false);
-	const [isRemoving, setIsRemoving] = useState(false);
+	const [isUpdatingModerationState, setIsUpdatingModerationState] =
+		useState(false);
 	const [isTogglingSticky, setIsTogglingSticky] = useState(false);
+	const [isSavingModerationDetails, setIsSavingModerationDetails] =
+		useState(false);
 	const titleId = useId();
 	const urlId = useId();
 	const bodyId = useId();
 	const nsfwId = useId();
+	const modTitleId = useId();
+	const modFlairId = useId();
 
 	const canDistinguish =
 		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
 	const canModerate = currentUserAdminLevel >= 2;
+	const isRemoved = stateMod === "REMOVED";
+	const isFiltered = stateMod === "FILTERED";
 	const isLifecycleHidden = post.isDeleted || isRemoved;
+	const currentVisibilityMessage = visibilityMessage;
 
 	const handleSave = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -271,33 +284,36 @@ function PostContent({
 		}
 	};
 
-	const handleToggleRemoved = async () => {
-		setIsRemoving(true);
+	const handleSetModerationState = async (
+		nextState: "VISIBLE" | "FILTERED" | "REMOVED",
+	) => {
+		setIsUpdatingModerationState(true);
 		setError(null);
 
 		try {
-			const nextRemoved = !isRemoved;
-			const result = await removeSubmissionFn({
-				data: { id: post.id, removed: nextRemoved },
+			const result = await setSubmissionModerationStateFn({
+				data: { id: post.id, state: nextState },
 			});
 			if (!result.success) {
 				setError(result.error);
 				return;
 			}
 
-			setIsRemoved(nextRemoved);
+			setStateMod(nextState);
 			setVisibilityMessage(
-				nextRemoved
+				nextState === "REMOVED"
 					? "Removed by moderator"
-					: post.isDeleted
-						? "Deleted by author"
-						: null,
+					: nextState === "FILTERED" && !canModerate
+						? "Filtered by moderator"
+						: post.isDeleted
+							? "Deleted by author"
+							: null,
 			);
 			await router.invalidate();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to update post");
 		} finally {
-			setIsRemoving(false);
+			setIsUpdatingModerationState(false);
 		}
 	};
 
@@ -390,6 +406,37 @@ function PostContent({
 		}
 	};
 
+	const handleSaveModerationDetails = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setError(null);
+		setIsSavingModerationDetails(true);
+
+		try {
+			const result = await updateSubmissionModerationDetailsFn({
+				data: {
+					id: post.id,
+					title: modTitle,
+					flair: modFlair,
+				},
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setIsEditingModerationDetails(false);
+			await router.invalidate();
+		} catch (err) {
+			setError(
+				err instanceof Error
+					? err.message
+					: "Failed to update moderation details",
+			);
+		} finally {
+			setIsSavingModerationDetails(false);
+		}
+	};
+
 	return (
 		<article className="rounded-xl border border-slate-800 bg-slate-900/80 shadow-xl">
 			{/* Header with metadata */}
@@ -421,6 +468,16 @@ function PostContent({
 							{post.flair}
 						</span>
 					)}
+					{isFiltered && (
+						<span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-200">
+							Filtered
+						</span>
+					)}
+					{isRemoved && (
+						<span className="rounded bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-300">
+							Removed
+						</span>
+					)}
 					{distinguishLevel > 0 && (
 						<span className="rounded bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
 							MOD
@@ -450,9 +507,9 @@ function PostContent({
 
 				{/* Content */}
 				<div className="flex-1 p-6">
-					{visibilityMessage && (
+					{currentVisibilityMessage && (
 						<div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
-							{visibilityMessage}
+							{currentVisibilityMessage}
 						</div>
 					)}
 
@@ -570,6 +627,63 @@ function PostContent({
 						</form>
 					) : (
 						<>
+							{canModerate && isEditingModerationDetails && (
+								<form
+									onSubmit={handleSaveModerationDetails}
+									className="mb-6 rounded-lg border border-slate-800 bg-slate-950/60 p-4"
+								>
+									<div className="grid gap-4 md:grid-cols-2">
+										<div className="space-y-2">
+											<Label htmlFor={modTitleId} className="text-slate-300">
+												Moderator title
+											</Label>
+											<Input
+												id={modTitleId}
+												value={modTitle}
+												onChange={(e) => setModTitle(e.target.value)}
+												maxLength={500}
+												className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+											/>
+										</div>
+										<div className="space-y-2">
+											<Label htmlFor={modFlairId} className="text-slate-300">
+												Moderator flair
+											</Label>
+											<Input
+												id={modFlairId}
+												value={modFlair}
+												onChange={(e) => setModFlair(e.target.value)}
+												placeholder="Leave blank to clear"
+												maxLength={350}
+												className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+											/>
+										</div>
+									</div>
+									<div className="mt-4 flex gap-3">
+										<Button
+											type="submit"
+											disabled={isSavingModerationDetails}
+											className="bg-cyan-500 hover:bg-cyan-600"
+										>
+											{isSavingModerationDetails
+												? "Saving..."
+												: "Save mod edits"}
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
+											onClick={() => {
+												setModTitle(post.title);
+												setModFlair(post.flair ?? "");
+												setIsEditingModerationDetails(false);
+											}}
+										>
+											Cancel
+										</Button>
+									</div>
+								</form>
+							)}
+
 							<h1
 								className="mb-4 text-2xl font-bold text-white"
 								// biome-ignore lint/security/noDangerouslySetInnerHtml: Stored title HTML is sanitized server-side
@@ -691,11 +805,31 @@ function PostContent({
 					<>
 						<button
 							type="button"
-							disabled={isRemoving}
-							onClick={handleToggleRemoved}
+							disabled={isUpdatingModerationState}
+							onClick={() =>
+								handleSetModerationState(isFiltered ? "VISIBLE" : "FILTERED")
+							}
 							className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
 						>
-							{isRemoving ? "Updating..." : isRemoved ? "Unremove" : "Remove"}
+							{isUpdatingModerationState
+								? "Updating..."
+								: isFiltered
+									? "Unfilter"
+									: "Filter"}
+						</button>
+						<button
+							type="button"
+							disabled={isUpdatingModerationState}
+							onClick={() =>
+								handleSetModerationState(isRemoved ? "VISIBLE" : "REMOVED")
+							}
+							className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+						>
+							{isUpdatingModerationState
+								? "Updating..."
+								: isRemoved
+									? "Unremove"
+									: "Remove"}
 						</button>
 						<button
 							type="button"
@@ -708,6 +842,19 @@ function PostContent({
 								: isStickied
 									? "Unsticky"
 									: "Sticky"}
+						</button>
+						<button
+							type="button"
+							onClick={() => {
+								setModTitle(post.title);
+								setModFlair(post.flair ?? "");
+								setIsEditingModerationDetails((value) => !value);
+							}}
+							className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800"
+						>
+							{isEditingModerationDetails
+								? "Cancel mod edit"
+								: "Edit title/flair"}
 						</button>
 					</>
 				)}

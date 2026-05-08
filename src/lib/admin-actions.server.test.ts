@@ -5,6 +5,7 @@ const { dbMock } = vi.hoisted(() => ({
 		select: vi.fn(),
 		update: vi.fn(),
 		insert: vi.fn(),
+		transaction: vi.fn(),
 	},
 }));
 
@@ -28,12 +29,13 @@ vi.mock("@/lib/sessions.server", () => ({
 
 vi.mock("@/lib/lifecycle.server", () => ({
 	setCommentPinnedState: vi.fn(),
+	setCommentModerationState: vi.fn(),
 	setCommentRemovedState: vi.fn(),
+	setSubmissionModerationState: vi.fn(),
 	setSubmissionRemovedState: vi.fn(),
 	setSubmissionStickyState: vi.fn(),
 }));
 
-import type { SafeUser } from "@/lib/auth.server";
 import {
 	banUserFn,
 	createUserNoteFn,
@@ -42,16 +44,23 @@ import {
 	pinCommentFn,
 	removeCommentFn,
 	removeSubmissionFn,
+	setCommentModerationStateFn,
+	setSubmissionModerationStateFn,
 	shadowbanUserFn,
 	stickySubmissionFn,
 	unbanUserFn,
 	unshadowbanUserFn,
 	updateCommentFilterStatusFn,
 	updateSubmissionFilterStatusFn,
+	updateSubmissionModerationDetailsFn,
+	updateUserModerationProfileFn,
 } from "@/lib/admin-actions.server";
+import type { SafeUser } from "@/lib/auth.server";
 import {
+	setCommentModerationState,
 	setCommentPinnedState,
 	setCommentRemovedState,
+	setSubmissionModerationState,
 	setSubmissionRemovedState,
 	setSubmissionStickyState,
 } from "@/lib/lifecycle.server";
@@ -114,7 +123,7 @@ describe("admin-actions.server", () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(null);
 
 		await expect(
-			updateSubmissionFilterStatusFn({ data: { id: 1, action: "normal" } }),
+			updateSubmissionFilterStatusFn({ data: { id: 1, action: "approve" } }),
 		).resolves.toEqual({
 			success: false,
 			error: "Unauthorized",
@@ -131,52 +140,86 @@ describe("admin-actions.server", () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
 
 		await expect(
-			updateSubmissionFilterStatusFn({ data: { id: 10, action: "normal" } }),
+			updateSubmissionFilterStatusFn({ data: { id: 10, action: "approve" } }),
 		).resolves.toEqual({ success: true });
 		await expect(
-			updateSubmissionFilterStatusFn({ data: { id: 11, action: "removed" } }),
+			updateSubmissionFilterStatusFn({ data: { id: 11, action: "filtered" } }),
 		).resolves.toEqual({ success: true });
 		await expect(
-			updateCommentFilterStatusFn({ data: { id: 20, action: "normal" } }),
+			updateSubmissionFilterStatusFn({ data: { id: 12, action: "removed" } }),
 		).resolves.toEqual({ success: true });
 		await expect(
-			updateCommentFilterStatusFn({ data: { id: 21, action: "removed" } }),
+			updateCommentFilterStatusFn({ data: { id: 20, action: "approve" } }),
+		).resolves.toEqual({ success: true });
+		await expect(
+			updateCommentFilterStatusFn({ data: { id: 21, action: "filtered" } }),
+		).resolves.toEqual({ success: true });
+		await expect(
+			updateCommentFilterStatusFn({ data: { id: 22, action: "removed" } }),
 		).resolves.toEqual({ success: true });
 
-		expect(setSubmissionRemovedState).toHaveBeenNthCalledWith(
+		expect(setSubmissionModerationState).toHaveBeenNthCalledWith(
 			1,
 			{
 				submissionId: 10,
 				moderatorId: 2,
 				moderatorName: "mod",
-				removed: false,
+				state: "VISIBLE",
 				actionKind: "approve_post",
 			},
 			dbMock,
 		);
-		expect(setSubmissionRemovedState).toHaveBeenNthCalledWith(2, {
-			submissionId: 11,
-			moderatorId: 2,
-			moderatorName: "mod",
-			removed: true,
-		}, dbMock);
-		expect(setCommentRemovedState).toHaveBeenNthCalledWith(
+		expect(setSubmissionModerationState).toHaveBeenNthCalledWith(
+			2,
+			{
+				submissionId: 11,
+				moderatorId: 2,
+				moderatorName: "mod",
+				state: "FILTERED",
+			},
+			dbMock,
+		);
+		expect(setSubmissionModerationState).toHaveBeenNthCalledWith(
+			3,
+			{
+				submissionId: 12,
+				moderatorId: 2,
+				moderatorName: "mod",
+				state: "REMOVED",
+			},
+			dbMock,
+		);
+		expect(setCommentModerationState).toHaveBeenNthCalledWith(
 			1,
 			{
 				commentId: 20,
 				moderatorId: 2,
 				moderatorName: "mod",
-				removed: false,
+				state: "VISIBLE",
 				actionKind: "approve_comment",
 			},
 			dbMock,
 		);
-		expect(setCommentRemovedState).toHaveBeenNthCalledWith(2, {
-			commentId: 21,
-			moderatorId: 2,
-			moderatorName: "mod",
-			removed: true,
-		}, dbMock);
+		expect(setCommentModerationState).toHaveBeenNthCalledWith(
+			2,
+			{
+				commentId: 21,
+				moderatorId: 2,
+				moderatorName: "mod",
+				state: "FILTERED",
+			},
+			dbMock,
+		);
+		expect(setCommentModerationState).toHaveBeenNthCalledWith(
+			3,
+			{
+				commentId: 22,
+				moderatorId: 2,
+				moderatorName: "mod",
+				state: "REMOVED",
+			},
+			dbMock,
+		);
 	});
 
 	it("marks ignored reports directly in the database", async () => {
@@ -194,23 +237,25 @@ describe("admin-actions.server", () => {
 			updateCommentFilterStatusFn({ data: { id: 22, action: "ignored" } }),
 		).resolves.toEqual({ success: true });
 
-		expect(submissionUpdate.set).toHaveBeenCalledWith({ stateReport: "IGNORED" });
+		expect(submissionUpdate.set).toHaveBeenCalledWith({
+			stateReport: "IGNORED",
+		});
 		expect(commentUpdate.set).toHaveBeenCalledWith({ stateReport: "IGNORED" });
 	});
 
 	it("handles direct lifecycle moderation actions and not-found failures", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValueOnce(null);
 		await expect(
-			removeSubmissionFn({ data: { id: 1, removed: true } }),
+			setSubmissionModerationStateFn({ data: { id: 1, state: "REMOVED" } }),
 		).resolves.toEqual({
 			success: false,
 			error: "Unauthorized",
 		});
 
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		vi.mocked(setSubmissionRemovedState).mockResolvedValueOnce(false);
+		vi.mocked(setSubmissionModerationState).mockResolvedValueOnce(false);
 		await expect(
-			removeSubmissionFn({ data: { id: 1, removed: true } }),
+			setSubmissionModerationStateFn({ data: { id: 1, state: "REMOVED" } }),
 		).resolves.toEqual({
 			success: false,
 			error: "Post not found",
@@ -223,11 +268,12 @@ describe("admin-actions.server", () => {
 			success: true,
 		});
 
-		vi.mocked(setCommentRemovedState).mockResolvedValueOnce(true);
+		vi.mocked(setCommentModerationState).mockResolvedValueOnce(true);
 		await expect(
-			removeCommentFn({ data: { id: 5, removed: false } }),
+			setCommentModerationStateFn({ data: { id: 5, state: "FILTERED" } }),
 		).resolves.toEqual({
 			success: true,
+			state: "FILTERED",
 		});
 
 		vi.mocked(setCommentPinnedState).mockResolvedValueOnce(false);
@@ -236,6 +282,71 @@ describe("admin-actions.server", () => {
 		).resolves.toEqual({
 			success: false,
 			error: "Comment not found",
+		});
+	});
+
+	it("retains legacy remove wrappers", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		vi.mocked(setSubmissionRemovedState).mockResolvedValueOnce(true);
+		vi.mocked(setCommentRemovedState).mockResolvedValueOnce(true);
+
+		await expect(
+			removeSubmissionFn({ data: { id: 1, removed: true } }),
+		).resolves.toEqual({
+			success: true,
+		});
+		await expect(
+			removeCommentFn({ data: { id: 5, removed: false } }),
+		).resolves.toEqual({
+			success: true,
+		});
+	});
+
+	it("edits submission title/flair and logs both actions", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		const updateChain = {
+			set: vi.fn().mockReturnValue({
+				where: vi.fn().mockReturnValue({
+					returning: vi.fn().mockResolvedValue([
+						{
+							id: 1,
+							title: "Updated title",
+							titleHtml: "<p>Updated title</p>",
+							flair: "news",
+						},
+					]),
+				}),
+			}),
+		};
+		const firstInsert = createInsertChain();
+		const secondInsert = createInsertChain();
+		dbMock.update.mockReturnValueOnce(updateChain);
+		dbMock.insert
+			.mockReturnValueOnce(firstInsert)
+			.mockReturnValueOnce(secondInsert);
+
+		await expect(
+			updateSubmissionModerationDetailsFn({
+				data: { id: 1, title: "Updated title", flair: "news" },
+			}),
+		).resolves.toEqual({
+			success: true,
+			title: "Updated title",
+			titleHtml: "<p>Updated title</p>",
+			flair: "news",
+		});
+
+		expect(firstInsert.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetSubmissionId: 1,
+			kind: "edit_post_title",
+			note: '"Updated title"',
+		});
+		expect(secondInsert.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetSubmissionId: 1,
+			kind: "flair_post",
+			note: '"news"',
 		});
 	});
 
@@ -270,9 +381,7 @@ describe("admin-actions.server", () => {
 		await expect(shadowbanUserFn({ data: { userId: 9 } })).resolves.toEqual({
 			success: true,
 		});
-		await expect(
-			unshadowbanUserFn({ data: { userId: 9 } }),
-		).resolves.toEqual({
+		await expect(unshadowbanUserFn({ data: { userId: 9 } })).resolves.toEqual({
 			success: true,
 		});
 
@@ -312,6 +421,61 @@ describe("admin-actions.server", () => {
 			userId: 2,
 			targetUserId: 9,
 			kind: "unshadowban",
+		});
+	});
+
+	it("updates user presentation fields and logs verification/custom title actions", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		const updateChain = {
+			set: vi.fn().mockReturnValue({
+				where: vi.fn().mockReturnValue({
+					returning: vi.fn().mockResolvedValue([
+						{
+							id: 9,
+							verified: "Staff",
+							verifiedColor: "00ff00",
+							customTitlePlain: "Trusted voice",
+							customTitle: "<p>Trusted voice</p>",
+						},
+					]),
+				}),
+			}),
+		};
+		const firstInsert = createInsertChain();
+		const secondInsert = createInsertChain();
+		dbMock.update.mockReturnValueOnce(updateChain);
+		dbMock.insert
+			.mockReturnValueOnce(firstInsert)
+			.mockReturnValueOnce(secondInsert);
+
+		await expect(
+			updateUserModerationProfileFn({
+				data: {
+					userId: 9,
+					verified: "Staff",
+					verifiedColor: "#00ff00",
+					customTitlePlain: "Trusted voice",
+				},
+			}),
+		).resolves.toEqual({
+			success: true,
+			verified: "Staff",
+			verifiedColor: "00ff00",
+			customTitlePlain: "Trusted voice",
+			customTitle: "<p>Trusted voice</p>",
+		});
+
+		expect(firstInsert.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetUserId: 9,
+			kind: "verify_user",
+			note: '"Staff" (00ff00)',
+		});
+		expect(secondInsert.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetUserId: 9,
+			kind: "set_custom_title",
+			note: '"Trusted voice"',
 		});
 	});
 
@@ -423,9 +587,7 @@ describe("admin-actions.server", () => {
 		dbMock.update.mockReturnValueOnce(updateChain);
 		dbMock.insert.mockReturnValueOnce(insertChain);
 
-		await expect(
-			distinguishCommentFn({ data: { id: 50 } }),
-		).resolves.toEqual({
+		await expect(distinguishCommentFn({ data: { id: 50 } })).resolves.toEqual({
 			success: true,
 			distinguishLevel: 0,
 		});

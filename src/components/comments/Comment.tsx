@@ -11,7 +11,7 @@ import { IconMask } from "@/components/ui/icon-mask";
 import {
 	distinguishCommentFn,
 	pinCommentFn,
-	removeCommentFn,
+	setCommentModerationStateFn,
 } from "@/lib/admin-actions.server";
 import {
 	createCommentFn,
@@ -57,12 +57,21 @@ export const Comment = memo(function Comment({
 	);
 	const [isDistinguishing, setIsDistinguishing] = useState(false);
 	const [isSaved, setIsSaved] = useState(comment.isSaved);
-	const [isRemoved, setIsRemoved] = useState(comment.isRemoved);
+	const [stateMod, setStateMod] = useState(comment.stateMod);
 	const [isPinned, setIsPinned] = useState(comment.isPinned);
 	const [isSavingComment, setIsSavingComment] = useState(false);
-	const [isRemoving, setIsRemoving] = useState(false);
+	const [isUpdatingModerationState, setIsUpdatingModerationState] =
+		useState(false);
 	const [isPinning, setIsPinning] = useState(false);
-	const isModHidden = comment.isModHidden || isRemoved;
+	const isAuthor = currentUserId === comment.authorId;
+	const userVote = comment.userVote;
+	const canDistinguish =
+		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
+	const canModerate = currentUserAdminLevel >= 2;
+	const isRemoved = stateMod === "REMOVED";
+	const isFiltered = stateMod === "FILTERED";
+	const isModHidden =
+		comment.isModHidden || (!canModerate && stateMod !== "VISIBLE");
 	const isContentHidden = isDeleted || isModHidden;
 	const visibilityMessage = comment.visibilityMessage;
 
@@ -70,12 +79,6 @@ export const Comment = memo(function Comment({
 	const openDeleteCommentModal = useModalsStore(
 		(s) => s.openDeleteCommentModal,
 	);
-	const isAuthor = currentUserId === comment.authorId;
-	const userVote = comment.userVote;
-
-	const canDistinguish =
-		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
-	const canModerate = currentUserAdminLevel >= 2;
 
 	const handleDelete = async () => {
 		try {
@@ -141,21 +144,19 @@ export const Comment = memo(function Comment({
 		}
 	};
 
-	const handleToggleRemoved = async () => {
-		setIsRemoving(true);
+	const handleSetModerationState = async (
+		nextState: "VISIBLE" | "FILTERED" | "REMOVED",
+	) => {
+		setIsUpdatingModerationState(true);
 		try {
-			const nextRemoved = !isRemoved;
-			const result = await removeCommentFn({
-				data: { id: comment.id, removed: nextRemoved },
+			const result = await setCommentModerationStateFn({
+				data: { id: comment.id, state: nextState },
 			});
 			if (result.success) {
-				setIsRemoved(nextRemoved);
-				setCurrentBody(
-					nextRemoved ? "<p>[removed by moderator]</p>" : comment.bodyHtml,
-				);
+				setStateMod(nextState);
 			}
 		} finally {
-			setIsRemoving(false);
+			setIsUpdatingModerationState(false);
 		}
 	};
 
@@ -245,6 +246,16 @@ export const Comment = memo(function Comment({
 							Pinned
 						</span>
 					)}
+					{isFiltered && (
+						<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+							Filtered
+						</span>
+					)}
+					{isRemoved && (
+						<span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-medium text-red-300">
+							Removed
+						</span>
+					)}
 
 					<span className="flex items-center gap-1">
 						<IconMask
@@ -309,9 +320,7 @@ export const Comment = memo(function Comment({
 											className="prose prose-invert prose-sm max-w-none text-slate-300"
 											// biome-ignore lint/security/noDangerouslySetInnerHtml: Content sanitized server-side
 											dangerouslySetInnerHTML={{
-												__html: isContentHidden
-													? currentBody
-													: currentBody,
+												__html: isContentHidden ? currentBody : currentBody,
 											}}
 										/>
 									</>
@@ -419,11 +428,31 @@ export const Comment = memo(function Comment({
 											<>
 												<button
 													type="button"
-													onClick={handleToggleRemoved}
-													disabled={isRemoving}
+													onClick={() =>
+														handleSetModerationState(
+															isFiltered ? "VISIBLE" : "FILTERED",
+														)
+													}
+													disabled={isUpdatingModerationState}
+													className="text-slate-500 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													{isUpdatingModerationState
+														? "Updating..."
+														: isFiltered
+															? "Unfilter"
+															: "Filter"}
+												</button>
+												<button
+													type="button"
+													onClick={() =>
+														handleSetModerationState(
+															isRemoved ? "VISIBLE" : "REMOVED",
+														)
+													}
+													disabled={isUpdatingModerationState}
 													className="text-slate-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
 												>
-													{isRemoving
+													{isUpdatingModerationState
 														? "Updating..."
 														: isRemoved
 															? "Unremove"

@@ -52,9 +52,13 @@ const baseSubmission: SubmissionSummary = {
 	isStickied: false,
 	isDeleted: false,
 	isRemoved: false,
+	isFiltered: false,
 	visibilityMessage: null,
 	isSaved: false,
+	isBlockedAuthor: false,
 	userVote: -1,
+	stateMod: "VISIBLE",
+	stateModSetBy: null,
 };
 
 describe("RecentSubmissions", () => {

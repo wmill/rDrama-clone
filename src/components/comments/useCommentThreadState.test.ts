@@ -25,10 +25,13 @@ function makeComment(overrides: Partial<CommentFlat> = {}): CommentFlat {
 		distinguishLevel: 0,
 		isDeleted: false,
 		isRemoved: false,
+		isFiltered: false,
 		isPinned: false,
 		isSaved: false,
 		isModHidden: false,
 		userVote: 0,
+		stateMod: "VISIBLE",
+		stateModSetBy: null,
 		...overrides,
 	};
 }

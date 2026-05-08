@@ -9,44 +9,76 @@ import {
 	userNotes,
 	users,
 } from "@/db/schema";
-import { getCurrentUser } from "@/lib/sessions.server";
 import {
+	type ModerationState,
+	setCommentModerationState,
 	setCommentPinnedState,
 	setCommentRemovedState,
+	setSubmissionModerationState,
 	setSubmissionRemovedState,
 	setSubmissionStickyState,
 } from "@/lib/lifecycle.server";
+import { renderPostTitleHtml } from "@/lib/markdown";
+import { getCurrentUser } from "@/lib/sessions.server";
 
-type FilterAction = "normal" | "removed" | "ignored";
+type QueueModerationAction = "approve" | "filtered" | "removed" | "ignored";
+
+function normalizeOptionalModerationText(value?: string | null): string | null {
+	if (value === undefined || value === null) {
+		return null;
+	}
+
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeVerifiedColor(value?: string | null): string | null {
+	const normalized = normalizeOptionalModerationText(value);
+	if (!normalized) {
+		return null;
+	}
+
+	return normalized.replace(/^#/, "").toLowerCase();
+}
 
 export const updateSubmissionFilterStatusFn = createServerFn({
 	method: "POST",
 })
-	.inputValidator((data: { id: number; action: FilterAction }) => data)
+	.inputValidator((data: { id: number; action: QueueModerationAction }) => data)
 	.handler(async ({ data }) => {
 		const user = await getCurrentUser();
 		if (!user || user.adminLevel < 2) {
 			return { success: false as const, error: "Unauthorized" };
 		}
 
-		if (data.action === "normal") {
-			await setSubmissionRemovedState(
+		if (data.action === "approve") {
+			await setSubmissionModerationState(
 				{
 					submissionId: data.id,
 					moderatorId: user.id,
 					moderatorName: user.username,
-					removed: false,
+					state: "VISIBLE",
 					actionKind: "approve_post",
 				},
 				db,
 			);
-		} else if (data.action === "removed") {
-			await setSubmissionRemovedState(
+		} else if (data.action === "filtered") {
+			await setSubmissionModerationState(
 				{
 					submissionId: data.id,
 					moderatorId: user.id,
 					moderatorName: user.username,
-					removed: true,
+					state: "FILTERED",
+				},
+				db,
+			);
+		} else if (data.action === "removed") {
+			await setSubmissionModerationState(
+				{
+					submissionId: data.id,
+					moderatorId: user.id,
+					moderatorName: user.username,
+					state: "REMOVED",
 				},
 				db,
 			);
@@ -61,31 +93,41 @@ export const updateSubmissionFilterStatusFn = createServerFn({
 	});
 
 export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; action: FilterAction }) => data)
+	.inputValidator((data: { id: number; action: QueueModerationAction }) => data)
 	.handler(async ({ data }) => {
 		const user = await getCurrentUser();
 		if (!user || user.adminLevel < 2) {
 			return { success: false as const, error: "Unauthorized" };
 		}
 
-		if (data.action === "normal") {
-			await setCommentRemovedState(
+		if (data.action === "approve") {
+			await setCommentModerationState(
 				{
 					commentId: data.id,
 					moderatorId: user.id,
 					moderatorName: user.username,
-					removed: false,
+					state: "VISIBLE",
 					actionKind: "approve_comment",
 				},
 				db,
 			);
-		} else if (data.action === "removed") {
-			await setCommentRemovedState(
+		} else if (data.action === "filtered") {
+			await setCommentModerationState(
 				{
 					commentId: data.id,
 					moderatorId: user.id,
 					moderatorName: user.username,
-					removed: true,
+					state: "FILTERED",
+				},
+				db,
+			);
+		} else if (data.action === "removed") {
+			await setCommentModerationState(
+				{
+					commentId: data.id,
+					moderatorId: user.id,
+					moderatorName: user.username,
+					state: "REMOVED",
 				},
 				db,
 			);
@@ -97,6 +139,26 @@ export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
 		}
 
 		return { success: true as const };
+	});
+
+export const setSubmissionModerationStateFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; state: ModerationState }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const success = await setSubmissionModerationState({
+			submissionId: data.id,
+			moderatorId: user.id,
+			moderatorName: user.username,
+			state: data.state,
+		});
+
+		return success
+			? { success: true as const, state: data.state }
+			: { success: false as const, error: "Post not found" };
 	});
 
 export const removeSubmissionFn = createServerFn({ method: "POST" })
@@ -119,6 +181,66 @@ export const removeSubmissionFn = createServerFn({ method: "POST" })
 			: { success: false as const, error: "Post not found" };
 	});
 
+export const updateSubmissionModerationDetailsFn = createServerFn({
+	method: "POST",
+})
+	.inputValidator(
+		(data: { id: number; title: string; flair?: string | null }) => data,
+	)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const title = data.title.trim();
+		if (!title) {
+			return { success: false as const, error: "Title is required" };
+		}
+
+		const flair = normalizeOptionalModerationText(data.flair);
+		const updatedRows = await db
+			.update(submissions)
+			.set({
+				title,
+				titleHtml: renderPostTitleHtml(title),
+				flair,
+				editedUtc: Math.floor(Date.now() / 1000),
+			})
+			.where(eq(submissions.id, data.id))
+			.returning({
+				id: submissions.id,
+				title: submissions.title,
+				titleHtml: submissions.titleHtml,
+				flair: submissions.flair,
+			});
+
+		const updated = updatedRows[0];
+		if (!updated) {
+			return { success: false as const, error: "Post not found" };
+		}
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetSubmissionId: data.id,
+			kind: "edit_post_title",
+			note: `"${title}"`,
+		});
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetSubmissionId: data.id,
+			kind: flair ? "flair_post" : "clear_post_flair",
+			note: flair ? `"${flair}"` : "(cleared)",
+		});
+
+		return {
+			success: true as const,
+			title: updated.title,
+			titleHtml: updated.titleHtml,
+			flair: updated.flair,
+		};
+	});
+
 export const stickySubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; stickied: boolean }) => data)
 	.handler(async ({ data }) => {
@@ -137,6 +259,26 @@ export const stickySubmissionFn = createServerFn({ method: "POST" })
 		return success
 			? { success: true as const }
 			: { success: false as const, error: "Post not found" };
+	});
+
+export const setCommentModerationStateFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; state: ModerationState }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const success = await setCommentModerationState({
+			commentId: data.id,
+			moderatorId: user.id,
+			moderatorName: user.username,
+			state: data.state,
+		});
+
+		return success
+			? { success: true as const, state: data.state }
+			: { success: false as const, error: "Comment not found" };
 	});
 
 export const removeCommentFn = createServerFn({ method: "POST" })
@@ -272,6 +414,78 @@ export const unshadowbanUserFn = createServerFn({ method: "POST" })
 		});
 
 		return { success: true as const };
+	});
+
+export const updateUserModerationProfileFn = createServerFn({
+	method: "POST",
+})
+	.inputValidator(
+		(data: {
+			userId: number;
+			verified?: string | null;
+			verifiedColor?: string | null;
+			customTitlePlain?: string | null;
+		}) => data,
+	)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const verified = normalizeOptionalModerationText(data.verified);
+		const verifiedColor = normalizeVerifiedColor(data.verifiedColor);
+		const customTitlePlain = normalizeOptionalModerationText(
+			data.customTitlePlain,
+		);
+		const customTitle = customTitlePlain
+			? renderPostTitleHtml(customTitlePlain)
+			: null;
+
+		const updatedRows = await db
+			.update(users)
+			.set({
+				verified,
+				verifiedColor,
+				customTitlePlain,
+				customTitle,
+			})
+			.where(eq(users.id, data.userId))
+			.returning({
+				id: users.id,
+				verified: users.verified,
+				verifiedColor: users.verifiedColor,
+				customTitlePlain: users.customTitlePlain,
+				customTitle: users.customTitle,
+			});
+
+		const updated = updatedRows[0];
+		if (!updated) {
+			return { success: false as const, error: "User not found" };
+		}
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetUserId: data.userId,
+			kind: verified ? "verify_user" : "unverify_user",
+			note: verified
+				? `"${verified}" (${verifiedColor ?? "default"})`
+				: "(cleared)",
+		});
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetUserId: data.userId,
+			kind: customTitlePlain ? "set_custom_title" : "clear_custom_title",
+			note: customTitlePlain ? `"${customTitlePlain}"` : "(cleared)",
+		});
+
+		return {
+			success: true as const,
+			verified: updated.verified,
+			verifiedColor: updated.verifiedColor,
+			customTitlePlain: updated.customTitlePlain,
+			customTitle: updated.customTitle,
+		};
 	});
 
 export const createUserNoteFn = createServerFn({ method: "POST" })

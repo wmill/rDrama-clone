@@ -10,7 +10,10 @@ import {
 } from "@/db/schema";
 
 export const DELETED_BY_AUTHOR_MESSAGE = "Deleted by author";
+export const FILTERED_BY_MODERATOR_MESSAGE = "Filtered by moderator";
 export const REMOVED_BY_MODERATOR_MESSAGE = "Removed by moderator";
+
+export type ModerationState = "VISIBLE" | "FILTERED" | "REMOVED";
 
 type DbLike = typeof db;
 
@@ -20,17 +23,53 @@ async function logModAction(
 		| {
 				userId: number;
 				kind: string;
+				note?: string;
+				targetUserId?: number;
 				targetSubmissionId: number;
 				targetCommentId?: never;
 		  }
 		| {
 				userId: number;
 				kind: string;
+				note?: string;
+				targetUserId?: number;
 				targetCommentId: number;
+				targetSubmissionId?: never;
+		  }
+		| {
+				userId: number;
+				kind: string;
+				note?: string;
+				targetUserId: number;
+				targetCommentId?: never;
 				targetSubmissionId?: never;
 		  },
 ) {
 	await tx.insert(modActions).values(input);
+}
+
+function getSubmissionStateActionKind(
+	state: ModerationState,
+	previousState: ModerationState,
+): string {
+	if (state === "VISIBLE") {
+		return previousState === "FILTERED" ? "unfilter_post" : "unremove_post";
+	}
+
+	return state === "FILTERED" ? "filter_post" : "remove_post";
+}
+
+function getCommentStateActionKind(
+	state: ModerationState,
+	previousState: ModerationState,
+): string {
+	if (state === "VISIBLE") {
+		return previousState === "FILTERED"
+			? "unfilter_comment"
+			: "unremove_comment";
+	}
+
+	return state === "FILTERED" ? "filter_comment" : "remove_comment";
 }
 
 export async function authorDeleteSubmission(
@@ -56,21 +95,31 @@ export async function authorDeleteSubmission(
 	return result.length > 0;
 }
 
-export async function setSubmissionRemovedState(
+export async function setSubmissionModerationState(
 	input: {
 		submissionId: number;
 		moderatorId: number;
 		moderatorName: string;
-		removed: boolean;
+		state: ModerationState;
 		actionKind?: string;
 	},
 	tx: DbLike = db,
 ): Promise<boolean> {
+	const [current] = await tx
+		.select({ stateMod: submissions.stateMod })
+		.from(submissions)
+		.where(eq(submissions.id, input.submissionId))
+		.limit(1);
+
+	if (!current) {
+		return false;
+	}
+
 	const result = await tx
 		.update(submissions)
 		.set({
-			stateMod: input.removed ? "REMOVED" : "VISIBLE",
-			stateModSetBy: input.removed ? input.moderatorName : null,
+			stateMod: input.state,
+			stateModSetBy: input.state === "VISIBLE" ? null : input.moderatorName,
 			stateReport: "RESOLVED",
 		})
 		.where(eq(submissions.id, input.submissionId))
@@ -85,10 +134,35 @@ export async function setSubmissionRemovedState(
 		targetSubmissionId: input.submissionId,
 		kind:
 			input.actionKind ??
-			(input.removed ? "remove_post" : "unremove_post"),
+			getSubmissionStateActionKind(
+				input.state,
+				current.stateMod as ModerationState,
+			),
 	});
 
 	return true;
+}
+
+export async function setSubmissionRemovedState(
+	input: {
+		submissionId: number;
+		moderatorId: number;
+		moderatorName: string;
+		removed: boolean;
+		actionKind?: string;
+	},
+	tx: DbLike = db,
+): Promise<boolean> {
+	return setSubmissionModerationState(
+		{
+			submissionId: input.submissionId,
+			moderatorId: input.moderatorId,
+			moderatorName: input.moderatorName,
+			state: input.removed ? "REMOVED" : "VISIBLE",
+			actionKind: input.actionKind,
+		},
+		tx,
+	);
 }
 
 export async function setSubmissionStickyState(
@@ -174,21 +248,31 @@ export async function authorDeleteComment(
 	return result.length > 0;
 }
 
-export async function setCommentRemovedState(
+export async function setCommentModerationState(
 	input: {
 		commentId: number;
 		moderatorId: number;
 		moderatorName: string;
-		removed: boolean;
+		state: ModerationState;
 		actionKind?: string;
 	},
 	tx: DbLike = db,
 ): Promise<boolean> {
+	const [current] = await tx
+		.select({ stateMod: comments.stateMod })
+		.from(comments)
+		.where(eq(comments.id, input.commentId))
+		.limit(1);
+
+	if (!current) {
+		return false;
+	}
+
 	const result = await tx
 		.update(comments)
 		.set({
-			stateMod: input.removed ? "REMOVED" : "VISIBLE",
-			stateModSetBy: input.removed ? input.moderatorName : null,
+			stateMod: input.state,
+			stateModSetBy: input.state === "VISIBLE" ? null : input.moderatorName,
 			stateReport: "RESOLVED",
 		})
 		.where(eq(comments.id, input.commentId))
@@ -203,10 +287,35 @@ export async function setCommentRemovedState(
 		targetCommentId: input.commentId,
 		kind:
 			input.actionKind ??
-			(input.removed ? "remove_comment" : "unremove_comment"),
+			getCommentStateActionKind(
+				input.state,
+				current.stateMod as ModerationState,
+			),
 	});
 
 	return true;
+}
+
+export async function setCommentRemovedState(
+	input: {
+		commentId: number;
+		moderatorId: number;
+		moderatorName: string;
+		removed: boolean;
+		actionKind?: string;
+	},
+	tx: DbLike = db,
+): Promise<boolean> {
+	return setCommentModerationState(
+		{
+			commentId: input.commentId,
+			moderatorId: input.moderatorId,
+			moderatorName: input.moderatorName,
+			state: input.removed ? "REMOVED" : "VISIBLE",
+			actionKind: input.actionKind,
+		},
+		tx,
+	);
 }
 
 export async function setCommentPinnedState(

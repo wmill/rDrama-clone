@@ -7,9 +7,11 @@ vi.mock("@/db", () => ({
 import {
 	authorDeleteComment,
 	authorDeleteSubmission,
+	setCommentModerationState,
 	setCommentPinnedState,
 	setCommentRemovedState,
 	setCommentSavedState,
+	setSubmissionModerationState,
 	setSubmissionRemovedState,
 	setSubmissionSavedState,
 	setSubmissionStickyState,
@@ -30,6 +32,14 @@ function createInsertChain() {
 		onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
 	};
 	return chain;
+}
+
+function createSelectChain<T>(result: T) {
+	return {
+		from: vi.fn().mockReturnThis(),
+		where: vi.fn().mockReturnThis(),
+		limit: vi.fn().mockResolvedValue(result),
+	};
 }
 
 function createDeleteChain() {
@@ -53,7 +63,9 @@ describe("lifecycle helpers", () => {
 				.mockReturnValueOnce(commentUpdate),
 		};
 
-		await expect(authorDeleteSubmission(10, 20, tx as never)).resolves.toBe(true);
+		await expect(authorDeleteSubmission(10, 20, tx as never)).resolves.toBe(
+			true,
+		);
 		await expect(authorDeleteComment(11, 21, tx as never)).resolves.toBe(true);
 		expect(submissionUpdate.set).toHaveBeenCalled();
 		expect(commentUpdate.set).toHaveBeenCalled();
@@ -63,30 +75,31 @@ describe("lifecycle helpers", () => {
 		const updateChain = createUpdateChain();
 		const insertChain = createInsertChain();
 		const tx = {
+			select: vi.fn(() => createSelectChain([{ stateMod: "FILTERED" }])),
 			update: vi.fn(() => updateChain),
 			insert: vi.fn(() => insertChain),
 		};
 
-		const success = await setSubmissionRemovedState(
+		const success = await setSubmissionModerationState(
 			{
 				submissionId: 10,
 				moderatorId: 2,
 				moderatorName: "mod",
-				removed: true,
+				state: "VISIBLE",
 			},
 			tx as never,
 		);
 
 		expect(success).toBe(true);
 		expect(updateChain.set).toHaveBeenCalledWith({
-			stateMod: "REMOVED",
-			stateModSetBy: "mod",
+			stateMod: "VISIBLE",
+			stateModSetBy: null,
 			stateReport: "RESOLVED",
 		});
 		expect(insertChain.values).toHaveBeenCalledWith({
 			userId: 2,
 			targetSubmissionId: 10,
-			kind: "remove_post",
+			kind: "unfilter_post",
 		});
 	});
 
@@ -95,6 +108,7 @@ describe("lifecycle helpers", () => {
 		const pinUpdateChain = createUpdateChain();
 		const insertChain = createInsertChain();
 		const tx = {
+			select: vi.fn(() => createSelectChain([{ stateMod: "VISIBLE" }])),
 			update: vi
 				.fn()
 				.mockReturnValueOnce(removeUpdateChain)
@@ -102,13 +116,12 @@ describe("lifecycle helpers", () => {
 			insert: vi.fn(() => insertChain),
 		};
 
-		await setCommentRemovedState(
+		await setCommentModerationState(
 			{
 				commentId: 22,
 				moderatorId: 3,
 				moderatorName: "mod",
-				removed: false,
-				actionKind: "approve_comment",
+				state: "FILTERED",
 			},
 			tx as never,
 		);
@@ -123,8 +136,8 @@ describe("lifecycle helpers", () => {
 		);
 
 		expect(removeUpdateChain.set).toHaveBeenCalledWith({
-			stateMod: "VISIBLE",
-			stateModSetBy: null,
+			stateMod: "FILTERED",
+			stateModSetBy: "mod",
 			stateReport: "RESOLVED",
 		});
 		expect(pinUpdateChain.set).toHaveBeenCalledWith({
@@ -134,7 +147,56 @@ describe("lifecycle helpers", () => {
 		expect(insertChain.values).toHaveBeenCalledWith({
 			userId: 3,
 			targetCommentId: 22,
-			kind: "approve_comment",
+			kind: "filter_comment",
+		});
+	});
+
+	it("supports legacy removed-state wrappers", async () => {
+		const submissionSelect = createSelectChain([{ stateMod: "VISIBLE" }]);
+		const commentSelect = createSelectChain([{ stateMod: "REMOVED" }]);
+		const submissionUpdate = createUpdateChain();
+		const commentUpdate = createUpdateChain();
+		const insertChain = createInsertChain();
+		const tx = {
+			select: vi
+				.fn()
+				.mockReturnValueOnce(submissionSelect)
+				.mockReturnValueOnce(commentSelect),
+			update: vi
+				.fn()
+				.mockReturnValueOnce(submissionUpdate)
+				.mockReturnValueOnce(commentUpdate),
+			insert: vi.fn(() => insertChain),
+		};
+
+		await setSubmissionRemovedState(
+			{
+				submissionId: 1,
+				moderatorId: 2,
+				moderatorName: "mod",
+				removed: true,
+			},
+			tx as never,
+		);
+		await setCommentRemovedState(
+			{
+				commentId: 2,
+				moderatorId: 2,
+				moderatorName: "mod",
+				removed: false,
+			},
+			tx as never,
+		);
+
+		expect(submissionUpdate.set).toHaveBeenCalledWith({
+			stateMod: "REMOVED",
+			stateModSetBy: "mod",
+			stateReport: "RESOLVED",
+		});
+		expect(commentUpdate.set).toHaveBeenCalledWith({
+			stateMod: "VISIBLE",
+			stateModSetBy: null,
+			stateReport: "RESOLVED",
 		});
 	});
 

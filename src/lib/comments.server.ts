@@ -30,6 +30,7 @@ import { renderCommentMarkdown } from "@/lib/markdown";
 import { createNotificationsForComment } from "@/lib/notifications.server";
 import type { VoteType } from "@/lib/votes.server";
 import type { CommentFeedSortType, TimeFilter } from "./constants";
+import type { ModerationState } from "./lifecycle.server";
 
 export type CommentFeedItem = {
 	id: number;
@@ -49,8 +50,11 @@ export type CommentFeedItem = {
 	distinguishLevel: number;
 	isDeleted: boolean;
 	isRemoved: boolean;
+	isFiltered: boolean;
 	isSaved: boolean;
 	userVote: VoteType;
+	stateMod: ModerationState;
+	stateModSetBy: string | null;
 };
 
 export type CommentSummary = {
@@ -77,6 +81,8 @@ export type CommentSummary = {
 	isModHidden: boolean;
 	visibilityMessage?: string | null;
 	userVote: VoteType;
+	stateMod: ModerationState;
+	stateModSetBy: string | null;
 };
 
 export type CommentWithReplies = CommentSummary & {
@@ -189,10 +195,13 @@ function mapCommentRow(row: RawCommentRow): CommentFlat {
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: row.stateUserDeletedUtc !== null,
 		isRemoved: row.stateMod !== "VISIBLE",
+		isFiltered: row.stateMod === "FILTERED",
 		isPinned: row.pinnedBy !== null,
 		isSaved: row.savedCommentId !== null,
 		isModHidden: false,
 		userVote: (row.userVoteType as VoteType) ?? 0,
+		stateMod: (row.stateMod ?? "VISIBLE") as ModerationState,
+		stateModSetBy: row.stateModSetBy,
 	};
 }
 

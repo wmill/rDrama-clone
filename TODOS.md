@@ -60,8 +60,8 @@ Current admin/moderation support exists, but it is still a narrow subset of `rDr
 
 ### Moderation actions
 
-- [ ] Expand beyond reported-content triage to include unremove flows, filter-state transitions, sticky/unsticky, title/flair/verification actions, and richer audit logging parity.
-- [ ] Add moderation actions for comments where legacy behavior supports the same lifecycle controls.
+- [x] Expand beyond reported-content triage to include unremove flows, filter-state transitions, sticky/unsticky, title/flair/verification actions, and richer audit logging parity.
+- [x] Add moderation actions for comments where legacy behavior supports the same lifecycle controls.
 
 ### Moderation views
 
@@ -97,4 +97,4 @@ Priority additions:
 - [ ] Post lifecycle coverage: edit/delete/remove/unremove, sticky/distinguish permissions, save/unsave
 - [ ] Comment lifecycle coverage: create/edit/delete/remove/unremove, blocked/shadowbanned visibility cases
 - [ ] Notifications/search/social coverage: reply notifications, unread count, search filtering, follow/unfollow/block behavior
-- [ ] Admin/mod coverage: permission boundaries, queue transitions, mod action logging, audit correctness
+- [x] Admin/mod coverage: permission boundaries, queue transitions, mod action logging, audit correctness

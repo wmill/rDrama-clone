@@ -12,6 +12,8 @@ import {
 import {
 	authorDeleteSubmission,
 	DELETED_BY_AUTHOR_MESSAGE,
+	FILTERED_BY_MODERATOR_MESSAGE,
+	type ModerationState,
 	REMOVED_BY_MODERATOR_MESSAGE,
 } from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
@@ -41,10 +43,13 @@ export type SubmissionSummary = {
 	isStickied: boolean;
 	isDeleted: boolean;
 	isRemoved: boolean;
+	isFiltered: boolean;
 	visibilityMessage: string | null;
 	isSaved: boolean;
 	isBlockedAuthor: boolean;
 	userVote: VoteType;
+	stateMod: ModerationState;
+	stateModSetBy?: string | null;
 };
 
 export type SubmissionDetail = SubmissionSummary & {
@@ -80,7 +85,8 @@ type SubmissionRow = {
 	views?: number;
 	distinguishLevel?: number;
 	stateUserDeletedUtc: Date | null;
-	stateMod: string;
+	stateMod: ModerationState;
+	stateModSetBy?: string | null;
 	userVoteType: number | null;
 	savedSubmissionId: number | null;
 	subscribedSubmissionId?: number | null;
@@ -89,18 +95,26 @@ type SubmissionRow = {
 
 function mapSubmissionRow<T extends SubmissionRow>(
 	row: T,
-	options?: { includeBlockedPlaceholder?: boolean },
+	options?: {
+		includeBlockedPlaceholder?: boolean;
+		viewerCanModerate?: boolean;
+	},
 ) {
 	const isDeleted = row.stateUserDeletedUtc !== null;
-	const isRemoved = row.stateMod !== "VISIBLE";
+	const isRemoved = row.stateMod === "REMOVED";
+	const isFiltered = row.stateMod === "FILTERED";
 	const isBlockedAuthor = row.blockedTargetId !== null;
+	const isHiddenByModeration =
+		isRemoved || (isFiltered && !options?.viewerCanModerate);
 	const visibilityMessage = isDeleted
 		? DELETED_BY_AUTHOR_MESSAGE
 		: isRemoved
 			? REMOVED_BY_MODERATOR_MESSAGE
-			: options?.includeBlockedPlaceholder && isBlockedAuthor
-				? `You are blocking @${row.authorName}`
-				: null;
+			: isFiltered && !options?.viewerCanModerate
+				? FILTERED_BY_MODERATOR_MESSAGE
+				: options?.includeBlockedPlaceholder && isBlockedAuthor
+					? `You are blocking @${row.authorName}`
+					: null;
 	const blockedTitle = `[blocked post by @${row.authorName}]`;
 
 	return {
@@ -114,10 +128,16 @@ function mapSubmissionRow<T extends SubmissionRow>(
 				? blockedTitle
 				: row.titleHtml,
 		url: options?.includeBlockedPlaceholder && isBlockedAuthor ? null : row.url,
-		body: visibilityMessage ? `[${visibilityMessage.toLowerCase()}]` : row.body,
-		bodyHtml: visibilityMessage
-			? `<p>[${visibilityMessage.toLowerCase()}]</p>`
-			: row.bodyHtml,
+		body: isHiddenByModeration
+			? `[${visibilityMessage?.toLowerCase() ?? "hidden"}]`
+			: visibilityMessage
+				? `[${visibilityMessage.toLowerCase()}]`
+				: row.body,
+		bodyHtml: isHiddenByModeration
+			? `<p>[${visibilityMessage?.toLowerCase() ?? "hidden"}]</p>`
+			: visibilityMessage
+				? `<p>[${visibilityMessage.toLowerCase()}]</p>`
+				: row.bodyHtml,
 		embedUrl:
 			options?.includeBlockedPlaceholder && isBlockedAuthor
 				? null
@@ -127,10 +147,13 @@ function mapSubmissionRow<T extends SubmissionRow>(
 		isStickied: row.stickied !== null,
 		isDeleted,
 		isRemoved,
+		isFiltered,
 		visibilityMessage,
 		isSaved: row.savedSubmissionId !== null,
 		isSubscribed: row.subscribedSubmissionId !== null,
 		isBlockedAuthor,
+		stateMod: row.stateMod,
+		stateModSetBy: row.stateModSetBy ?? null,
 	};
 }
 
@@ -280,6 +303,7 @@ export async function getSubmissions(options: {
 			userVoteType: votes.voteType,
 			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
 			stateMod: submissions.stateMod,
+			stateModSetBy: submissions.stateModSetBy,
 			savedSubmissionId: saveRelationship.submissionId,
 			blockedTargetId: userBlocks.targetId,
 		})
@@ -322,6 +346,7 @@ export async function getSubmissions(options: {
 export async function getSubmissionById(
 	id: number,
 	userId?: number,
+	viewerCanModerate = false,
 ): Promise<SubmissionDetail | null> {
 	const [result] = await db
 		.select({
@@ -348,6 +373,7 @@ export async function getSubmissionById(
 			distinguishLevel: submissions.distinguishLevel,
 			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
 			stateMod: submissions.stateMod,
+			stateModSetBy: submissions.stateModSetBy,
 			userVoteType: votes.voteType,
 			savedSubmissionId: saveRelationship.submissionId,
 			subscribedSubmissionId: subscriptions.submissionId,
@@ -393,7 +419,10 @@ export async function getSubmissionById(
 
 	if (!result) return null;
 
-	const mapped = mapSubmissionRow(result, { includeBlockedPlaceholder: true });
+	const mapped = mapSubmissionRow(result, {
+		includeBlockedPlaceholder: true,
+		viewerCanModerate,
+	});
 	return mapped;
 }
 

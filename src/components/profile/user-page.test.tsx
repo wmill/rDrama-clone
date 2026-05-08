@@ -27,6 +27,7 @@ vi.mock("@/lib/admin-actions.server", () => ({
 	shadowbanUserFn: vi.fn(),
 	unbanUserFn: vi.fn(),
 	unshadowbanUserFn: vi.fn(),
+	updateUserModerationProfileFn: vi.fn(),
 }));
 
 function createProfileData(
@@ -46,9 +47,11 @@ function createProfileData(
 			profileUrl: null,
 			bannerUrl: null,
 			verified: null,
+			verifiedColor: null,
 			patron: 0,
 			originalUsername: null,
 			customTitle: null,
+			customTitlePlain: null,
 			bioHtml: null,
 			bio: null,
 			isBanned: 0,
@@ -119,5 +122,41 @@ describe("UserPage", () => {
 			screen.getByText(/Unblock this user to view their profile content/i),
 		).not.toBeNull();
 		expect(screen.queryByText("Sort:")).toBeNull();
+	});
+
+	it("shows presentation controls only to admins viewing another user", () => {
+		render(
+			<UserPage
+				data={createProfileData({
+					viewer: {
+						id: 1,
+						username: "viewer",
+						email: "viewer@example.com",
+						adminLevel: 2,
+						createdUtc: 0,
+						isActivated: true,
+						isBanned: 0,
+						banReason: null,
+						unbanUtc: 0,
+						shadowBanned: null,
+						coins: 0,
+						proCoins: 0,
+						profileUrl: null,
+						bannerUrl: null,
+						bio: null,
+						customTitle: null,
+					},
+				})}
+				adminDetails={{ user: {} as never, notes: [] }}
+				onSortChange={vi.fn()}
+				onTimeChange={vi.fn()}
+				onPageChange={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText("Presentation")).not.toBeNull();
+		expect(
+			screen.getByRole("button", { name: "Save Presentation" }),
+		).not.toBeNull();
 	});
 });

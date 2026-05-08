@@ -27,7 +27,7 @@ function ReportedCommentsPage() {
 
 	const handleAction = async (
 		id: number,
-		action: "normal" | "removed" | "ignored",
+		action: "approve" | "filtered" | "removed" | "ignored",
 	) => {
 		const result = await updateCommentFilterStatusFn({
 			data: { id, action },
@@ -63,11 +63,16 @@ function ReportedCommentCard({
 	onAction,
 }: {
 	comment: ReportedComment;
-	onAction: (id: number, action: "normal" | "removed" | "ignored") => void;
+	onAction: (
+		id: number,
+		action: "approve" | "filtered" | "removed" | "ignored",
+	) => void;
 }) {
 	const [isPending, setIsPending] = useState(false);
 
-	const act = async (action: "normal" | "removed" | "ignored") => {
+	const act = async (
+		action: "approve" | "filtered" | "removed" | "ignored",
+	) => {
 		setIsPending(true);
 		try {
 			await onAction(comment.id, action);
@@ -115,10 +120,19 @@ function ReportedCommentCard({
 						size="sm"
 						variant="outline"
 						disabled={isPending}
-						onClick={() => act("normal")}
+						onClick={() => act("approve")}
 						className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30"
 					>
 						Approve
+					</Button>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={isPending}
+						onClick={() => act("filtered")}
+						className="border-amber-600 text-amber-300 hover:bg-amber-900/30"
+					>
+						Filter
 					</Button>
 					<Button
 						size="sm"
