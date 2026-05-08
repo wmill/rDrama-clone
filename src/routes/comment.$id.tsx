@@ -28,7 +28,7 @@ const getCommentFn = createServerFn({ method: "GET" })
 		if (target.parentSubmissionId === null) return null;
 
 		const [submission, ancestors] = await Promise.all([
-			getSubmissionById(target.parentSubmissionId),
+			getSubmissionById(target.parentSubmissionId, userId),
 			getCommentAncestors(data.id, userId),
 		]);
 		if (!submission) return null;

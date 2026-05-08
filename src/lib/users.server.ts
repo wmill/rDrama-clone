@@ -1,13 +1,15 @@
-import { and, desc, eq, gte, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
 	comments,
 	commentVotes,
 	follows,
+	saveRelationship,
 	submissions,
 	userBlocks,
 	users,
+	commentSaveRelationship,
 } from "@/db/schema";
 import {
 	getCommentViewerContext,
@@ -23,7 +25,11 @@ import type { SafeUser } from "./auth.server";
 
 const PAGE_SIZE = 25;
 
-export type ProfileTab = "comments" | "posts";
+export type ProfileTab =
+	| "comments"
+	| "posts"
+	| "saved-comments"
+	| "saved-posts";
 
 export type ProfileCommentItem = {
 	id: number;
@@ -349,6 +355,52 @@ async function getProfilePosts(options: {
 	return { rows, hasNextPage: results.length > limit };
 }
 
+async function getSavedProfilePosts(options: {
+	userId: number;
+	sort: SortType;
+	t: TimeFilter;
+	page: number;
+}): Promise<{ rows: ProfilePostItem[]; hasNextPage: boolean }> {
+	const limit = PAGE_SIZE;
+	const offset = (options.page - 1) * limit;
+	const timeCutoff = getTimeCutoff(options.t);
+
+	const conditions: SQL[] = [
+		eq(saveRelationship.userId, options.userId),
+		eq(submissions.stateMod, "VISIBLE"),
+		isNull(submissions.stateUserDeletedUtc),
+	];
+	if (timeCutoff !== null) {
+		conditions.push(gte(submissions.createdUtc, timeCutoff));
+	}
+
+	const results = await db
+		.select({
+			id: submissions.id,
+			title: submissions.title,
+			titleHtml: submissions.titleHtml,
+			bodyHtml: submissions.bodyHtml,
+			url: submissions.url,
+			createdUtc: submissions.createdUtc,
+			upvotes: submissions.upvotes,
+			downvotes: submissions.downvotes,
+			commentCount: submissions.commentCount,
+		})
+		.from(saveRelationship)
+		.innerJoin(submissions, eq(saveRelationship.submissionId, submissions.id))
+		.where(and(...conditions))
+		.orderBy(...buildPostOrderBy(options.sort))
+		.limit(limit + 1)
+		.offset(offset);
+
+	const rows = results.slice(0, limit).map((row) => ({
+		...row,
+		score: row.upvotes - row.downvotes,
+	}));
+
+	return { rows, hasNextPage: results.length > limit };
+}
+
 async function getProfileComments(options: {
 	authorId: number;
 	sort: CommentFeedSortType;
@@ -372,6 +424,7 @@ async function getProfileComments(options: {
 	const results = await db
 		.select({
 			id: comments.id,
+			authorId: comments.authorId,
 			parentSubmissionId: comments.parentSubmission,
 			submissionTitle: submissions.title,
 			authorName: users.username,
@@ -453,6 +506,115 @@ async function getProfileComments(options: {
 	return { rows, hasNextPage: results.length > limit };
 }
 
+async function getSavedProfileComments(options: {
+	userId: number;
+	sort: CommentFeedSortType;
+	t: TimeFilter;
+	page: number;
+	viewerId?: number;
+}): Promise<{ rows: ProfileCommentItem[]; hasNextPage: boolean }> {
+	const limit = PAGE_SIZE;
+	const offset = (options.page - 1) * limit;
+	const timeCutoff = getTimeCutoff(options.t);
+	const viewer = await getCommentViewerContext(options.viewerId);
+
+	const conditions: SQL[] = [
+		eq(commentSaveRelationship.userId, options.userId),
+		eq(comments.stateMod, "VISIBLE"),
+		isNull(comments.stateUserDeletedUtc),
+		eq(submissions.stateMod, "VISIBLE"),
+		isNull(submissions.stateUserDeletedUtc),
+		eq(submissions.private, false),
+	];
+	if (timeCutoff !== null) {
+		conditions.push(gte(comments.createdUtc, timeCutoff));
+	}
+
+	const results = await db
+		.select({
+			id: comments.id,
+			parentSubmissionId: comments.parentSubmission,
+			submissionTitle: submissions.title,
+			authorName: users.username,
+			authorShadowBanned: users.shadowBanned,
+			bodyHtml: comments.bodyHtml,
+			createdUtc: comments.createdUtc,
+			upvotes: comments.upvotes,
+			downvotes: comments.downvotes,
+			distinguishLevel: comments.distinguishLevel,
+			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			stateMod: comments.stateMod,
+			stateModSetBy: comments.stateModSetBy,
+			parentSubmissionPrivate: submissions.private,
+			parentSubmissionDeletedUtc: submissions.stateUserDeletedUtc,
+			parentSubmissionStateMod: submissions.stateMod,
+			userVoteType: commentVotes.voteType,
+			blockedTargetId: userBlocks.targetId,
+		})
+		.from(commentSaveRelationship)
+		.innerJoin(comments, eq(commentSaveRelationship.commentId, comments.id))
+		.innerJoin(submissions, eq(comments.parentSubmission, submissions.id))
+		.innerJoin(users, eq(comments.authorId, users.id))
+		.leftJoin(
+			commentVotes,
+			options.viewerId
+				? and(
+						eq(commentVotes.commentId, comments.id),
+						eq(commentVotes.userId, options.viewerId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			userBlocks,
+			options.viewerId
+				? and(
+						eq(userBlocks.userId, options.viewerId),
+						eq(userBlocks.targetId, comments.authorId),
+					)
+				: sql`false`,
+		)
+		.where(and(...conditions))
+		.orderBy(...buildCommentOrderBy(options.sort))
+		.limit(limit + 1)
+		.offset(offset);
+
+	const rows = results
+		.slice(0, limit)
+		.filter((row) =>
+			shouldIncludeCommentInFeed(
+				{
+					authorId: row.authorId,
+					authorName: row.authorName,
+					distinguishLevel: row.distinguishLevel,
+					stateMod: row.stateMod,
+					stateModSetBy: row.stateModSetBy,
+					stateUserDeletedUtc: row.stateUserDeletedUtc,
+					authorShadowBanned: row.authorShadowBanned,
+					isBlocking: row.blockedTargetId !== null,
+					parentSubmissionId: row.parentSubmissionId,
+					parentSubmissionPrivate: row.parentSubmissionPrivate,
+					parentSubmissionDeletedUtc: row.parentSubmissionDeletedUtc,
+					parentSubmissionStateMod: row.parentSubmissionStateMod,
+				},
+				viewer,
+			),
+		)
+		.filter((row) => row.parentSubmissionId !== null)
+		.map((row) => ({
+			id: row.id,
+			parentSubmissionId: row.parentSubmissionId as number,
+			submissionTitle: row.submissionTitle,
+			bodyHtml: row.bodyHtml,
+			createdUtc: row.createdUtc,
+			upvotes: row.upvotes,
+			downvotes: row.downvotes,
+			score: row.upvotes - row.downvotes,
+			userVote: row.userVoteType ?? 0,
+		}));
+
+	return { rows, hasNextPage: results.length > limit };
+}
+
 export async function getProfilePageData(options: {
 	username: string;
 	tab: ProfileTab;
@@ -466,7 +628,11 @@ export async function getProfilePageData(options: {
 
 	const isOwner = options.viewer?.id === profileUser.id;
 	const isAdmin = (options.viewer?.adminLevel ?? 0) > 0;
-	const isPrivateRestricted = profileUser.isPrivate && !isOwner && !isAdmin;
+	const isSavedTab =
+		options.tab === "saved-comments" || options.tab === "saved-posts";
+	const isPrivateRestricted = isSavedTab
+		? !isOwner && !isAdmin
+		: profileUser.isPrivate && !isOwner && !isAdmin;
 	const followingCount = await getFollowingCount(profileUser.id);
 
 	let comments: ProfileCommentItem[] = [];
@@ -482,6 +648,25 @@ export async function getProfilePageData(options: {
 				page: options.page,
 			});
 			posts = result.rows;
+			hasNextPage = result.hasNextPage;
+		} else if (options.tab === "saved-posts") {
+			const result = await getSavedProfilePosts({
+				userId: profileUser.id,
+				sort: options.sort as SortType,
+				t: options.t,
+				page: options.page,
+			});
+			posts = result.rows;
+			hasNextPage = result.hasNextPage;
+		} else if (options.tab === "saved-comments") {
+			const result = await getSavedProfileComments({
+				userId: profileUser.id,
+				sort: options.sort as CommentFeedSortType,
+				t: options.t,
+				page: options.page,
+				viewerId: options.viewer?.id,
+			});
+			comments = result.rows;
 			hasNextPage = result.hasNextPage;
 		} else {
 			const result = await getProfileComments({

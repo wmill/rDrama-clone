@@ -31,6 +31,10 @@ import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-
 import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
+import { Route as AtusernameSavedPostsRouteImport } from './routes/@$username_.saved.posts'
+import { Route as AtusernameSavedCommentsRouteImport } from './routes/@$username_.saved.comments'
+import { Route as UUsernameSavedPostsRouteImport } from './routes/u.$username_.saved.posts'
+import { Route as UUsernameSavedCommentsRouteImport } from './routes/u.$username_.saved.comments'
 
 const SubmitRoute = SubmitRouteImport.update({
   id: '/submit',
@@ -142,6 +146,26 @@ const UUsernamePostsRoute = UUsernamePostsRouteImport.update({
   path: '/u/$username/posts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtusernameSavedPostsRoute = AtusernameSavedPostsRouteImport.update({
+  id: '/@$username_/saved/posts',
+  path: '/@$username/saved/posts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtusernameSavedCommentsRoute = AtusernameSavedCommentsRouteImport.update({
+  id: '/@$username_/saved/comments',
+  path: '/@$username/saved/comments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UUsernameSavedPostsRoute = UUsernameSavedPostsRouteImport.update({
+  id: '/u/$username_/saved/posts',
+  path: '/u/$username/saved/posts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UUsernameSavedCommentsRoute = UUsernameSavedCommentsRouteImport.update({
+  id: '/u/$username_/saved/comments',
+  path: '/u/$username/saved/comments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -165,7 +189,11 @@ export interface FileRoutesByFullPath {
   '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
   '/admin/': typeof AdminIndexRoute
+  '/@$username/saved/comments': typeof AtusernameSavedCommentsRoute
+  '/@$username/saved/posts': typeof AtusernameSavedPostsRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
+  '/u/$username/saved/comments': typeof UUsernameSavedCommentsRoute
+  '/u/$username/saved/posts': typeof UUsernameSavedPostsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -188,7 +216,11 @@ export interface FileRoutesByTo {
   '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
   '/admin': typeof AdminIndexRoute
+  '/@$username/saved/comments': typeof AtusernameSavedCommentsRoute
+  '/@$username/saved/posts': typeof AtusernameSavedPostsRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
+  '/u/$username/saved/comments': typeof UUsernameSavedCommentsRoute
+  '/u/$username/saved/posts': typeof UUsernameSavedPostsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -213,7 +245,11 @@ export interface FileRoutesById {
   '/u/$username': typeof UUsernameRoute
   '/u/me': typeof UMeRoute
   '/admin/': typeof AdminIndexRoute
+  '/@$username_/saved/comments': typeof AtusernameSavedCommentsRoute
+  '/@$username_/saved/posts': typeof AtusernameSavedPostsRoute
   '/u/$username_/posts': typeof UUsernamePostsRoute
+  '/u/$username_/saved/comments': typeof UUsernameSavedCommentsRoute
+  '/u/$username_/saved/posts': typeof UUsernameSavedPostsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -239,7 +275,11 @@ export interface FileRouteTypes {
     | '/u/$username'
     | '/u/me'
     | '/admin/'
+    | '/@$username/saved/comments'
+    | '/@$username/saved/posts'
     | '/u/$username/posts'
+    | '/u/$username/saved/comments'
+    | '/u/$username/saved/posts'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -262,7 +302,11 @@ export interface FileRouteTypes {
     | '/u/$username'
     | '/u/me'
     | '/admin'
+    | '/@$username/saved/comments'
+    | '/@$username/saved/posts'
     | '/u/$username/posts'
+    | '/u/$username/saved/comments'
+    | '/u/$username/saved/posts'
   id:
     | '__root__'
     | '/'
@@ -286,7 +330,11 @@ export interface FileRouteTypes {
     | '/u/$username'
     | '/u/me'
     | '/admin/'
+    | '/@$username_/saved/comments'
+    | '/@$username_/saved/posts'
     | '/u/$username_/posts'
+    | '/u/$username_/saved/comments'
+    | '/u/$username_/saved/posts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -307,7 +355,11 @@ export interface RootRouteChildren {
   PostIdRoute: typeof PostIdRoute
   UUsernameRoute: typeof UUsernameRoute
   UMeRoute: typeof UMeRoute
+  AtusernameSavedCommentsRoute: typeof AtusernameSavedCommentsRoute
+  AtusernameSavedPostsRoute: typeof AtusernameSavedPostsRoute
   UUsernamePostsRoute: typeof UUsernamePostsRoute
+  UUsernameSavedCommentsRoute: typeof UUsernameSavedCommentsRoute
+  UUsernameSavedPostsRoute: typeof UUsernameSavedPostsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -466,6 +518,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UUsernamePostsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/@$username_/saved/posts': {
+      id: '/@$username_/saved/posts'
+      path: '/@$username/saved/posts'
+      fullPath: '/@$username/saved/posts'
+      preLoaderRoute: typeof AtusernameSavedPostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/@$username_/saved/comments': {
+      id: '/@$username_/saved/comments'
+      path: '/@$username/saved/comments'
+      fullPath: '/@$username/saved/comments'
+      preLoaderRoute: typeof AtusernameSavedCommentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$username_/saved/posts': {
+      id: '/u/$username_/saved/posts'
+      path: '/u/$username/saved/posts'
+      fullPath: '/u/$username/saved/posts'
+      preLoaderRoute: typeof UUsernameSavedPostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$username_/saved/comments': {
+      id: '/u/$username_/saved/comments'
+      path: '/u/$username/saved/comments'
+      fullPath: '/u/$username/saved/comments'
+      preLoaderRoute: typeof UUsernameSavedCommentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -503,7 +583,11 @@ const rootRouteChildren: RootRouteChildren = {
   PostIdRoute: PostIdRoute,
   UUsernameRoute: UUsernameRoute,
   UMeRoute: UMeRoute,
+  AtusernameSavedCommentsRoute: AtusernameSavedCommentsRoute,
+  AtusernameSavedPostsRoute: AtusernameSavedPostsRoute,
   UUsernamePostsRoute: UUsernamePostsRoute,
+  UUsernameSavedCommentsRoute: UUsernameSavedCommentsRoute,
+  UUsernameSavedPostsRoute: UUsernameSavedPostsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

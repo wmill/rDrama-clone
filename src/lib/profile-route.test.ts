@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	buildProfileCommentsHref,
 	buildProfilePostsHref,
+	buildProfileSavedCommentsHref,
+	buildProfileSavedPostsHref,
 	parseCommentsProfileSearch,
 	parsePostsProfileSearch,
 } from "@/lib/profile-route";
@@ -51,5 +53,21 @@ describe("profile-route helpers", () => {
 				page: 2,
 			}),
 		).toBe("/u/name%20with%20spaces/posts?sort=hot&t=week&page=2");
+
+		expect(
+			buildProfileSavedCommentsHref("name with spaces", {
+				sort: "new",
+				t: "all",
+				page: 1,
+			}),
+		).toBe("/u/name%20with%20spaces/saved/comments?sort=new&t=all&page=1");
+
+		expect(
+			buildProfileSavedPostsHref("name with spaces", {
+				sort: "hot",
+				t: "all",
+				page: 1,
+			}),
+		).toBe("/u/name%20with%20spaces/saved/posts?sort=hot&t=all&page=1");
 	});
 });

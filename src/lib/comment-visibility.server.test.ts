@@ -37,6 +37,7 @@ function makeRow(overrides: Partial<RawCommentRow>): RawCommentRow {
 		stateMod: "VISIBLE",
 		stateModSetBy: null,
 		userVoteType: 0,
+		savedCommentId: null,
 		isBlocking: false,
 		parentSubmissionPrivate: false,
 		parentSubmissionDeletedUtc: null,

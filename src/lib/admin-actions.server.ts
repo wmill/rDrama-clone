@@ -10,6 +10,12 @@ import {
 	users,
 } from "@/db/schema";
 import { getCurrentUser } from "@/lib/sessions.server";
+import {
+	setCommentPinnedState,
+	setCommentRemovedState,
+	setSubmissionRemovedState,
+	setSubmissionStickyState,
+} from "@/lib/lifecycle.server";
 
 type FilterAction = "normal" | "removed" | "ignored";
 
@@ -24,25 +30,26 @@ export const updateSubmissionFilterStatusFn = createServerFn({
 		}
 
 		if (data.action === "normal") {
-			await db
-				.update(submissions)
-				.set({ stateMod: "VISIBLE", stateReport: "RESOLVED" })
-				.where(eq(submissions.id, data.id));
-			await db.insert(modActions).values({
-				userId: user.id,
-				targetSubmissionId: data.id,
-				kind: "approve_post",
-			});
+			await setSubmissionRemovedState(
+				{
+					submissionId: data.id,
+					moderatorId: user.id,
+					moderatorName: user.username,
+					removed: false,
+					actionKind: "approve_post",
+				},
+				db,
+			);
 		} else if (data.action === "removed") {
-			await db
-				.update(submissions)
-				.set({ stateMod: "REMOVED", stateReport: "RESOLVED" })
-				.where(eq(submissions.id, data.id));
-			await db.insert(modActions).values({
-				userId: user.id,
-				targetSubmissionId: data.id,
-				kind: "remove_post",
-			});
+			await setSubmissionRemovedState(
+				{
+					submissionId: data.id,
+					moderatorId: user.id,
+					moderatorName: user.username,
+					removed: true,
+				},
+				db,
+			);
 		} else {
 			await db
 				.update(submissions)
@@ -62,25 +69,26 @@ export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
 		}
 
 		if (data.action === "normal") {
-			await db
-				.update(comments)
-				.set({ stateMod: "VISIBLE", stateReport: "RESOLVED" })
-				.where(eq(comments.id, data.id));
-			await db.insert(modActions).values({
-				userId: user.id,
-				targetCommentId: data.id,
-				kind: "approve_comment",
-			});
+			await setCommentRemovedState(
+				{
+					commentId: data.id,
+					moderatorId: user.id,
+					moderatorName: user.username,
+					removed: false,
+					actionKind: "approve_comment",
+				},
+				db,
+			);
 		} else if (data.action === "removed") {
-			await db
-				.update(comments)
-				.set({ stateMod: "REMOVED", stateReport: "RESOLVED" })
-				.where(eq(comments.id, data.id));
-			await db.insert(modActions).values({
-				userId: user.id,
-				targetCommentId: data.id,
-				kind: "remove_comment",
-			});
+			await setCommentRemovedState(
+				{
+					commentId: data.id,
+					moderatorId: user.id,
+					moderatorName: user.username,
+					removed: true,
+				},
+				db,
+			);
 		} else {
 			await db
 				.update(comments)
@@ -89,6 +97,86 @@ export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
 		}
 
 		return { success: true as const };
+	});
+
+export const removeSubmissionFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; removed: boolean }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const success = await setSubmissionRemovedState({
+			submissionId: data.id,
+			moderatorId: user.id,
+			moderatorName: user.username,
+			removed: data.removed,
+		});
+
+		return success
+			? { success: true as const }
+			: { success: false as const, error: "Post not found" };
+	});
+
+export const stickySubmissionFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; stickied: boolean }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const success = await setSubmissionStickyState({
+			submissionId: data.id,
+			moderatorId: user.id,
+			moderatorName: user.username,
+			stickied: data.stickied,
+		});
+
+		return success
+			? { success: true as const }
+			: { success: false as const, error: "Post not found" };
+	});
+
+export const removeCommentFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; removed: boolean }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const success = await setCommentRemovedState({
+			commentId: data.id,
+			moderatorId: user.id,
+			moderatorName: user.username,
+			removed: data.removed,
+		});
+
+		return success
+			? { success: true as const }
+			: { success: false as const, error: "Comment not found" };
+	});
+
+export const pinCommentFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; pinned: boolean }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const success = await setCommentPinnedState({
+			commentId: data.id,
+			moderatorId: user.id,
+			moderatorName: user.username,
+			pinned: data.pinned,
+		});
+
+		return success
+			? { success: true as const }
+			: { success: false as const, error: "Comment not found" };
 	});
 
 export const banUserFn = createServerFn({ method: "POST" })

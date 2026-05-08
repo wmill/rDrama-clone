@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { setSubmissionSavedState } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { deleteSubmission, updateSubmission } from "@/lib/submissions.server";
 
@@ -71,6 +72,23 @@ export const deleteSubmissionFn = createServerFn({ method: "POST" })
 				error: "You cannot delete this post",
 			};
 		}
+
+		return { success: true as const };
+	});
+
+export const saveSubmissionFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; saved: boolean }) => data)
+	.handler(async ({ data }: { data: { id: number; saved: boolean } }) => {
+		const user = await getCurrentUser();
+		if (!user) {
+			return { success: false as const, error: "Not logged in" };
+		}
+
+		await setSubmissionSavedState({
+			submissionId: data.id,
+			userId: user.id,
+			saved: data.saved,
+		});
 
 		return { success: true as const };
 	});

@@ -1,7 +1,12 @@
 import { and, desc, eq, isNull, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { submissions, users, votes } from "@/db/schema";
+import { saveRelationship, submissions, users, votes } from "@/db/schema";
+import {
+	authorDeleteSubmission,
+	DELETED_BY_AUTHOR_MESSAGE,
+	REMOVED_BY_MODERATOR_MESSAGE,
+} from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import type { VoteType } from "@/lib/votes.server";
 import type { SortType, TimeFilter } from "./constants";
@@ -25,6 +30,11 @@ export type SubmissionSummary = {
 	isPinned: boolean;
 	isNsfw: boolean;
 	stickied: string | null;
+	isStickied: boolean;
+	isDeleted: boolean;
+	isRemoved: boolean;
+	visibilityMessage: string | null;
+	isSaved: boolean;
 	userVote: VoteType;
 };
 
@@ -35,6 +45,59 @@ export type SubmissionDetail = SubmissionSummary & {
 	distinguishLevel: number;
 	userVote: VoteType;
 };
+
+type SubmissionRow = {
+	id: number;
+	title: string;
+	titleHtml: string;
+	createdUtc: number;
+	authorId: number;
+	authorName: string;
+	url: string | null;
+	body: string | null;
+	bodyHtml: string | null;
+	upvotes: number;
+	downvotes: number;
+	commentCount: number;
+	thumbUrl: string | null;
+	flair: string | null;
+	isPinned: boolean;
+	isNsfw: boolean;
+	stickied: string | null;
+	embedUrl?: string | null;
+	editedUtc?: number;
+	views?: number;
+	distinguishLevel?: number;
+	stateUserDeletedUtc: Date | null;
+	stateMod: string;
+	userVoteType: number | null;
+	savedSubmissionId: number | null;
+};
+
+function mapSubmissionRow<T extends SubmissionRow>(row: T) {
+	const isDeleted = row.stateUserDeletedUtc !== null;
+	const isRemoved = row.stateMod !== "VISIBLE";
+	const visibilityMessage = isDeleted
+		? DELETED_BY_AUTHOR_MESSAGE
+		: isRemoved
+			? REMOVED_BY_MODERATOR_MESSAGE
+			: null;
+
+	return {
+		...row,
+		body: visibilityMessage ? `[${visibilityMessage.toLowerCase()}]` : row.body,
+		bodyHtml: visibilityMessage
+			? `<p>[${visibilityMessage.toLowerCase()}]</p>`
+			: row.bodyHtml,
+		score: row.upvotes - row.downvotes,
+		userVote: (row.userVoteType as VoteType) ?? 0,
+		isStickied: row.stickied !== null,
+		isDeleted,
+		isRemoved,
+		visibilityMessage,
+		isSaved: row.savedSubmissionId !== null,
+	};
+}
 
 function getTimeFilterSeconds(filter: TimeFilter): number | null {
 	const now = Math.floor(Date.now() / 1000);
@@ -180,6 +243,9 @@ export async function getSubmissions(options: {
 			isNsfw: submissions.over18,
 			stickied: submissions.stickied,
 			userVoteType: votes.voteType,
+			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
+			stateMod: submissions.stateMod,
+			savedSubmissionId: saveRelationship.submissionId,
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
@@ -189,16 +255,21 @@ export async function getSubmissions(options: {
 				? and(eq(votes.submissionId, submissions.id), eq(votes.userId, userId))
 				: sql`false`,
 		)
+		.leftJoin(
+			saveRelationship,
+			userId
+				? and(
+						eq(saveRelationship.submissionId, submissions.id),
+						eq(saveRelationship.userId, userId),
+					)
+				: sql`false`,
+		)
 		.where(and(...conditions))
 		.orderBy(...orderBy)
 		.limit(limit)
 		.offset(offset);
 
-	return results.map(({ userVoteType, ...row }) => ({
-		...row,
-		score: row.upvotes - row.downvotes,
-		userVote: (userVoteType as VoteType) ?? 0,
-	}));
+	return results.map((row) => mapSubmissionRow(row));
 }
 
 export async function getSubmissionById(
@@ -231,6 +302,7 @@ export async function getSubmissionById(
 			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
 			stateMod: submissions.stateMod,
 			userVoteType: votes.voteType,
+			savedSubmissionId: saveRelationship.submissionId,
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
@@ -240,27 +312,22 @@ export async function getSubmissionById(
 				? and(eq(votes.submissionId, submissions.id), eq(votes.userId, userId))
 				: sql`false`,
 		)
+		.leftJoin(
+			saveRelationship,
+			userId
+				? and(
+						eq(saveRelationship.submissionId, submissions.id),
+						eq(saveRelationship.userId, userId),
+					)
+				: sql`false`,
+		)
 		.where(eq(submissions.id, id))
 		.limit(1);
 
 	if (!result) return null;
 
-	if (result.stateMod !== "VISIBLE") {
-		return null;
-	}
-
-	if (result.stateUserDeletedUtc !== null) {
-		return null;
-	}
-
-	const { userVoteType, stateUserDeletedUtc, stateMod, ...rest } = result;
-	void stateUserDeletedUtc;
-	void stateMod;
-	return {
-		...rest,
-		score: rest.upvotes - rest.downvotes,
-		userVote: (userVoteType as VoteType) ?? 0,
-	};
+	const mapped = mapSubmissionRow(result);
+	return mapped;
 }
 
 export async function incrementViews(id: number): Promise<void> {
@@ -348,18 +415,7 @@ export async function deleteSubmission(
 	id: number,
 	authorId: number,
 ): Promise<boolean> {
-	const result = await db
-		.update(submissions)
-		.set({
-			stateUserDeletedUtc: new Date(),
-			body: "[deleted]",
-			bodyHtml: "[deleted]",
-			editedUtc: Math.floor(Date.now() / 1000),
-		})
-		.where(and(eq(submissions.id, id), eq(submissions.authorId, authorId)))
-		.returning({ id: submissions.id });
-
-	return result.length > 0;
+	return authorDeleteSubmission(id, authorId);
 }
 
 export async function getRandomSubmissionId(): Promise<number | null> {

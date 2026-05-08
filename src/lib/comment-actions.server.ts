@@ -6,6 +6,7 @@ import {
 	getCommentsBySubmissionSince,
 	updateComment,
 } from "@/lib/comments.server";
+import { setCommentSavedState } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 
 export const createCommentFn = createServerFn({ method: "POST" })
@@ -69,6 +70,23 @@ export const deleteCommentFn = createServerFn({ method: "POST" })
 		}
 		const result = await deleteComment(data.id, user.id);
 		return { success: result };
+	});
+
+export const saveCommentFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; saved: boolean }) => data)
+	.handler(async ({ data }: { data: { id: number; saved: boolean } }) => {
+		const user = await getCurrentUser();
+		if (!user) {
+			return { success: false as const, error: "Not logged in" };
+		}
+
+		await setCommentSavedState({
+			commentId: data.id,
+			userId: user.id,
+			saved: data.saved,
+		});
+
+		return { success: true as const };
 	});
 
 export const getCommentsSinceFn = createServerFn({ method: "GET" })

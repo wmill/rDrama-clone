@@ -8,10 +8,15 @@ import replyUrl from "lucide-static/icons/reply.svg?url";
 import trash2Url from "lucide-static/icons/trash-2.svg?url";
 import { memo, useMemo, useState } from "react";
 import { IconMask } from "@/components/ui/icon-mask";
-import { distinguishCommentFn } from "@/lib/admin-actions.server";
+import {
+	distinguishCommentFn,
+	pinCommentFn,
+	removeCommentFn,
+} from "@/lib/admin-actions.server";
 import {
 	createCommentFn,
 	deleteCommentFn,
+	saveCommentFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
 import type { CommentFlat, CommentWithReplies } from "@/lib/comments.server";
@@ -51,7 +56,13 @@ export const Comment = memo(function Comment({
 		comment.distinguishLevel,
 	);
 	const [isDistinguishing, setIsDistinguishing] = useState(false);
-	const isModHidden = comment.isModHidden;
+	const [isSaved, setIsSaved] = useState(comment.isSaved);
+	const [isRemoved, setIsRemoved] = useState(comment.isRemoved);
+	const [isPinned, setIsPinned] = useState(comment.isPinned);
+	const [isSavingComment, setIsSavingComment] = useState(false);
+	const [isRemoving, setIsRemoving] = useState(false);
+	const [isPinning, setIsPinning] = useState(false);
+	const isModHidden = comment.isModHidden || isRemoved;
 	const isContentHidden = isDeleted || isModHidden;
 	const visibilityMessage = comment.visibilityMessage;
 
@@ -64,6 +75,7 @@ export const Comment = memo(function Comment({
 
 	const canDistinguish =
 		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
+	const canModerate = currentUserAdminLevel >= 2;
 
 	const handleDelete = async () => {
 		try {
@@ -75,7 +87,22 @@ export const Comment = memo(function Comment({
 		const result = await deleteCommentFn({ data: { id: comment.id } });
 		if (result.success) {
 			setIsDeleted(true);
-			setCurrentBody("[deleted]");
+			setCurrentBody("<p>[deleted by author]</p>");
+		}
+	};
+
+	const handleToggleSave = async () => {
+		setIsSavingComment(true);
+		try {
+			const nextSaved = !isSaved;
+			const result = await saveCommentFn({
+				data: { id: comment.id, saved: nextSaved },
+			});
+			if (result.success) {
+				setIsSaved(nextSaved);
+			}
+		} finally {
+			setIsSavingComment(false);
 		}
 	};
 
@@ -111,6 +138,39 @@ export const Comment = memo(function Comment({
 			}
 		} finally {
 			setIsDistinguishing(false);
+		}
+	};
+
+	const handleToggleRemoved = async () => {
+		setIsRemoving(true);
+		try {
+			const nextRemoved = !isRemoved;
+			const result = await removeCommentFn({
+				data: { id: comment.id, removed: nextRemoved },
+			});
+			if (result.success) {
+				setIsRemoved(nextRemoved);
+				setCurrentBody(
+					nextRemoved ? "<p>[removed by moderator]</p>" : comment.bodyHtml,
+				);
+			}
+		} finally {
+			setIsRemoving(false);
+		}
+	};
+
+	const handleTogglePinned = async () => {
+		setIsPinning(true);
+		try {
+			const nextPinned = !isPinned;
+			const result = await pinCommentFn({
+				data: { id: comment.id, pinned: nextPinned },
+			});
+			if (result.success) {
+				setIsPinned(nextPinned);
+			}
+		} finally {
+			setIsPinning(false);
 		}
 	};
 
@@ -180,6 +240,11 @@ export const Comment = memo(function Comment({
 							MOD
 						</span>
 					)}
+					{isPinned && (
+						<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+							Pinned
+						</span>
+					)}
 
 					<span className="flex items-center gap-1">
 						<IconMask
@@ -243,7 +308,11 @@ export const Comment = memo(function Comment({
 										<div
 											className="prose prose-invert prose-sm max-w-none text-slate-300"
 											// biome-ignore lint/security/noDangerouslySetInnerHtml: Content sanitized server-side
-											dangerouslySetInnerHTML={{ __html: currentBody }}
+											dangerouslySetInnerHTML={{
+												__html: isContentHidden
+													? currentBody
+													: currentBody,
+											}}
 										/>
 									</>
 								)}
@@ -289,6 +358,21 @@ export const Comment = memo(function Comment({
 											Permalink
 										</Link>
 
+										{currentUserId && (
+											<button
+												type="button"
+												onClick={handleToggleSave}
+												disabled={isSavingComment}
+												className="text-slate-500 hover:text-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{isSavingComment
+													? "Saving..."
+													: isSaved
+														? "Unsave"
+														: "Save"}
+											</button>
+										)}
+
 										{isAuthor && !isDeleted && !isModHidden && (
 											<>
 												<button
@@ -329,6 +413,35 @@ export const Comment = memo(function Comment({
 											>
 												{distinguishLevel > 0 ? "Undistinguish" : "Distinguish"}
 											</button>
+										)}
+
+										{canModerate && (
+											<>
+												<button
+													type="button"
+													onClick={handleToggleRemoved}
+													disabled={isRemoving}
+													className="text-slate-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													{isRemoving
+														? "Updating..."
+														: isRemoved
+															? "Unremove"
+															: "Remove"}
+												</button>
+												<button
+													type="button"
+													onClick={handleTogglePinned}
+													disabled={isPinning}
+													className="text-slate-500 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													{isPinning
+														? "Updating..."
+														: isPinned
+															? "Unpin"
+															: "Pin"}
+												</button>
+											</>
 										)}
 									</div>
 								)}

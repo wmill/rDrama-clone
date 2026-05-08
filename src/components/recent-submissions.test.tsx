@@ -49,6 +49,11 @@ const baseSubmission: SubmissionSummary = {
 	isPinned: false,
 	isNsfw: false,
 	stickied: null,
+	isStickied: false,
+	isDeleted: false,
+	isRemoved: false,
+	visibilityMessage: null,
+	isSaved: false,
 	userVote: -1,
 };
 

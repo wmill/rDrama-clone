@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { ExternalLink, FileText, MessageSquare } from "lucide-react";
+import { useState } from "react";
 
 import { VoteButtons } from "@/components/comments/VoteButtons";
 import type { SortType, TimeFilter } from "@/lib/constants";
+import { saveSubmissionFn } from "@/lib/post-actions.server";
 import type { SubmissionSummary } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -116,117 +118,155 @@ export function RecentSubmissions({
 
 			<ul className="grid gap-3">
 				{submissions.map((submission) => (
-					<li
+					<SubmissionListItem
 						key={submission.id}
-						className="group relative overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/80 transition-all duration-200 hover:-translate-y-[1px] hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/10"
-					>
-						<div className="flex">
-							{/* Vote column */}
-							<div className="flex w-12 flex-col items-center justify-center bg-slate-800/50 py-3">
-								<VoteButtons
-									type="submission"
-									id={submission.id}
-									score={submission.score}
-									userVote={submission.userVote}
-									size="sm"
-									disabled={!currentUserId}
-								/>
-							</div>
-
-							{/* Content */}
-							<div className="flex-1 p-3">
-								<div className="flex items-start gap-3">
-									{/* Thumbnail placeholder */}
-									{submission.thumbUrl ? (
-										<img
-											src={submission.thumbUrl}
-											alt=""
-											className="h-16 w-16 rounded-lg object-cover"
-										/>
-									) : submission.url ? (
-										<div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-700">
-											<ExternalLink className="h-6 w-6 text-slate-400" />
-										</div>
-									) : null}
-
-									<div className="min-w-0 flex-1">
-										{/* Title */}
-										<h3 className="text-base font-medium text-white">
-											<Link
-												to="/post/$id"
-												params={{ id: String(submission.id) }}
-												search={{ sort: "top" }}
-												className="hover:text-cyan-400"
-											>
-												{submission.title}
-											</Link>
-											{submission.url && (
-												<a
-													href={submission.url}
-													target="_blank"
-													rel="noopener noreferrer"
-													className="ml-2 text-xs text-slate-500 hover:text-cyan-400"
-												>
-													({new URL(submission.url).hostname})
-												</a>
-											)}
-										</h3>
-
-										{/* Meta line */}
-										<p className="mt-1 text-sm text-slate-400">
-											<span className="text-slate-500">by</span>{" "}
-											<Link
-												to="/u/$username"
-												params={{ username: submission.authorName }}
-												search={{ sort: "new", t: "all", page: 1 }}
-												className="font-medium text-cyan-400 hover:underline"
-											>
-												{submission.authorName}
-											</Link>{" "}
-											<span className="text-slate-600">&middot;</span>{" "}
-											{formatRelativeTime(submission.createdUtc)}
-										</p>
-
-										{/* Tags and actions */}
-										<div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-											{submission.isPinned && (
-												<span className="rounded bg-green-500/20 px-2 py-0.5 font-medium text-green-400">
-													Pinned
-												</span>
-											)}
-											{submission.isNsfw && (
-												<span className="rounded bg-red-500/20 px-2 py-0.5 font-medium text-red-400">
-													NSFW
-												</span>
-											)}
-											{submission.flair && (
-												<span className="rounded bg-slate-700 px-2 py-0.5 text-slate-300">
-													{submission.flair}
-												</span>
-											)}
-											<Link
-												to="/post/$id"
-												params={{ id: String(submission.id) }}
-												search={{ sort: "top" }}
-												className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
-											>
-												<MessageSquare className="h-3.5 w-3.5" />
-												{submission.commentCount} comments
-											</Link>
-											{!submission.url && (
-												<span className="flex items-center gap-1 text-slate-500">
-													<FileText className="h-3.5 w-3.5" />
-													Text
-												</span>
-											)}
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-					</li>
+						submission={submission}
+						currentUserId={currentUserId}
+					/>
 				))}
 			</ul>
 		</div>
+	);
+}
+
+function SubmissionListItem({
+	submission,
+	currentUserId,
+}: {
+	submission: SubmissionSummary;
+	currentUserId?: number;
+}) {
+	const [isSaved, setIsSaved] = useState(submission.isSaved);
+	const [isSaving, setIsSaving] = useState(false);
+
+	return (
+		<li className="group relative overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/80 transition-all duration-200 hover:-translate-y-[1px] hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/10">
+			<div className="flex">
+				<div className="flex w-12 flex-col items-center justify-center bg-slate-800/50 py-3">
+					<VoteButtons
+						type="submission"
+						id={submission.id}
+						score={submission.score}
+						userVote={submission.userVote}
+						size="sm"
+						disabled={!currentUserId}
+					/>
+				</div>
+
+				<div className="flex-1 p-3">
+					<div className="flex items-start gap-3">
+						{submission.thumbUrl ? (
+							<img
+								src={submission.thumbUrl}
+								alt=""
+								className="h-16 w-16 rounded-lg object-cover"
+							/>
+						) : submission.url ? (
+							<div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-700">
+								<ExternalLink className="h-6 w-6 text-slate-400" />
+							</div>
+						) : null}
+
+						<div className="min-w-0 flex-1">
+							<h3 className="text-base font-medium text-white">
+								<Link
+									to="/post/$id"
+									params={{ id: String(submission.id) }}
+									search={{ sort: "top" }}
+									className="hover:text-cyan-400"
+								>
+									{submission.title}
+								</Link>
+								{submission.url && (
+									<a
+										href={submission.url}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="ml-2 text-xs text-slate-500 hover:text-cyan-400"
+									>
+										({new URL(submission.url).hostname})
+									</a>
+								)}
+							</h3>
+
+							<p className="mt-1 text-sm text-slate-400">
+								<span className="text-slate-500">by</span>{" "}
+								<Link
+									to="/u/$username"
+									params={{ username: submission.authorName }}
+									search={{ sort: "new", t: "all", page: 1 }}
+									className="font-medium text-cyan-400 hover:underline"
+								>
+									{submission.authorName}
+								</Link>{" "}
+								<span className="text-slate-600">&middot;</span>{" "}
+								{formatRelativeTime(submission.createdUtc)}
+							</p>
+
+							<div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+								{submission.isPinned && (
+									<span className="rounded bg-green-500/20 px-2 py-0.5 font-medium text-green-400">
+										Pinned
+									</span>
+								)}
+								{submission.isStickied && (
+									<span className="rounded bg-amber-500/20 px-2 py-0.5 font-medium text-amber-300">
+										Stickied
+									</span>
+								)}
+								{submission.isNsfw && (
+									<span className="rounded bg-red-500/20 px-2 py-0.5 font-medium text-red-400">
+										NSFW
+									</span>
+								)}
+								{submission.flair && (
+									<span className="rounded bg-slate-700 px-2 py-0.5 text-slate-300">
+										{submission.flair}
+									</span>
+								)}
+								<Link
+									to="/post/$id"
+									params={{ id: String(submission.id) }}
+									search={{ sort: "top" }}
+									className="flex items-center gap-1 text-slate-500 hover:text-cyan-400"
+								>
+									<MessageSquare className="h-3.5 w-3.5" />
+									{submission.commentCount} comments
+								</Link>
+								{!submission.url && (
+									<span className="flex items-center gap-1 text-slate-500">
+										<FileText className="h-3.5 w-3.5" />
+										Text
+									</span>
+								)}
+								{currentUserId && (
+									<button
+										type="button"
+										onClick={async () => {
+											setIsSaving(true);
+											try {
+												const nextSaved = !isSaved;
+												const result = await saveSubmissionFn({
+													data: { id: submission.id, saved: nextSaved },
+												});
+												if (result.success) {
+													setIsSaved(nextSaved);
+												}
+											} finally {
+												setIsSaving(false);
+											}
+										}}
+										disabled={isSaving}
+										className="text-slate-500 hover:text-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+									>
+										{isSaving ? "Saving..." : isSaved ? "Unsave" : "Save"}
+									</button>
+								)}
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</li>
 	);
 }

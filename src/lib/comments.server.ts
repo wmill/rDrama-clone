@@ -13,6 +13,7 @@ import {
 import { db } from "@/db";
 import {
 	comments,
+	commentSaveRelationship,
 	commentVotes,
 	submissions,
 	userBlocks,
@@ -24,6 +25,9 @@ import {
 	getCommentVisibility,
 	shouldIncludeCommentInFeed,
 } from "@/lib/comment-visibility.server";
+import {
+	authorDeleteComment,
+} from "@/lib/lifecycle.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
 import type { VoteType } from "@/lib/votes.server";
 import type { CommentFeedSortType, TimeFilter } from "./constants";
@@ -45,6 +49,8 @@ export type CommentFeedItem = {
 	submissionTitle: string;
 	distinguishLevel: number;
 	isDeleted: boolean;
+	isRemoved: boolean;
+	isSaved: boolean;
 	userVote: VoteType;
 };
 
@@ -66,6 +72,9 @@ export type CommentSummary = {
 	pinnedBy: string | null;
 	distinguishLevel: number;
 	isDeleted: boolean;
+	isRemoved: boolean;
+	isPinned: boolean;
+	isSaved: boolean;
 	isModHidden: boolean;
 	visibilityMessage?: string | null;
 	userVote: VoteType;
@@ -102,6 +111,7 @@ export type RawCommentRow = {
 	stateMod: string | null;
 	stateModSetBy: string | null;
 	userVoteType: number | null;
+	savedCommentId: number | null;
 	isBlocking: boolean;
 	parentSubmissionPrivate?: boolean | null;
 	parentSubmissionDeletedUtc?: Date | null;
@@ -179,6 +189,9 @@ function mapCommentRow(row: RawCommentRow): CommentFlat {
 		pinnedBy: row.pinnedBy,
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: row.stateUserDeletedUtc !== null,
+		isRemoved: row.stateMod !== "VISIBLE",
+		isPinned: row.pinnedBy !== null,
+		isSaved: row.savedCommentId !== null,
 		isModHidden: false,
 		userVote: (row.userVoteType as VoteType) ?? 0,
 	};
@@ -212,7 +225,7 @@ function mapThreadCommentRow(
 			...mapCommentRow(row),
 			authorName: "[deleted]",
 			body: visibility.message ?? MOD_HIDDEN_PLACEHOLDER,
-			bodyHtml: visibility.message ?? MOD_HIDDEN_PLACEHOLDER,
+			bodyHtml: `<p>${visibility.message ?? MOD_HIDDEN_PLACEHOLDER}</p>`,
 			isModHidden: true,
 			visibilityMessage: visibility.message,
 		};
@@ -301,6 +314,7 @@ async function getSubmissionCommentRows(
 			stateMod: comments.stateMod,
 			stateModSetBy: comments.stateModSetBy,
 			userVoteType: commentVotes.voteType,
+			savedCommentId: commentSaveRelationship.commentId,
 			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
@@ -311,6 +325,15 @@ async function getSubmissionCommentRows(
 				? and(
 						eq(commentVotes.commentId, comments.id),
 						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			commentSaveRelationship,
+			userId
+				? and(
+						eq(commentSaveRelationship.commentId, comments.id),
+						eq(commentSaveRelationship.userId, userId),
 					)
 				: sql`false`,
 		)
@@ -394,6 +417,7 @@ async function getRawCommentRowById(
 			stateMod: comments.stateMod,
 			stateModSetBy: comments.stateModSetBy,
 			userVoteType: commentVotes.voteType,
+			savedCommentId: commentSaveRelationship.commentId,
 			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
@@ -404,6 +428,15 @@ async function getRawCommentRowById(
 				? and(
 						eq(commentVotes.commentId, comments.id),
 						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			commentSaveRelationship,
+			userId
+				? and(
+						eq(commentSaveRelationship.commentId, comments.id),
+						eq(commentSaveRelationship.userId, userId),
 					)
 				: sql`false`,
 		)
@@ -459,12 +492,15 @@ async function getRawCommentSubtreeRows(
 			c.state_mod,
 			c.state_mod_set_by,
 			cv.vote_type AS user_vote_type,
+			csr.comment_id AS saved_comment_id,
 			ub.target_id AS blocked_target_id
 		FROM comments c
 		INNER JOIN target t ON c.path <@ t.path
 		INNER JOIN users u ON c.author_id = u.id
 		LEFT JOIN commentvotes cv
 			ON cv.comment_id = c.id AND cv.user_id = ${userIdParam}
+		LEFT JOIN comment_save_relationship csr
+			ON csr.comment_id = c.id AND csr.user_id = ${userIdParam}
 		LEFT JOIN userblocks ub
 			ON ub.user_id = ${userIdParam} AND ub.target_id = c.author_id
 		ORDER BY c.level ASC, c.created_utc DESC, c.id DESC`,
@@ -491,6 +527,7 @@ async function getRawCommentSubtreeRows(
 		stateMod: row.state_mod as string | null,
 		stateModSetBy: row.state_mod_set_by as string | null,
 		userVoteType: row.user_vote_type as number | null,
+		savedCommentId: row.saved_comment_id as number | null,
 		isBlocking: row.blocked_target_id !== null,
 	}));
 }
@@ -521,7 +558,21 @@ export async function getCommentThreadFlat(
 	if (rows.length === 0) return null;
 
 	const filtered = filterThreadComments(rows, viewer);
-	return filtered.some((row) => row.id === id) ? filtered : null;
+	if (filtered.some((row) => row.id === id)) {
+		return filtered;
+	}
+
+	const target = rows.find((row) => row.id === id);
+	if (!target) {
+		return null;
+	}
+
+	const placeholder = mapThreadCommentRow(target, viewer, true);
+	if (!placeholder) {
+		return null;
+	}
+
+	return [placeholder, ...filtered];
 }
 
 export async function getCommentById(
@@ -532,7 +583,7 @@ export async function getCommentById(
 	const row = await getRawCommentRowById(id, userId);
 	if (!row) return null;
 
-	const mapped = mapThreadCommentRow(row, viewer, false);
+	const mapped = mapThreadCommentRow(row, viewer, true);
 	return mapped;
 }
 
@@ -559,6 +610,7 @@ export async function getRecentComments(
 			distinguishLevel: comments.distinguishLevel,
 			stateUserDeletedUtc: comments.stateUserDeletedUtc,
 			stateMod: comments.stateMod,
+			savedCommentId: sql<number | null>`null`,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
@@ -590,6 +642,9 @@ export async function getRecentComments(
 		pinnedBy: row.pinnedBy,
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: false,
+		isRemoved: false,
+		isPinned: row.pinnedBy !== null,
+		isSaved: false,
 		isModHidden: false,
 		userVote: 0 as VoteType,
 	}));
@@ -680,6 +735,7 @@ export async function getCommentsFeed(
 			stateMod: comments.stateMod,
 			stateModSetBy: comments.stateModSetBy,
 			userVoteType: commentVotes.voteType,
+			savedCommentId: commentSaveRelationship.commentId,
 			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
@@ -691,6 +747,15 @@ export async function getCommentsFeed(
 				? and(
 						eq(commentVotes.commentId, comments.id),
 						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			commentSaveRelationship,
+			userId
+				? and(
+						eq(commentSaveRelationship.commentId, comments.id),
+						eq(commentSaveRelationship.userId, userId),
 					)
 				: sql`false`,
 		)
@@ -748,6 +813,8 @@ export async function getCommentsFeed(
 			submissionTitle: row.submissionTitle,
 			distinguishLevel: row.distinguishLevel,
 			isDeleted: false,
+			isRemoved: false,
+			isSaved: row.savedCommentId !== null,
 			userVote: (row.userVoteType as VoteType) ?? 0,
 		}));
 }
@@ -791,6 +858,7 @@ export async function getCommentAncestors(
 			stateMod: comments.stateMod,
 			stateModSetBy: comments.stateModSetBy,
 			userVoteType: commentVotes.voteType,
+			savedCommentId: commentSaveRelationship.commentId,
 			blockedTargetId: userBlocks.targetId,
 		})
 		.from(comments)
@@ -801,6 +869,15 @@ export async function getCommentAncestors(
 				? and(
 						eq(commentVotes.commentId, comments.id),
 						eq(commentVotes.userId, userId),
+					)
+				: sql`false`,
+		)
+		.leftJoin(
+			commentSaveRelationship,
+			userId
+				? and(
+						eq(commentSaveRelationship.commentId, comments.id),
+						eq(commentSaveRelationship.userId, userId),
 					)
 				: sql`false`,
 		)
@@ -933,17 +1010,7 @@ export async function deleteComment(
 	id: number,
 	authorId: number,
 ): Promise<boolean> {
-	const result = await db
-		.update(comments)
-		.set({
-			stateUserDeletedUtc: new Date(),
-			body: "[deleted]",
-			bodyHtml: "[deleted]",
-		})
-		.where(and(eq(comments.id, id), eq(comments.authorId, authorId)))
-		.returning({ id: comments.id });
-
-	return result.length > 0;
+	return authorDeleteComment(id, authorId);
 }
 
 // export async function getCommentContext(

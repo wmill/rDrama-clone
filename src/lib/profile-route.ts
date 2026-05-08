@@ -108,3 +108,17 @@ export function buildProfilePostsHref(
 ): string {
 	return `/u/${encodeURIComponent(username)}/posts?${buildSearchParams(search).toString()}`;
 }
+
+export function buildProfileSavedCommentsHref(
+	username: string,
+	search: ProfileCommentsSearch,
+): string {
+	return `/u/${encodeURIComponent(username)}/saved/comments?${buildSearchParams(search).toString()}`;
+}
+
+export function buildProfileSavedPostsHref(
+	username: string,
+	search: ProfilePostsSearch,
+): string {
+	return `/u/${encodeURIComponent(username)}/saved/posts?${buildSearchParams(search).toString()}`;
+}

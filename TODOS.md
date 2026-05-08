@@ -20,11 +20,11 @@ These are the main blockers to replacing `rDrama` for normal site use.
 
 ### Post lifecycle parity
 
-- [ ] Match legacy post state transitions instead of treating edit/delete as author-only CRUD.
-- [ ] Add moderator remove/unremove flows for submissions and comments.
-- [ ] Add sticky/pin behavior and remaining distinguish/staff-state parity.
-- [ ] Add save/unsave behavior and saved-content surfaces.
-- [ ] Tighten deleted/removed visibility and counters so content matches `rDrama` semantics instead of disappearing outright.
+- [x] Match legacy post state transitions instead of treating edit/delete as author-only CRUD.
+- [x] Add moderator remove/unremove flows for submissions and comments.
+- [x] Add sticky/pin behavior and remaining distinguish/staff-state parity.
+- [x] Add save/unsave behavior and saved-content surfaces.
+- [x] Tighten deleted/removed visibility and counters so content matches `rDrama` semantics instead of disappearing outright.
 - [ ] Add tests for author delete, moderator remove/unremove, deleted-post visibility, and permission boundaries.
 
 ### Notifications
@@ -89,7 +89,7 @@ Current admin/moderation support exists, but it is still a narrow subset of `rDr
 
 ## Test plan
 
-Current baseline: `pnpm test --run` passes with 13 test files and 53 tests, but coverage is still concentrated in utilities and component behavior.
+Current baseline: `pnpm test --run` passes with 14 test files and 58 tests, but coverage is still concentrated in utilities and component behavior.
 
 Priority additions:
 

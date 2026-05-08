@@ -14,13 +14,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { distinguishSubmissionFn } from "@/lib/admin-actions.server";
+import {
+	distinguishSubmissionFn,
+	removeSubmissionFn,
+	stickySubmissionFn,
+} from "@/lib/admin-actions.server";
 import {
 	type CommentSortType,
 	getCommentsBySubmissionFlat,
 } from "@/lib/comments.server";
 import {
 	deleteSubmissionFn,
+	saveSubmissionFn,
 	type UpdateSubmissionInput,
 	updateSubmissionFn,
 } from "@/lib/post-actions.server";
@@ -167,6 +172,15 @@ function PostContent({
 		post.distinguishLevel,
 	);
 	const [isDistinguishing, setIsDistinguishing] = useState(false);
+	const [isSaved, setIsSaved] = useState(post.isSaved);
+	const [isRemoved, setIsRemoved] = useState(post.isRemoved);
+	const [isStickied, setIsStickied] = useState(post.isStickied);
+	const [visibilityMessage, setVisibilityMessage] = useState(
+		post.visibilityMessage,
+	);
+	const [isSavingPost, setIsSavingPost] = useState(false);
+	const [isRemoving, setIsRemoving] = useState(false);
+	const [isTogglingSticky, setIsTogglingSticky] = useState(false);
 	const titleId = useId();
 	const urlId = useId();
 	const bodyId = useId();
@@ -174,6 +188,8 @@ function PostContent({
 
 	const canDistinguish =
 		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
+	const canModerate = currentUserAdminLevel >= 2;
+	const isLifecycleHidden = post.isDeleted || isRemoved;
 
 	const handleSave = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -221,11 +237,87 @@ function PostContent({
 				return;
 			}
 
-			await router.navigate({ to: "/", search: { sort: "hot", t: "all" } });
+			setVisibilityMessage("Deleted by author");
+			await router.invalidate();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to delete post");
 		} finally {
 			setIsDeleting(false);
+		}
+	};
+
+	const handleToggleSave = async () => {
+		setIsSavingPost(true);
+		setError(null);
+
+		try {
+			const nextSaved = !isSaved;
+			const result = await saveSubmissionFn({
+				data: { id: post.id, saved: nextSaved },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setIsSaved(nextSaved);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to save post");
+		} finally {
+			setIsSavingPost(false);
+		}
+	};
+
+	const handleToggleRemoved = async () => {
+		setIsRemoving(true);
+		setError(null);
+
+		try {
+			const nextRemoved = !isRemoved;
+			const result = await removeSubmissionFn({
+				data: { id: post.id, removed: nextRemoved },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setIsRemoved(nextRemoved);
+			setVisibilityMessage(
+				nextRemoved
+					? "Removed by moderator"
+					: post.isDeleted
+						? "Deleted by author"
+						: null,
+			);
+			await router.invalidate();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to update post");
+		} finally {
+			setIsRemoving(false);
+		}
+	};
+
+	const handleToggleSticky = async () => {
+		setIsTogglingSticky(true);
+		setError(null);
+
+		try {
+			const nextStickied = !isStickied;
+			const result = await stickySubmissionFn({
+				data: { id: post.id, stickied: nextStickied },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setIsStickied(nextStickied);
+			await router.invalidate();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to sticky post");
+		} finally {
+			setIsTogglingSticky(false);
 		}
 	};
 
@@ -306,6 +398,11 @@ function PostContent({
 							MOD
 						</span>
 					)}
+					{isStickied && (
+						<span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-300">
+							Stickied
+						</span>
+					)}
 				</div>
 			</div>
 
@@ -325,6 +422,12 @@ function PostContent({
 
 				{/* Content */}
 				<div className="flex-1 p-6">
+					{visibilityMessage && (
+						<div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+							{visibilityMessage}
+						</div>
+					)}
+
 					{isEditing ? (
 						<form onSubmit={handleSave} className="space-y-6">
 							{error && (
@@ -467,7 +570,7 @@ function PostContent({
 								</div>
 							)}
 
-							{post.embedUrl && (
+							{post.embedUrl && !isLifecycleHidden && (
 								<div className="mt-4 aspect-video">
 									<iframe
 										src={post.embedUrl}
@@ -505,6 +608,17 @@ function PostContent({
 				{currentUserId && (
 					<button
 						type="button"
+						disabled={isSavingPost}
+						onClick={handleToggleSave}
+						className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						{isSavingPost ? "Saving..." : isSaved ? "Unsave" : "Save"}
+					</button>
+				)}
+
+				{currentUserId && !isLifecycleHidden && (
+					<button
+						type="button"
 						disabled={isReporting}
 						onClick={handleReport}
 						className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
@@ -530,7 +644,36 @@ function PostContent({
 					</button>
 				)}
 
-				{isAuthor && (
+				{canModerate && (
+					<>
+						<button
+							type="button"
+							disabled={isRemoving}
+							onClick={handleToggleRemoved}
+							className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+						>
+							{isRemoving
+								? "Updating..."
+								: isRemoved
+									? "Unremove"
+									: "Remove"}
+						</button>
+						<button
+							type="button"
+							disabled={isTogglingSticky}
+							onClick={handleToggleSticky}
+							className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+						>
+							{isTogglingSticky
+								? "Updating..."
+								: isStickied
+									? "Unsticky"
+									: "Sticky"}
+						</button>
+					</>
+				)}
+
+				{isAuthor && !isLifecycleHidden && (
 					<div className="ml-auto flex gap-2">
 						<Button
 							variant="outline"

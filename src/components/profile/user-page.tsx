@@ -74,9 +74,14 @@ export function UserPage({
 	const user = data.profileUser;
 	const avatarHref = user.highRes || user.profileUrl || undefined;
 	const sortOptions =
-		data.tab === "posts" ? postSortOptions : commentSortOptions;
+		data.tab === "posts" || data.tab === "saved-posts"
+			? postSortOptions
+			: commentSortOptions;
 
 	const isAdmin = (data.viewer?.adminLevel ?? 0) >= 2 && !data.isOwner;
+	const canSeeSavedTabs = data.isOwner || (data.viewer?.adminLevel ?? 0) >= 2;
+	const isSavedTab =
+		data.tab === "saved-comments" || data.tab === "saved-posts";
 
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
@@ -240,12 +245,41 @@ export function UserPage({
 						>
 							Posts ({user.postCount.toLocaleString()})
 						</Link>
+						{canSeeSavedTabs && (
+							<>
+								<Link
+									to="/u/$username/saved/comments"
+									params={{ username: user.username }}
+									search={DEFAULT_COMMENTS_PROFILE_SEARCH}
+									className={`rounded-md px-3 py-2 text-sm font-medium ${
+										data.tab === "saved-comments"
+											? "bg-cyan-500 text-white"
+											: "bg-slate-800 text-slate-300 hover:bg-slate-700"
+									}`}
+								>
+									Saved Comments
+								</Link>
+								<Link
+									to="/u/$username/saved/posts"
+									params={{ username: user.username }}
+									search={DEFAULT_POSTS_PROFILE_SEARCH}
+									className={`rounded-md px-3 py-2 text-sm font-medium ${
+										data.tab === "saved-posts"
+											? "bg-cyan-500 text-white"
+											: "bg-slate-800 text-slate-300 hover:bg-slate-700"
+									}`}
+								>
+									Saved Posts
+								</Link>
+							</>
+						)}
 					</div>
 
 					{data.isPrivateRestricted ? (
 						<div className="rounded-lg border border-slate-700 bg-slate-950/50 p-6 text-center text-slate-300">
-							This profile is private. Only the account owner or admins can view
-							posts and comments.
+							{isSavedTab
+								? "Saved content is private. Only the account owner or admins can view it."
+								: "This profile is private. Only the account owner or admins can view posts and comments."}
 						</div>
 					) : (
 						<>
@@ -291,11 +325,13 @@ export function UserPage({
 								</div>
 							</div>
 
-							{data.tab === "posts" ? (
+							{data.tab === "posts" || data.tab === "saved-posts" ? (
 								<div className="space-y-3">
 									{data.posts.length === 0 ? (
 										<p className="rounded-lg border border-dashed border-slate-700 p-6 text-center text-slate-400">
-											No posts found.
+											{data.tab === "saved-posts"
+												? "No saved posts found."
+												: "No posts found."}
 										</p>
 									) : (
 										data.posts.map((post) => (
@@ -330,7 +366,9 @@ export function UserPage({
 								<div className="space-y-3">
 									{data.comments.length === 0 ? (
 										<p className="rounded-lg border border-dashed border-slate-700 p-6 text-center text-slate-400">
-											No comments found.
+											{data.tab === "saved-comments"
+												? "No saved comments found."
+												: "No comments found."}
 										</p>
 									) : (
 										data.comments.map((comment) => (
