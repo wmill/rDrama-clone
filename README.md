@@ -17,6 +17,12 @@ I've been focussed on rendering, the admin and moderation stuff is still missing
 
 To run this application:
 
+# Set up .env.local
+
+```bash
+mv .env.local.sample .env.local
+```
+
 ```bash
 pnpm install
 pnpm dev
