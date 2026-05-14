@@ -76,6 +76,7 @@ export type CommentSummary = {
 	distinguishLevel: number;
 	isDeleted: boolean;
 	isRemoved: boolean;
+	isFiltered: boolean;
 	isPinned: boolean;
 	isSaved: boolean;
 	isModHidden: boolean;
@@ -651,10 +652,13 @@ export async function getRecentComments(
 		distinguishLevel: row.distinguishLevel,
 		isDeleted: false,
 		isRemoved: false,
+		isFiltered: false,
 		isPinned: row.pinnedBy !== null,
 		isSaved: false,
 		isModHidden: false,
 		userVote: 0 as VoteType,
+		stateMod: "VISIBLE" as ModerationState,
+		stateModSetBy: null,
 	}));
 }
 
@@ -822,8 +826,11 @@ export async function getCommentsFeed(
 			distinguishLevel: row.distinguishLevel,
 			isDeleted: false,
 			isRemoved: false,
+			isFiltered: row.stateMod === "FILTERED",
 			isSaved: row.savedCommentId !== null,
 			userVote: (row.userVoteType as VoteType) ?? 0,
+			stateMod: (row.stateMod ?? "VISIBLE") as ModerationState,
+			stateModSetBy: row.stateModSetBy,
 		}));
 }
 

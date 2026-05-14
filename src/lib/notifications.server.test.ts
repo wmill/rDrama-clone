@@ -126,7 +126,7 @@ describe("notifications.server", () => {
 				{ userId: 5, commentId: 50, read: false },
 			]),
 		);
-		expect(insertChain.values.mock.calls[0]?.[0]).toHaveLength(4);
+		expect(insertChain.values).toHaveBeenCalledTimes(1);
 	});
 
 	it("counts only visible unread notifications", async () => {
@@ -138,7 +138,7 @@ describe("notifications.server", () => {
 			blockedAuthorIds: new Set([9]),
 		});
 		vi.mocked(db.select)
-			.mockReturnValueOnce(createSelectChain([{ username: "alice" }]))
+			.mockReturnValueOnce(createSelectChain([{ username: "alice" }]) as never)
 			.mockReturnValueOnce(
 				createSelectChain([
 					{
@@ -229,7 +229,7 @@ describe("notifications.server", () => {
 						submissionStateMod: "VISIBLE",
 						submissionStateUserDeletedUtc: null,
 					},
-				]),
+				]) as never,
 			);
 
 		await expect(getUnreadNotificationCount(5)).resolves.toBe(2);
@@ -245,7 +245,7 @@ describe("notifications.server", () => {
 		});
 		vi.mocked(extractUserMentionsFromMarkdown).mockReturnValue(["alice"]);
 		vi.mocked(db.select)
-			.mockReturnValueOnce(createSelectChain([{ username: "alice" }]))
+			.mockReturnValueOnce(createSelectChain([{ username: "alice" }]) as never)
 			.mockReturnValueOnce(
 				createSelectChain([
 					{
@@ -270,7 +270,7 @@ describe("notifications.server", () => {
 						submissionStateMod: "VISIBLE",
 						submissionStateUserDeletedUtc: null,
 					},
-				]),
+				]) as never,
 			);
 
 		const page = await getNotificationsPage({

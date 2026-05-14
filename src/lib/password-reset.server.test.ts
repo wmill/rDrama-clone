@@ -116,7 +116,9 @@ describe("password reset", () => {
 			loginNonce: 9,
 		});
 		mocks.redisGet.mockResolvedValueOnce("previous-token");
-		vi.spyOn(crypto, "randomBytes").mockReturnValue(Buffer.alloc(32, 1));
+		vi.spyOn(crypto, "randomBytes").mockImplementation(() =>
+			Buffer.alloc(32, 1),
+		);
 
 		await requestPasswordReset("  USER@example.com ");
 
@@ -214,7 +216,9 @@ describe("password reset", () => {
 			}),
 		);
 		expect(mocks.updateWhere).toHaveBeenCalledTimes(1);
-		expect(mocks.pipelineDel).toHaveBeenCalledWith("password_reset:reset-token");
+		expect(mocks.pipelineDel).toHaveBeenCalledWith(
+			"password_reset:reset-token",
+		);
 		expect(mocks.pipelineDel).toHaveBeenCalledWith("password_reset_user:99");
 		expect(mocks.pipelineExec).toHaveBeenCalledTimes(1);
 		expect(deleteAllUserSessions).toHaveBeenCalledWith(99);

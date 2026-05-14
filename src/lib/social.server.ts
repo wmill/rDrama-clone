@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import { db } from "@/db";
+import { type AppDbExecutor, db } from "@/db";
 import { follows, userBlocks, users } from "@/db/schema";
 import type { SafeUser } from "@/lib/auth.server";
 
@@ -115,19 +115,13 @@ export async function setFollowState(input: {
 	userId: number;
 	targetUserId: number;
 	following: boolean;
-	tx?: typeof db;
+	tx?: AppDbExecutor;
 }): Promise<void> {
 	if (input.userId === input.targetUserId) {
 		throw new Error("You cannot follow yourself");
 	}
 
-	const database = input.tx ?? db;
-	const executor =
-		input.tx !== undefined
-			? async (fn: (tx: typeof db) => Promise<void>) => fn(database)
-			: (fn: (tx: typeof db) => Promise<void>) => db.transaction(fn);
-
-	await executor(async (tx) => {
+	const applyFollowState = async (tx: AppDbExecutor) => {
 		if (input.following) {
 			const inserted = await tx
 				.insert(follows)
@@ -183,14 +177,21 @@ export async function setFollowState(input: {
 				storedSubscriberCount: sql`GREATEST(${users.storedSubscriberCount} - 1, 0)`,
 			})
 			.where(eq(users.id, input.targetUserId));
-	});
+	};
+
+	if (input.tx) {
+		await applyFollowState(input.tx);
+		return;
+	}
+
+	await db.transaction((tx) => applyFollowState(tx));
 }
 
 export async function setBlockState(input: {
 	userId: number;
 	targetUserId: number;
 	blocked: boolean;
-	tx?: typeof db;
+	tx?: AppDbExecutor;
 }): Promise<void> {
 	if (input.userId === input.targetUserId) {
 		throw new Error("You cannot block yourself");

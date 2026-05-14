@@ -552,6 +552,7 @@ async function getSavedProfileComments(options: {
 			id: comments.id,
 			parentSubmissionId: comments.parentSubmission,
 			submissionTitle: submissions.title,
+			authorId: comments.authorId,
 			authorName: users.username,
 			authorShadowBanned: users.shadowBanned,
 			bodyHtml: comments.bodyHtml,

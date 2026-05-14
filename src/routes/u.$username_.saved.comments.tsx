@@ -35,7 +35,7 @@ const getSavedCommentsPageFn = createServerFn({ method: "GET" })
 			t: data.t,
 			page: data.page,
 			viewer,
-		})
+		});
 
 		if (!profileData) return null;
 
@@ -49,7 +49,7 @@ const getSavedCommentsPageFn = createServerFn({ method: "GET" })
 		}
 
 		return { profileData, adminDetails };
-	})
+	});
 
 export const Route = createFileRoute("/u/$username_/saved/comments")({
 	component: UserSavedCommentsPage,
@@ -68,7 +68,7 @@ export const Route = createFileRoute("/u/$username_/saved/comments")({
 				t: deps.t,
 				page: deps.page,
 			},
-		})
+		});
 
 		if (!result) throw notFound();
 
@@ -80,7 +80,7 @@ export const Route = createFileRoute("/u/$username_/saved/comments")({
 					profileData.profileUser.username,
 					deps,
 				),
-			})
+			});
 		}
 
 		return { data: profileData, adminDetails };
@@ -104,7 +104,7 @@ function UserSavedCommentsPage() {
 						t: data.t,
 						page: 1,
 					},
-				})
+				});
 			}}
 			onTimeChange={async (t) => {
 				await router.navigate({
@@ -115,7 +115,7 @@ function UserSavedCommentsPage() {
 						t,
 						page: 1,
 					},
-				})
+				});
 			}}
 			onPageChange={async (page) => {
 				await router.navigate({
@@ -126,8 +126,8 @@ function UserSavedCommentsPage() {
 						t: data.t,
 						page,
 					},
-				})
+				});
 			}}
 		/>
-	)
+	);
 }

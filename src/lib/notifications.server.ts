@@ -1,7 +1,7 @@
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import { db } from "@/db";
+import { type AppDbExecutor, db } from "@/db";
 import {
 	comments,
 	notifications,
@@ -229,7 +229,7 @@ async function loadNotificationRows(
 
 export async function createNotificationsForComment(
 	commentId: number,
-	tx: typeof db = db,
+	tx: AppDbExecutor = db,
 ): Promise<void> {
 	const [commentRow] = await tx
 		.select({
@@ -248,32 +248,42 @@ export async function createNotificationsForComment(
 	}
 
 	const recipients = new Set<number>();
+	const submissionRowPromise =
+		commentRow.parentSubmissionId === null
+			? Promise.resolve(null)
+			: tx
+					.select({
+						authorId: submissions.authorId,
+					})
+					.from(submissions)
+					.where(eq(submissions.id, commentRow.parentSubmissionId))
+					.limit(1)
+					.then((rows) => rows[0] ?? null);
+	const parentCommentRowPromise =
+		commentRow.parentCommentId === null
+			? Promise.resolve(null)
+			: tx
+					.select({
+						authorId: comments.authorId,
+					})
+					.from(comments)
+					.where(eq(comments.id, commentRow.parentCommentId))
+					.limit(1)
+					.then((rows) => rows[0] ?? null);
+	const subscriberRowsPromise =
+		commentRow.parentSubmissionId === null
+			? Promise.resolve([] as Array<{ userId: number }>)
+			: tx
+					.select({
+						userId: subscriptions.userId,
+					})
+					.from(subscriptions)
+					.where(eq(subscriptions.submissionId, commentRow.parentSubmissionId));
 	const [submissionRow, parentCommentRow, subscriberRows, mentionedUserIds] =
 		await Promise.all([
-			tx
-				.select({
-					authorId: submissions.authorId,
-				})
-				.from(submissions)
-				.where(eq(submissions.id, commentRow.parentSubmissionId))
-				.limit(1)
-				.then((rows) => rows[0] ?? null),
-			commentRow.parentCommentId
-				? tx
-						.select({
-							authorId: comments.authorId,
-						})
-						.from(comments)
-						.where(eq(comments.id, commentRow.parentCommentId))
-						.limit(1)
-						.then((rows) => rows[0] ?? null)
-				: Promise.resolve(null),
-			tx
-				.select({
-					userId: subscriptions.userId,
-				})
-				.from(subscriptions)
-				.where(eq(subscriptions.submissionId, commentRow.parentSubmissionId)),
+			submissionRowPromise,
+			parentCommentRowPromise,
+			subscriberRowsPromise,
 			resolveMentionRecipientIds(
 				extractUserMentionsFromMarkdown(commentRow.body ?? ""),
 			),
@@ -418,7 +428,7 @@ export async function setSubmissionSubscriptionState(options: {
 	userId: number;
 	submissionId: number;
 	subscribed: boolean;
-	tx?: typeof db;
+	tx?: AppDbExecutor;
 }): Promise<void> {
 	const executor = options.tx ?? db;
 

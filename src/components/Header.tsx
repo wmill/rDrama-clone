@@ -74,6 +74,7 @@ export default function Header({
 					{user && (
 						<Link
 							to="/notifications"
+							search={{ page: 1 }}
 							onClick={() => setIsOpen(false)}
 							className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
 							activeProps={{

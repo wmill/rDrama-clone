@@ -24,3 +24,9 @@ export const db = drizzle(pool, {
 	schema,
 	logger: process.env.NODE_ENV !== "production",
 });
+
+export type AppDb = typeof db;
+export type AppDbTransaction = Parameters<
+	Parameters<AppDb["transaction"]>[0]
+>[0];
+export type AppDbExecutor = AppDb | AppDbTransaction;

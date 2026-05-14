@@ -317,7 +317,7 @@ describe("comment visibility", () => {
 			blockedAuthorIds: new Set<number>(),
 		});
 
-		const createSelectChain = <T,>(result: T) => ({
+		const createSelectChain = <T>(result: T) => ({
 			from: vi.fn().mockReturnThis(),
 			where: vi.fn().mockReturnThis(),
 			limit: vi.fn().mockResolvedValue(result),

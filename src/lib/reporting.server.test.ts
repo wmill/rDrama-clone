@@ -77,7 +77,7 @@ describe("reportSubmission", () => {
 		};
 
 		vi.mocked(db.transaction).mockImplementation(async (callback) =>
-			callback(tx),
+			callback(tx as never),
 		);
 
 		const result = await reportSubmission({
@@ -108,7 +108,7 @@ describe("reportSubmission", () => {
 		};
 
 		vi.mocked(db.transaction).mockImplementation(async (callback) =>
-			callback(tx),
+			callback(tx as never),
 		);
 
 		await reportSubmission({
@@ -134,7 +134,7 @@ describe("reportSubmission", () => {
 		};
 
 		vi.mocked(db.transaction).mockImplementation(async (callback) =>
-			callback(tx),
+			callback(tx as never),
 		);
 
 		await expect(
@@ -173,7 +173,7 @@ describe("reportComment", () => {
 		};
 
 		vi.mocked(db.transaction).mockImplementation(async (callback) =>
-			callback(tx),
+			callback(tx as never),
 		);
 
 		const result = await reportComment({

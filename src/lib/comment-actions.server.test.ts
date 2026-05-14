@@ -28,19 +28,19 @@ vi.mock("@/lib/lifecycle.server", () => ({
 
 import type { SafeUser } from "@/lib/auth.server";
 import {
-	createComment,
-	deleteComment,
-	getCommentById,
-	getCommentsBySubmissionSince,
-	updateComment,
-} from "@/lib/comments.server";
-import {
 	createCommentFn,
 	deleteCommentFn,
 	getCommentsSinceFn,
 	saveCommentFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
+import {
+	createComment,
+	deleteComment,
+	getCommentById,
+	getCommentsBySubmissionSince,
+	updateComment,
+} from "@/lib/comments.server";
 import { setCommentSavedState } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 
