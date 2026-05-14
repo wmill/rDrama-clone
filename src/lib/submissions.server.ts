@@ -18,6 +18,7 @@ import {
 } from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
+import { indexSubmissionBestEffort } from "@/lib/search.server";
 import type { VoteType } from "@/lib/votes.server";
 import type { SortType, TimeFilter } from "./constants";
 
@@ -484,6 +485,7 @@ export async function createSubmission(data: {
 		return createdSubmission;
 	});
 
+	void indexSubmissionBestEffort(result.id);
 	return result.id;
 }
 
@@ -515,6 +517,10 @@ export async function updateSubmission(
 		})
 		.where(and(eq(submissions.id, id), eq(submissions.authorId, authorId)))
 		.returning({ id: submissions.id });
+
+	if (result.length > 0) {
+		void indexSubmissionBestEffort(id);
+	}
 
 	return result.length > 0;
 }

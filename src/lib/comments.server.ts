@@ -28,6 +28,7 @@ import {
 import { authorDeleteComment } from "@/lib/lifecycle.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
 import { createNotificationsForComment } from "@/lib/notifications.server";
+import { indexCommentBestEffort } from "@/lib/search.server";
 import type { VoteType } from "@/lib/votes.server";
 import type { CommentFeedSortType, TimeFilter } from "./constants";
 import type { ModerationState } from "./lifecycle.server";
@@ -1005,6 +1006,7 @@ export async function createComment(data: {
 		return createdComment;
 	});
 
+	void indexCommentBestEffort(result.id);
 	return result.id;
 }
 
@@ -1024,6 +1026,10 @@ export async function updateComment(
 		})
 		.where(and(eq(comments.id, id), eq(comments.authorId, authorId)))
 		.returning({ id: comments.id });
+
+	if (result.length > 0) {
+		void indexCommentBestEffort(id);
+	}
 
 	return result.length > 0;
 }

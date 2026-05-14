@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Bell, Home, Menu, Shield, X } from "lucide-react";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 
 import { AuthButton } from "@/components/auth-button";
 import type { SafeUser } from "@/lib/auth.server";
@@ -13,10 +13,24 @@ export default function Header({
 	unreadNotificationCount: number;
 }) {
 	const [isOpen, setIsOpen] = useState(false);
+	const [query, setQuery] = useState("");
+	const navigate = useNavigate();
+
+	const handleSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		await navigate({
+			to: "/search",
+			search: {
+				q: query.trim(),
+				type: "posts",
+				page: 1,
+			},
+		});
+	};
 
 	return (
 		<>
-			<header className="p-4 flex items-center bg-gray-800 text-white shadow-lg">
+			<header className="flex flex-wrap items-center gap-3 bg-gray-800 p-4 text-white shadow-lg">
 				<button
 					onClick={() => setIsOpen(true)}
 					className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
@@ -34,6 +48,28 @@ export default function Header({
 						/>
 					</Link>
 				</h1>
+				<form
+					onSubmit={handleSearchSubmit}
+					className="order-3 w-full sm:order-none sm:ml-6 sm:max-w-md sm:flex-1"
+				>
+					<div className="flex gap-2">
+						<input
+							type="search"
+							name="q"
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							placeholder="Search posts and comments"
+							aria-label="Search"
+							className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400"
+						/>
+						<button
+							type="submit"
+							className="rounded-lg bg-cyan-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-cyan-600"
+						>
+							Search
+						</button>
+					</div>
+				</form>
 				<div className="ml-auto">
 					<AuthButton />
 				</div>

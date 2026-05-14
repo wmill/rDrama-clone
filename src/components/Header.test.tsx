@@ -1,9 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import Header from "@/components/Header";
 import type { SafeUser } from "@/lib/auth.server";
+
+const navigate = vi.fn();
 
 vi.mock("@/components/auth-button", () => ({
 	AuthButton: () => <div>auth</div>,
@@ -24,6 +26,7 @@ vi.mock("@tanstack/react-router", () => ({
 			{children}
 		</a>
 	),
+	useNavigate: () => navigate,
 }));
 
 const mockUser: SafeUser = {
@@ -57,5 +60,19 @@ describe("Header", () => {
 		render(<Header user={null} unreadNotificationCount={0} />);
 
 		expect(screen.queryByText("Notifications")).toBeNull();
+	});
+
+	it("submits the header search form to the public search route", async () => {
+		render(<Header user={mockUser} unreadNotificationCount={0} />);
+
+		fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), {
+			target: { value: " walter " },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+		expect(navigate).toHaveBeenCalledWith({
+			to: "/search",
+			search: { q: "walter", type: "posts", page: 1 },
+		});
 	});
 });

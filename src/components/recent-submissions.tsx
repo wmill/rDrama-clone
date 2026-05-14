@@ -13,6 +13,10 @@ type RecentSubmissionsProps = {
 	currentUserId?: number;
 	sort?: SortType;
 	time?: TimeFilter;
+	title?: string;
+	eyebrow?: string;
+	emptyMessage?: string;
+	showSubmitLink?: boolean;
 	onSortChange?: (sort: SortType) => void;
 	onTimeChange?: (time: TimeFilter) => void;
 	showSortControls?: boolean;
@@ -40,6 +44,10 @@ export function RecentSubmissions({
 	currentUserId,
 	sort = "hot",
 	time = "all",
+	title = "Submissions",
+	eyebrow = "Community posts",
+	emptyMessage = "No submissions found.",
+	showSubmitLink = true,
 	onSortChange,
 	onTimeChange,
 	showSortControls = true,
@@ -63,16 +71,18 @@ export function RecentSubmissions({
 				<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 					<div>
 						<p className="text-xs uppercase tracking-[0.2em] text-cyan-300/80">
-							Community posts
+							{eyebrow}
 						</p>
-						<h2 className="text-2xl font-extrabold text-white">Submissions</h2>
+						<h2 className="text-2xl font-extrabold text-white">{title}</h2>
 					</div>
-					<Link
-						to="/submit"
-						className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-600"
-					>
-						+ New Post
-					</Link>
+					{showSubmitLink && (
+						<Link
+							to="/submit"
+							className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-600"
+						>
+							+ New Post
+						</Link>
+					)}
 				</div>
 
 				{showSortControls && (
@@ -117,19 +127,25 @@ export function RecentSubmissions({
 			</div>
 
 			<ul className="grid gap-3">
-				{submissions.map((submission) => (
-					<SubmissionListItem
-						key={submission.id}
-						submission={submission}
-						currentUserId={currentUserId}
-					/>
-				))}
+				{submissions.length > 0 ? (
+					submissions.map((submission) => (
+						<SubmissionListItem
+							key={submission.id}
+							submission={submission}
+							currentUserId={currentUserId}
+						/>
+					))
+				) : (
+					<li className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-slate-400">
+						{emptyMessage}
+					</li>
+				)}
 			</ul>
 		</div>
 	);
 }
 
-function SubmissionListItem({
+export function SubmissionListItem({
 	submission,
 	currentUserId,
 }: {

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as Random_postRouteImport } from './routes/random_post'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -47,6 +48,11 @@ const SubmitRoute = SubmitRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -197,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/search': typeof SearchRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
@@ -227,6 +234,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/search': typeof SearchRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
@@ -259,6 +267,7 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/search': typeof SearchRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/random_post'
     | '/reset-password'
+    | '/search'
     | '/signup'
     | '/submit'
     | '/@$username/posts'
@@ -322,6 +332,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/random_post'
     | '/reset-password'
+    | '/search'
     | '/signup'
     | '/submit'
     | '/@$username/posts'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/random_post'
     | '/reset-password'
+    | '/search'
     | '/signup'
     | '/submit'
     | '/@$username_/posts'
@@ -385,6 +397,7 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   Random_postRoute: typeof Random_postRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SearchRoute: typeof SearchRoute
   SignupRoute: typeof SignupRoute
   SubmitRoute: typeof SubmitRoute
   AtusernamePostsRoute: typeof AtusernamePostsRoute
@@ -415,6 +428,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -637,6 +657,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   Random_postRoute: Random_postRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SearchRoute: SearchRoute,
   SignupRoute: SignupRoute,
   SubmitRoute: SubmitRoute,
   AtusernamePostsRoute: AtusernamePostsRoute,
