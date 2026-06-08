@@ -1,0 +1,35 @@
+info:
+  name: Home Feed
+  type: http
+  seq: 1
+  tags:
+    - smoke
+
+http:
+  method: GET
+  url: "{{baseURL}}/"
+  params:
+    - name: sort
+      value: hot
+      type: query
+    - name: t
+      value: all
+      type: query
+  headers:
+    - name: Accept
+      value: text/html
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: 200
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Loads the public home feed with the default hot/all filters.

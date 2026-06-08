@@ -1,0 +1,29 @@
+info:
+  name: Submit Page
+  type: http
+  seq: 3
+  tags:
+    - smoke
+    - auth
+
+http:
+  method: GET
+  url: "{{baseURL}}/submit"
+  headers:
+    - name: Accept
+      value: text/html
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: 200
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Loads the submit route. Without a valid session cookie, it should render the login-required state.

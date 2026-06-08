@@ -1,0 +1,28 @@
+info:
+  name: Random Post
+  type: http
+  seq: 5
+  tags:
+    - smoke
+
+http:
+  method: GET
+  url: "{{baseURL}}/random_post"
+  headers:
+    - name: Accept
+      value: text/html
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: 200
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Follows the random-post redirect to either a post page or the home feed.

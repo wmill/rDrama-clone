@@ -1,0 +1,29 @@
+info:
+  name: Signup Page
+  type: http
+  seq: 2
+  tags:
+    - smoke
+    - auth
+
+http:
+  method: GET
+  url: "{{baseURL}}/signup"
+  headers:
+    - name: Accept
+      value: text/html
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: 200
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Loads the signup screen. The actual signup action uses TanStack createServerFn serialization rather than a normal POST /signup.

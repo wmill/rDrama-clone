@@ -1,0 +1,29 @@
+info:
+  name: Login Page
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - auth
+
+http:
+  method: GET
+  url: "{{baseURL}}/login"
+  headers:
+    - name: Accept
+      value: text/html
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: 200
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: Loads the login screen. The actual login action uses TanStack createServerFn serialization rather than a normal POST /login.

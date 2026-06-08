@@ -1,0 +1,6 @@
+info:
+  name: Auth Pages
+  type: folder
+  seq: 2
+
+docs: The login and signup actions are TanStack createServerFn RPC calls, not plain form posts. These starter requests cover the stable page routes.
