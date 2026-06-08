@@ -8,6 +8,9 @@ info:
 http:
   method: GET
   url: "{{baseURL}}/"
+  headers:
+    - name: Accept
+      value: text/html
   params:
     - name: sort
       value: hot
@@ -15,16 +18,16 @@ http:
     - name: t
       value: all
       type: query
-  headers:
-    - name: Accept
-      value: text/html
   auth: inherit
 
 runtime:
+  variables:
+    - name: baseURL
+      value: http://localhost:3000
   assertions:
     - expression: res.status
       operator: eq
-      value: 200
+      value: "200"
 
 settings:
   encodeUrl: true
