@@ -44,7 +44,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
   - *Done when*: each exported function has happy-path + at least one boundary test.
   - *Verify*: `pnpm test --run src/lib/votes.server.test.ts && pnpm check`
 
-- [ ] **T04: Tests for `src/lib/comments.server.ts`**
+- [x] **T04: Tests for `src/lib/comments.server.ts`** *(done 2026-07-09: 13 tests — createComment ltree/level/self-vote, updateComment re-render + non-author rejection, deleteComment delegation, getCommentById visibility for removed/filtered/deleted/shadowbanned/mod/author viewers)*
   - *Why*: The largest server module (create/update/delete, visibility mapping, ltree threading) is only tested indirectly via helpers.
   - *Files*: create `src/lib/comments.server.test.ts`. Priority functions: `createComment` (renders `bodyHtml`, sets ltree path/level), `updateComment` (re-renders `bodyHtml`, rejects non-author), `deleteComment` (rejects non-author), `getCommentById` visibility mapping (deleted/removed/filtered/shadowbanned viewers see placeholders, mods see content).
   - *Done when*: those functions are covered including permission-denial cases.
