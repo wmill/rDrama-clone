@@ -27,6 +27,7 @@ const ADMIN_NAV_LINKS = [
 	{ to: "/admin/reported-posts", label: "Reported Posts" },
 	{ to: "/admin/reported-comments", label: "Reported Comments" },
 	{ to: "/admin/filtered", label: "Content Queues" },
+	{ to: "/admin/mod-log", label: "Mod Log" },
 	{ to: "/admin/users", label: "Users" },
 ] as const;
 

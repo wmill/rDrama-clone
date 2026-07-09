@@ -31,6 +31,7 @@ import { Route as CommentIdRouteImport } from './routes/comment.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-posts'
 import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
+import { Route as AdminModLogRouteImport } from './routes/admin.mod-log'
 import { Route as AdminFilteredRouteImport } from './routes/admin.filtered'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
@@ -151,6 +152,11 @@ const AdminReportedCommentsRoute = AdminReportedCommentsRouteImport.update({
   path: '/reported-comments',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminModLogRoute = AdminModLogRouteImport.update({
+  id: '/mod-log',
+  path: '/mod-log',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFilteredRoute = AdminFilteredRouteImport.update({
   id: '/filtered',
   path: '/filtered',
@@ -214,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
   '/admin/filtered': typeof AdminFilteredRoute
+  '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -246,6 +253,7 @@ export interface FileRoutesByTo {
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
   '/admin/filtered': typeof AdminFilteredRoute
+  '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -280,6 +288,7 @@ export interface FileRoutesById {
   '/submit': typeof SubmitRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
   '/admin/filtered': typeof AdminFilteredRoute
+  '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -315,6 +324,7 @@ export interface FileRouteTypes {
     | '/submit'
     | '/@$username/posts'
     | '/admin/filtered'
+    | '/admin/mod-log'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
     | '/admin/users'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/submit'
     | '/@$username/posts'
     | '/admin/filtered'
+    | '/admin/mod-log'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
     | '/admin/users'
@@ -380,6 +391,7 @@ export interface FileRouteTypes {
     | '/submit'
     | '/@$username_/posts'
     | '/admin/filtered'
+    | '/admin/mod-log'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
     | '/admin/users'
@@ -582,6 +594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminReportedCommentsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/mod-log': {
+      id: '/admin/mod-log'
+      path: '/mod-log'
+      fullPath: '/admin/mod-log'
+      preLoaderRoute: typeof AdminModLogRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/filtered': {
       id: '/admin/filtered'
       path: '/filtered'
@@ -650,6 +669,7 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminFilteredRoute: typeof AdminFilteredRoute
+  AdminModLogRoute: typeof AdminModLogRoute
   AdminReportedCommentsRoute: typeof AdminReportedCommentsRoute
   AdminReportedPostsRoute: typeof AdminReportedPostsRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -658,6 +678,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminFilteredRoute: AdminFilteredRoute,
+  AdminModLogRoute: AdminModLogRoute,
   AdminReportedCommentsRoute: AdminReportedCommentsRoute,
   AdminReportedPostsRoute: AdminReportedPostsRoute,
   AdminUsersRoute: AdminUsersRoute,

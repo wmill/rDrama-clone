@@ -90,7 +90,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: each queue lists matching content with working approve/remove actions; non-admins are redirected.
   - *Verify*: `pnpm test --run && pnpm check`; manually via an admin user in `pnpm dev`.
 
-- [ ] **T11: Mod log view**
+- [x] **T11: Mod log view** *(done 2026-07-09: getModLog in admin.server.ts (actor/target-user/target-post joins, 50/page + hasMore via limit+1), paginated newest-first /admin/mod-log page with nav link; 3 query tests)*
   - *Why*: `modActions` rows are written on every mod action but there is no way to read them.
   - *Files*: new `src/routes/admin.mod-log.tsx`; query in `src/lib/admin.server.ts` joining `modActions` to `users` (actor) with pagination; render kind/target/actor/timestamp.
   - *Done when*: paginated, newest-first mod log page exists under `/admin`.

@@ -6,6 +6,7 @@ import {
 	commentFlags,
 	comments,
 	flags,
+	modActions,
 	submissions,
 	userNotes,
 	users,
@@ -254,6 +255,62 @@ export async function getModQueueComments(
 		.where(condition)
 		.orderBy(desc(comments.createdUtc))
 		.limit(MOD_QUEUE_LIMIT);
+}
+
+export type ModLogEntry = {
+	id: number;
+	kind: string | null;
+	note: string | null;
+	createdDatetimez: Date;
+	actorId: number | null;
+	actorName: string | null;
+	targetUserId: number | null;
+	targetUserName: string | null;
+	targetSubmissionId: number | null;
+	targetSubmissionTitle: string | null;
+	targetCommentId: number | null;
+};
+
+export type ModLogPage = {
+	entries: ModLogEntry[];
+	page: number;
+	hasMore: boolean;
+};
+
+export const MOD_LOG_PER_PAGE = 50;
+
+export async function getModLog(page = 1): Promise<ModLogPage> {
+	const safePage = Math.max(1, Math.floor(page));
+	const actor = alias(users, "actor");
+	const targetUser = alias(users, "target_user");
+
+	const rows = await db
+		.select({
+			id: modActions.id,
+			kind: modActions.kind,
+			note: modActions.note,
+			createdDatetimez: modActions.createdDatetimez,
+			actorId: modActions.userId,
+			actorName: actor.username,
+			targetUserId: modActions.targetUserId,
+			targetUserName: targetUser.username,
+			targetSubmissionId: modActions.targetSubmissionId,
+			targetSubmissionTitle: submissions.title,
+			targetCommentId: modActions.targetCommentId,
+		})
+		.from(modActions)
+		.leftJoin(actor, eq(modActions.userId, actor.id))
+		.leftJoin(targetUser, eq(modActions.targetUserId, targetUser.id))
+		.leftJoin(submissions, eq(modActions.targetSubmissionId, submissions.id))
+		.orderBy(desc(modActions.createdDatetimez), desc(modActions.id))
+		.limit(MOD_LOG_PER_PAGE + 1)
+		.offset((safePage - 1) * MOD_LOG_PER_PAGE);
+
+	return {
+		entries: rows.slice(0, MOD_LOG_PER_PAGE),
+		page: safePage,
+		hasMore: rows.length > MOD_LOG_PER_PAGE,
+	};
 }
 
 export async function searchUsers(

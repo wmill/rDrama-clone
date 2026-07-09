@@ -11,11 +11,13 @@ vi.mock("@/db", () => ({
 
 import { db } from "@/db";
 import {
+	getModLog,
 	getModQueueComments,
 	getModQueueSubmissions,
 	getReportedComments,
 	getReportedSubmissions,
 	getUserAdminDetails,
+	MOD_LOG_PER_PAGE,
 	searchUsers,
 } from "@/lib/admin.server";
 
@@ -28,6 +30,7 @@ function createChain(terminal: string, result: unknown) {
 		"where",
 		"orderBy",
 		"limit",
+		"offset",
 	]) {
 		chain[method] = vi.fn(() => chain);
 	}
@@ -211,6 +214,63 @@ describe("getModQueueComments", () => {
 		);
 
 		await expect(getModQueueComments("REMOVED")).resolves.toEqual(rows);
+	});
+});
+
+describe("getModLog", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	function makeEntry(id: number) {
+		return {
+			id,
+			kind: "ban_user",
+			note: "spam",
+			createdDatetimez: new Date(1000 + id),
+			actorId: 1,
+			actorName: "modbob",
+			targetUserId: 7,
+			targetUserName: "alice",
+			targetSubmissionId: null,
+			targetSubmissionTitle: null,
+			targetCommentId: null,
+		};
+	}
+
+	it("returns entries without hasMore when under a full page", async () => {
+		const rows = [makeEntry(2), makeEntry(1)];
+		vi.mocked(db.select).mockReturnValueOnce(
+			createChain("offset", rows) as never,
+		);
+
+		await expect(getModLog(1)).resolves.toEqual({
+			entries: rows,
+			page: 1,
+			hasMore: false,
+		});
+	});
+
+	it("trims the extra row and reports hasMore on a full page", async () => {
+		const rows = Array.from({ length: MOD_LOG_PER_PAGE + 1 }, (_, i) =>
+			makeEntry(MOD_LOG_PER_PAGE + 1 - i),
+		);
+		vi.mocked(db.select).mockReturnValueOnce(
+			createChain("offset", rows) as never,
+		);
+
+		const result = await getModLog(1);
+		expect(result.entries).toHaveLength(MOD_LOG_PER_PAGE);
+		expect(result.hasMore).toBe(true);
+	});
+
+	it("clamps invalid page numbers to 1", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createChain("offset", []) as never,
+		);
+
+		const result = await getModLog(-3);
+		expect(result.page).toBe(1);
 	});
 });
 
