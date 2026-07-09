@@ -4,7 +4,11 @@ import { z } from "zod";
 import { setSubmissionSavedState } from "@/lib/lifecycle.server";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
 import { getCurrentUser } from "@/lib/sessions.server";
-import { deleteSubmission, updateSubmission } from "@/lib/submissions.server";
+import {
+	BannedDomainError,
+	deleteSubmission,
+	updateSubmission,
+} from "@/lib/submissions.server";
 
 const updateSubmissionSchema = z
 	.object({
@@ -41,12 +45,20 @@ export const updateSubmissionFn = createServerFn({ method: "POST" })
 			return { success: false as const, error: "Not logged in" };
 		}
 
-		const updated = await updateSubmission(data.id, user.id, {
-			title: data.title,
-			url: data.url || undefined,
-			body: data.body || undefined,
-			isNsfw: data.isNsfw,
-		});
+		let updated: boolean;
+		try {
+			updated = await updateSubmission(data.id, user.id, {
+				title: data.title,
+				url: data.url || undefined,
+				body: data.body || undefined,
+				isNsfw: data.isNsfw,
+			});
+		} catch (err) {
+			if (err instanceof BannedDomainError) {
+				return { success: false as const, error: err.message };
+			}
+			throw err;
+		}
 
 		if (!updated) {
 			return {

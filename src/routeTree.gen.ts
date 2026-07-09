@@ -33,6 +33,7 @@ import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-
 import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
 import { Route as AdminModLogRouteImport } from './routes/admin.mod-log'
 import { Route as AdminFilteredRouteImport } from './routes/admin.filtered'
+import { Route as AdminBannedDomainsRouteImport } from './routes/admin.banned-domains'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
 import { Route as UUsernameFollowingRouteImport } from './routes/u.$username_.following'
@@ -163,6 +164,11 @@ const AdminFilteredRoute = AdminFilteredRouteImport.update({
   path: '/filtered',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBannedDomainsRoute = AdminBannedDomainsRouteImport.update({
+  id: '/banned-domains',
+  path: '/banned-domains',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AtusernamePostsRoute = AtusernamePostsRouteImport.update({
   id: '/@$username_/posts',
   path: '/@$username/posts',
@@ -225,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/banned-domains': typeof AdminBannedDomainsRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/banned-domains': typeof AdminBannedDomainsRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
@@ -295,6 +303,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
+  '/admin/banned-domains': typeof AdminBannedDomainsRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/banned-domains'
     | '/admin/filtered'
     | '/admin/mod-log'
     | '/admin/reported-comments'
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/banned-domains'
     | '/admin/filtered'
     | '/admin/mod-log'
     | '/admin/reported-comments'
@@ -401,6 +412,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username_/posts'
+    | '/admin/banned-domains'
     | '/admin/filtered'
     | '/admin/mod-log'
     | '/admin/reported-comments'
@@ -620,6 +632,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFilteredRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/banned-domains': {
+      id: '/admin/banned-domains'
+      path: '/banned-domains'
+      fullPath: '/admin/banned-domains'
+      preLoaderRoute: typeof AdminBannedDomainsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/@$username_/posts': {
       id: '/@$username_/posts'
       path: '/@$username/posts'
@@ -687,6 +706,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminBannedDomainsRoute: typeof AdminBannedDomainsRoute
   AdminFilteredRoute: typeof AdminFilteredRoute
   AdminModLogRoute: typeof AdminModLogRoute
   AdminReportedCommentsRoute: typeof AdminReportedCommentsRoute
@@ -697,6 +717,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBannedDomainsRoute: AdminBannedDomainsRoute,
   AdminFilteredRoute: AdminFilteredRoute,
   AdminModLogRoute: AdminModLogRoute,
   AdminReportedCommentsRoute: AdminReportedCommentsRoute,

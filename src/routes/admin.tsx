@@ -29,6 +29,7 @@ const ADMIN_NAV_LINKS = [
 	{ to: "/admin/filtered", label: "Content Queues" },
 	{ to: "/admin/mod-log", label: "Mod Log" },
 	{ to: "/admin/users", label: "Users" },
+	{ to: "/admin/banned-domains", label: "Banned Domains" },
 ] as const;
 
 function AdminLayout() {

@@ -2,6 +2,7 @@ import { and, desc, eq, isNull, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+	bannedDomains,
 	saveRelationship,
 	submissions,
 	subscriptions,
@@ -187,6 +188,35 @@ function normalizeOptionalText(value?: string | null): string | null {
 
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : null;
+}
+
+export class BannedDomainError extends Error {
+	constructor(domain: string, reason: string) {
+		super(`Links to ${domain} are not allowed: ${reason}`);
+		this.name = "BannedDomainError";
+	}
+}
+
+async function assertUrlDomainAllowed(url: string | null): Promise<void> {
+	if (!url) return;
+
+	let host: string;
+	try {
+		host = new URL(url).hostname.toLowerCase();
+	} catch {
+		// Invalid URLs are rejected by input validation, not domain policy.
+		return;
+	}
+
+	const domains = await db.select().from(bannedDomains);
+	const match = domains.find(({ domain }) => {
+		const banned = domain.toLowerCase();
+		return host === banned || host.endsWith(`.${banned}`);
+	});
+
+	if (match) {
+		throw new BannedDomainError(match.domain, match.reason);
+	}
 }
 
 export async function getSubmissions(options: {
@@ -446,6 +476,8 @@ export async function createSubmission(data: {
 	const url = normalizeOptionalText(data.url);
 	const body = normalizeOptionalText(data.body);
 
+	await assertUrlDomainAllowed(url);
+
 	const result = await db.transaction(async (tx) => {
 		const [createdSubmission] = await tx
 			.insert(submissions)
@@ -503,6 +535,8 @@ export async function updateSubmission(
 	const title = normalizeRequiredText(data.title);
 	const url = normalizeOptionalText(data.url);
 	const body = normalizeOptionalText(data.body);
+
+	await assertUrlDomainAllowed(url);
 
 	const result = await db
 		.update(submissions)

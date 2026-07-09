@@ -30,6 +30,8 @@ import { authorDeleteSubmission } from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { indexSubmissionBestEffort } from "@/lib/search.server";
 import {
+	BannedDomainError,
+	createSubmission,
 	deleteSubmission,
 	getSubmissionById,
 	getSubmissions,
@@ -47,6 +49,10 @@ function createSelectOrderChain(result: unknown) {
 		offset: vi.fn().mockResolvedValue(result),
 	};
 	return chain;
+}
+
+function createSelectFromChain(result: unknown) {
+	return { from: vi.fn().mockResolvedValue(result) };
 }
 
 function createSelectLimitChain(result: unknown) {
@@ -255,6 +261,73 @@ describe("submissions.server", () => {
 			}),
 		);
 		expect(indexSubmissionBestEffort).toHaveBeenCalledWith(7);
+	});
+
+	it("rejects new link posts to banned domains with the stored reason", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectFromChain([
+				{ domain: "spam.com", reason: "spam farm" },
+			]) as never,
+		);
+
+		await expect(
+			createSubmission({
+				authorId: 3,
+				title: "Check this out",
+				url: "https://spam.com/offer",
+			}),
+		).rejects.toThrow(BannedDomainError);
+		expect(db.transaction).not.toHaveBeenCalled();
+	});
+
+	it("rejects banned domains on subdomains and reports the reason", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectFromChain([
+				{ domain: "spam.com", reason: "spam farm" },
+			]) as never,
+		);
+
+		await expect(
+			createSubmission({
+				authorId: 3,
+				title: "Sneaky",
+				url: "https://evil.spam.com/offer",
+			}),
+		).rejects.toThrow("Links to spam.com are not allowed: spam farm");
+	});
+
+	it("rejects edits that point a post at a banned domain", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectFromChain([
+				{ domain: "spam.com", reason: "spam farm" },
+			]) as never,
+		);
+
+		await expect(
+			updateSubmission(7, 3, { title: "Edited", url: "https://spam.com/x" }),
+		).rejects.toThrow(BannedDomainError);
+		expect(db.update).not.toHaveBeenCalled();
+	});
+
+	it("allows link posts to domains that are not banned", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectFromChain([
+				{ domain: "spam.com", reason: "spam farm" },
+			]) as never,
+		);
+		const set = vi.fn(() => ({
+			where: vi.fn(() => ({
+				returning: vi.fn().mockResolvedValue([{ id: 7 }]),
+			})),
+		}));
+		vi.mocked(db.update).mockReturnValueOnce({ set } as never);
+
+		await expect(
+			updateSubmission(7, 3, {
+				title: "Fine",
+				url: "https://notspam.example.com/x",
+			}),
+		).resolves.toBe(true);
 	});
 
 	it("delegates deletes to authorDeleteSubmission and propagates rejection", async () => {

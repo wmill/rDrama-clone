@@ -5,6 +5,7 @@ const { dbMock } = vi.hoisted(() => ({
 		select: vi.fn(),
 		update: vi.fn(),
 		insert: vi.fn(),
+		delete: vi.fn(),
 		transaction: vi.fn(),
 	},
 }));
@@ -37,11 +38,13 @@ vi.mock("@/lib/lifecycle.server", () => ({
 }));
 
 import {
+	addBannedDomainFn,
 	banUserFn,
 	createUserNoteFn,
 	distinguishCommentFn,
 	distinguishSubmissionFn,
 	pinCommentFn,
+	removeBannedDomainFn,
 	removeCommentFn,
 	removeSubmissionFn,
 	setCommentModerationStateFn,
@@ -617,6 +620,94 @@ describe("admin-actions.server", () => {
 			userId: 3,
 			targetSubmissionId: 40,
 			kind: "distinguish_post",
+		});
+	});
+
+	it("rejects banned-domain management from non-admins", async () => {
+		const regular: SafeUser = {
+			...moderator,
+			id: 5,
+			username: "pleb",
+			adminLevel: 0,
+		};
+		vi.mocked(getCurrentUser).mockResolvedValue(regular);
+
+		await expect(
+			addBannedDomainFn({ data: { domain: "spam.com", reason: "spam" } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			removeBannedDomainFn({ data: { domain: "spam.com" } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+
+		expect(dbMock.insert).not.toHaveBeenCalled();
+		expect(dbMock.delete).not.toHaveBeenCalled();
+	});
+
+	it("normalizes and upserts a banned domain, logging the mod action", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		const upsertChain = {
+			values: vi.fn().mockReturnValue({
+				onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+			}),
+		};
+		const logChain = createInsertChain();
+		dbMock.insert
+			.mockReturnValueOnce(upsertChain)
+			.mockReturnValueOnce(logChain);
+
+		await expect(
+			addBannedDomainFn({
+				data: {
+					domain: "  https://www.Spam.COM/some/path ",
+					reason: " spam farm ",
+				},
+			}),
+		).resolves.toEqual({
+			success: true,
+			domain: "spam.com",
+			reason: "spam farm",
+		});
+
+		expect(upsertChain.values).toHaveBeenCalledWith({
+			domain: "spam.com",
+			reason: "spam farm",
+		});
+		expect(logChain.values).toHaveBeenCalledWith({
+			userId: 2,
+			kind: "ban_domain",
+			note: "spam.com: spam farm",
+		});
+	});
+
+	it("rejects invalid domain and missing reason inputs", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+
+		await expect(
+			addBannedDomainFn({ data: { domain: "not a domain", reason: "x" } }),
+		).resolves.toEqual({ success: false, error: "Invalid domain" });
+		await expect(
+			addBannedDomainFn({ data: { domain: "spam.com", reason: "   " } }),
+		).resolves.toEqual({ success: false, error: "Reason is required" });
+
+		expect(dbMock.insert).not.toHaveBeenCalled();
+	});
+
+	it("removes a banned domain and logs the mod action", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		const deleteChain = { where: vi.fn().mockResolvedValue(undefined) };
+		dbMock.delete.mockReturnValueOnce(deleteChain);
+		const logChain = createInsertChain();
+		dbMock.insert.mockReturnValueOnce(logChain);
+
+		await expect(
+			removeBannedDomainFn({ data: { domain: "spam.com" } }),
+		).resolves.toEqual({ success: true });
+
+		expect(dbMock.delete).toHaveBeenCalledTimes(1);
+		expect(logChain.values).toHaveBeenCalledWith({
+			userId: 2,
+			kind: "unban_domain",
+			note: "spam.com",
 		});
 	});
 

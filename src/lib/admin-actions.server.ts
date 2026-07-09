@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+	bannedDomains,
 	comments,
 	modActions,
 	submissions,
@@ -525,6 +526,81 @@ export const createUserNoteFn = createServerFn({ method: "POST" })
 			tag: data.tag as (typeof validTags)[number],
 			referencePost: data.referencePost ?? null,
 			referenceComment: data.referenceComment ?? null,
+		});
+
+		return { success: true as const };
+	});
+
+export function normalizeBannedDomainInput(value: string): string | null {
+	const trimmed = value.trim().toLowerCase();
+	if (!trimmed) {
+		return null;
+	}
+
+	const withoutScheme = trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
+	const host = withoutScheme
+		.split(/[/?#]/)[0]
+		.split("@")
+		.pop()
+		?.split(":")[0]
+		?.replace(/^www\./, "");
+
+	if (!host || !host.includes(".") || /\s/.test(host)) {
+		return null;
+	}
+
+	return host;
+}
+
+export const addBannedDomainFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { domain: string; reason: string }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const domain = normalizeBannedDomainInput(data.domain);
+		if (!domain) {
+			return { success: false as const, error: "Invalid domain" };
+		}
+
+		const reason = data.reason.trim();
+		if (!reason) {
+			return { success: false as const, error: "Reason is required" };
+		}
+
+		await db
+			.insert(bannedDomains)
+			.values({ domain, reason })
+			.onConflictDoUpdate({
+				target: bannedDomains.domain,
+				set: { reason },
+			});
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			kind: "ban_domain",
+			note: `${domain}: ${reason}`,
+		});
+
+		return { success: true as const, domain, reason };
+	});
+
+export const removeBannedDomainFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { domain: string }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		await db.delete(bannedDomains).where(eq(bannedDomains.domain, data.domain));
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			kind: "unban_domain",
+			note: data.domain,
 		});
 
 		return { success: true as const };

@@ -102,7 +102,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: an admin can open a user and see notes (add/view), recent activity, and report history in one place.
   - *Verify*: `pnpm test --run && pnpm check`; manual walkthrough in dev.
 
-- [ ] **T13: Banned-domain management**
+- [x] **T13: Banned-domain management** *(done 2026-07-09: assertUrlDomainAllowed in submissions.server.ts throws BannedDomainError (exact host or subdomain match) from createSubmission/updateSubmission; updateSubmissionFn maps it to a friendly error (submit.tsx already surfaced thrown messages); /admin/banned-domains CRUD page + listBannedDomains query + add/removeBannedDomainFn actions with domain normalization (scheme/www/path stripping) and ban_domain/unban_domain mod-log entries; 5 enforcement + 4 action tests)*
   - *Why*: The `bannedDomains` table exists with no feature code — banned domains are currently not enforced at all.
   - *Files*: enforcement in `createSubmission`/`updateSubmission` in `src/lib/submissions.server.ts` (reject URLs whose host matches a banned domain); admin CRUD page `src/routes/admin.banned-domains.tsx` + queries/actions in `src/lib/admin.server.ts` / `admin-actions.server.ts`.
   - *Done when*: submitting a link to a banned domain is rejected with the stored reason; admins can add/remove domains; both behaviors have server tests.
