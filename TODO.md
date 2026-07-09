@@ -8,7 +8,7 @@
 4. Run the *Verify* commands. **Never check a box unless they pass.**
 5. Check the box, then commit with a message starting with the task ID, e.g. `T03: add votes.server tests`. One task per commit.
 
-Baseline before any task: `pnpm check && pnpm test --run` passes (34 test files, 195 tests as of 2026-07-09, after T03–T08).
+Baseline before any task: `pnpm check && pnpm test --run` passes (38 test files, 242 tests as of 2026-07-09, after T03–T15).
 
 ### Project orientation (read once)
 
