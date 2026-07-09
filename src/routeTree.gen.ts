@@ -34,6 +34,7 @@ import { Route as AdminReportedCommentsRouteImport } from './routes/admin.report
 import { Route as AdminModLogRouteImport } from './routes/admin.mod-log'
 import { Route as AdminFilteredRouteImport } from './routes/admin.filtered'
 import { Route as AdminBannedDomainsRouteImport } from './routes/admin.banned-domains'
+import { Route as AdminBadgesRouteImport } from './routes/admin.badges'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
 import { Route as UUsernameFollowingRouteImport } from './routes/u.$username_.following'
@@ -169,6 +170,11 @@ const AdminBannedDomainsRoute = AdminBannedDomainsRouteImport.update({
   path: '/banned-domains',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBadgesRoute = AdminBadgesRouteImport.update({
+  id: '/badges',
+  path: '/badges',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AtusernamePostsRoute = AtusernamePostsRouteImport.update({
   id: '/@$username_/posts',
   path: '/@$username/posts',
@@ -231,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
@@ -266,6 +273,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
+  '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/badges'
     | '/admin/banned-domains'
     | '/admin/filtered'
     | '/admin/mod-log'
@@ -376,6 +386,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/badges'
     | '/admin/banned-domains'
     | '/admin/filtered'
     | '/admin/mod-log'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username_/posts'
+    | '/admin/badges'
     | '/admin/banned-domains'
     | '/admin/filtered'
     | '/admin/mod-log'
@@ -639,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBannedDomainsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/badges': {
+      id: '/admin/badges'
+      path: '/badges'
+      fullPath: '/admin/badges'
+      preLoaderRoute: typeof AdminBadgesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/@$username_/posts': {
       id: '/@$username_/posts'
       path: '/@$username/posts'
@@ -706,6 +725,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminBadgesRoute: typeof AdminBadgesRoute
   AdminBannedDomainsRoute: typeof AdminBannedDomainsRoute
   AdminFilteredRoute: typeof AdminFilteredRoute
   AdminModLogRoute: typeof AdminModLogRoute
@@ -717,6 +737,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBadgesRoute: AdminBadgesRoute,
   AdminBannedDomainsRoute: AdminBannedDomainsRoute,
   AdminFilteredRoute: AdminFilteredRoute,
   AdminModLogRoute: AdminModLogRoute,

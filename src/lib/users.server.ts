@@ -2,6 +2,8 @@ import { and, desc, eq, gte, isNull, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+	badgeDefs,
+	badges,
 	commentSaveRelationship,
 	comments,
 	commentVotes,
@@ -57,10 +59,18 @@ export type ProfilePostItem = {
 	commentCount: number;
 };
 
+export type UserBadge = {
+	badgeId: number;
+	name: string;
+	description: string | null;
+	url: string | null;
+};
+
 export type ProfilePageData = {
 	profileUser: typeof users.$inferSelect;
 	viewer: SafeUser | null;
 	followingCount: number;
+	badges: UserBadge[];
 	tab: ProfileTab;
 	sort: SortType | CommentFeedSortType;
 	t: TimeFilter;
@@ -138,6 +148,28 @@ function getTimeCutoff(time: TimeFilter): number | null {
 		default:
 			return null;
 	}
+}
+
+export async function getUserBadges(userId: number): Promise<UserBadge[]> {
+	const rows = await db
+		.select({
+			badgeId: badges.badgeId,
+			name: badgeDefs.name,
+			defDescription: badgeDefs.description,
+			grantDescription: badges.description,
+			url: badges.url,
+		})
+		.from(badges)
+		.innerJoin(badgeDefs, eq(badges.badgeId, badgeDefs.id))
+		.where(eq(badges.userId, userId))
+		.orderBy(badgeDefs.id);
+
+	return rows.map((row) => ({
+		badgeId: row.badgeId,
+		name: row.name,
+		description: row.grantDescription ?? row.defDescription,
+		url: row.url,
+	}));
 }
 
 export async function getUserByUsernameCanonical(
@@ -706,10 +738,13 @@ export async function getProfilePageData(options: {
 		}
 	}
 
+	const profileBadges = await getUserBadges(profileUser.id);
+
 	return {
 		profileUser,
 		viewer: options.viewer,
 		followingCount,
+		badges: profileBadges,
 		tab: options.tab,
 		sort: options.sort,
 		t: options.t,

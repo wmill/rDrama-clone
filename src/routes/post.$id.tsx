@@ -20,10 +20,12 @@ import {
 	stickySubmissionFn,
 	updateSubmissionModerationDetailsFn,
 } from "@/lib/admin-actions.server";
+import { awardContentFn } from "@/lib/award-actions.server";
 import {
 	type CommentSortType,
 	getCommentsBySubmissionFlat,
 } from "@/lib/comments.server";
+import { AWARD_OPTIONS } from "@/lib/constants";
 import {
 	deleteSubmissionFn,
 	saveSubmissionFn,
@@ -156,6 +158,7 @@ function PostContent({
 	const router = useRouter();
 	const openReportModal = useModalsStore((s) => s.openReportModal);
 	const openDeletePostModal = useModalsStore((s) => s.openDeletePostModal);
+	const openAwardModal = useModalsStore((s) => s.openAwardModal);
 	const isAuthor = currentUserId === post.authorId;
 	const [isEditing, setIsEditing] = useState(false);
 	const [title, setTitle] = useState(post.title);
@@ -168,6 +171,8 @@ function PostContent({
 	const [isSaving, setIsSaving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [isReporting, setIsReporting] = useState(false);
+	const [isAwarding, setIsAwarding] = useState(false);
+	const [awardMessage, setAwardMessage] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [reportMessage, setReportMessage] = useState<string | null>(null);
 	const [distinguishLevel, setDistinguishLevel] = useState(
@@ -391,6 +396,43 @@ function PostContent({
 			setError(err instanceof Error ? err.message : "Failed to report post");
 		} finally {
 			setIsReporting(false);
+		}
+	};
+
+	const handleAward = async () => {
+		let kind: string;
+		try {
+			const result = await openAwardModal({
+				awards: AWARD_OPTIONS.map((option) => ({
+					kind: option.kind,
+					title: option.title,
+					description: option.description,
+					canUseOwned: true,
+				})),
+			});
+			kind = result.kind;
+		} catch {
+			return;
+		}
+
+		setError(null);
+		setAwardMessage(null);
+		setIsAwarding(true);
+
+		try {
+			const result = await awardContentFn({
+				data: { submissionId: post.id, kind },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+
+			setAwardMessage("Award given!");
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to give award");
+		} finally {
+			setIsAwarding(false);
 		}
 	};
 
@@ -784,8 +826,23 @@ function PostContent({
 					</button>
 				)}
 
+				{currentUserId && !isLifecycleHidden && (
+					<button
+						type="button"
+						disabled={isAwarding}
+						onClick={handleAward}
+						className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						{isAwarding ? "Awarding..." : "Award"}
+					</button>
+				)}
+
 				{reportMessage && (
 					<span className="text-sm text-emerald-400">{reportMessage}</span>
+				)}
+
+				{awardMessage && (
+					<span className="text-sm text-amber-300">{awardMessage}</span>
 				)}
 
 				{canDistinguish && (

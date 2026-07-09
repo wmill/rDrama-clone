@@ -218,6 +218,15 @@ export function UserPage({
 												Patron
 											</span>
 										)}
+										{data.badges.map((badge) => (
+											<span
+												key={badge.badgeId}
+												title={badge.description ?? undefined}
+												className="rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-xs text-violet-300"
+											>
+												{badge.name}
+											</span>
+										))}
 									</div>
 
 									{user.originalUsername &&

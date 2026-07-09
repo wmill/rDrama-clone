@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
 import {
+	badgeDefs,
 	bannedDomains,
 	commentFlags,
 	comments,
@@ -312,6 +313,16 @@ export async function getModLog(page = 1): Promise<ModLogPage> {
 		page: safePage,
 		hasMore: rows.length > MOD_LOG_PER_PAGE,
 	};
+}
+
+export type BadgeDef = {
+	id: number;
+	name: string;
+	description: string | null;
+};
+
+export async function listBadgeDefs(): Promise<BadgeDef[]> {
+	return db.select().from(badgeDefs).orderBy(badgeDefs.id);
 }
 
 export type BannedDomain = {

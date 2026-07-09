@@ -78,6 +78,7 @@ function createProfileData(
 			customTitle: null,
 		},
 		followingCount: 9,
+		badges: [],
 		tab: "posts",
 		sort: "hot",
 		t: "all",
@@ -122,6 +123,29 @@ describe("UserPage", () => {
 			screen.getByText(/Unblock this user to view their profile content/i),
 		).not.toBeNull();
 		expect(screen.queryByText("Sort:")).toBeNull();
+	});
+
+	it("renders granted badges in the profile header", () => {
+		render(
+			<UserPage
+				data={createProfileData({
+					badges: [
+						{
+							badgeId: 1,
+							name: "Founder",
+							description: "Was here first",
+							url: null,
+						},
+					],
+				})}
+				onSortChange={vi.fn()}
+				onTimeChange={vi.fn()}
+				onPageChange={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText("Founder")).not.toBeNull();
+		expect(screen.getByTitle("Was here first")).not.toBeNull();
 	});
 
 	it("shows presentation controls only to admins viewing another user", () => {

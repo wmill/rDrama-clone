@@ -66,6 +66,15 @@ function createUpdateChain() {
 	return { set, where };
 }
 
+function createBadgesChain(result: unknown) {
+	const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+	chain.from = vi.fn(() => chain);
+	chain.innerJoin = vi.fn(() => chain);
+	chain.where = vi.fn(() => chain);
+	chain.orderBy = vi.fn().mockResolvedValue(result);
+	return chain;
+}
+
 function makeProfileUser(
 	overrides: Record<string, unknown> = {},
 ): typeof users.$inferSelect {
@@ -287,7 +296,8 @@ describe("getProfilePageData", () => {
 			.mockReturnValueOnce(
 				createUserLookupChain([makeProfileUser({ isPrivate: true })]) as never,
 			)
-			.mockReturnValueOnce(createCountChain([{ count: 3 }]) as never);
+			.mockReturnValueOnce(createCountChain([{ count: 3 }]) as never)
+			.mockReturnValueOnce(createBadgesChain([]) as never);
 
 		await expect(
 			getProfilePageData({
@@ -305,8 +315,8 @@ describe("getProfilePageData", () => {
 			posts: [],
 			followingCount: 3,
 		});
-		// only the user lookup and following count run for a restricted profile
-		expect(db.select).toHaveBeenCalledTimes(2);
+		// only user lookup, following count, and badges run for a restricted profile
+		expect(db.select).toHaveBeenCalledTimes(3);
 	});
 
 	it("lets the owner view their own private profile comments", async () => {
@@ -339,7 +349,8 @@ describe("getProfilePageData", () => {
 						blockedTargetId: null,
 					},
 				]) as never,
-			);
+			)
+			.mockReturnValueOnce(createBadgesChain([]) as never);
 
 		await expect(
 			getProfilePageData({
@@ -373,7 +384,8 @@ describe("getProfilePageData", () => {
 		});
 		vi.mocked(db.select)
 			.mockReturnValueOnce(createUserLookupChain([makeProfileUser()]) as never)
-			.mockReturnValueOnce(createCountChain([{ count: 0 }]) as never);
+			.mockReturnValueOnce(createCountChain([{ count: 0 }]) as never)
+			.mockReturnValueOnce(createBadgesChain([]) as never);
 
 		await expect(
 			getProfilePageData({
@@ -389,6 +401,6 @@ describe("getProfilePageData", () => {
 			comments: [],
 			posts: [],
 		});
-		expect(db.select).toHaveBeenCalledTimes(2);
+		expect(db.select).toHaveBeenCalledTimes(3);
 	});
 });

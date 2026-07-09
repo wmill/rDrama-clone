@@ -108,7 +108,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: submitting a link to a banned domain is rejected with the stored reason; admins can add/remove domains; both behaviors have server tests.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T14: Badges/awards management + backing actions**
+- [x] **T14: Badges/awards management + backing actions** *(done 2026-07-09: award-actions.server.ts with createBadgeDefFn / grantBadgeFn / revokeBadgeFn (admin, by username, mod-logged) and awardContentFn (validates AWARD_OPTIONS kind from constants.ts, inserts awardRelationships + bumps author receivedAwardCount); /admin/badges page (define + grant/revoke); AwardModal wired to a new Award button on the post page; profile header renders granted badges via getUserBadges → ProfilePageData.badges; 9 action tests + profile render test. Award note text is not persisted (awardRelationships has no note column).)*
   - *Why*: Schema (`badgeDefs`, `badges`, `awardRelationships`) and `src/components/modals/AwardModal.tsx` exist, but there are no server actions — the modal does nothing real.
   - *Files*: new `src/lib/award-actions.server.ts` (grant/revoke badge, award content) wired into `AwardModal.tsx`; admin management page for `badgeDefs`; display granted badges on `src/components/profile/user-page.tsx`.
   - *Done when*: an admin can define a badge, grant it to a user, and it renders on the profile; actions are tested.

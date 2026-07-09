@@ -1,0 +1,179 @@
+import { createServerFn } from "@tanstack/react-start";
+import { and, eq, sql } from "drizzle-orm";
+
+import { db } from "@/db";
+import {
+	awardRelationships,
+	badgeDefs,
+	badges,
+	comments,
+	modActions,
+	submissions,
+	users,
+} from "@/db/schema";
+import { AWARD_OPTIONS } from "@/lib/constants";
+import { getCurrentUser } from "@/lib/sessions.server";
+import { getUserByUsernameCanonical } from "@/lib/users.server";
+
+export const createBadgeDefFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { name: string; description?: string | null }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const name = data.name.trim();
+		if (!name) {
+			return { success: false as const, error: "Name is required" };
+		}
+		const description = data.description?.trim() || null;
+
+		const [created] = await db
+			.insert(badgeDefs)
+			.values({ name, description })
+			.returning();
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			kind: "create_badge_def",
+			note: `"${name}"`,
+		});
+
+		return { success: true as const, badgeDef: created };
+	});
+
+export const grantBadgeFn = createServerFn({ method: "POST" })
+	.inputValidator(
+		(data: {
+			username: string;
+			badgeId: number;
+			description?: string | null;
+		}) => data,
+	)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const target = await getUserByUsernameCanonical(data.username);
+		if (!target) {
+			return { success: false as const, error: "User not found" };
+		}
+
+		const [def] = await db
+			.select()
+			.from(badgeDefs)
+			.where(eq(badgeDefs.id, data.badgeId))
+			.limit(1);
+		if (!def) {
+			return { success: false as const, error: "Badge not found" };
+		}
+
+		await db
+			.insert(badges)
+			.values({
+				badgeId: def.id,
+				userId: target.id,
+				description: data.description?.trim() || null,
+			})
+			.onConflictDoNothing();
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetUserId: target.id,
+			kind: "grant_badge",
+			note: `"${def.name}"`,
+		});
+
+		return { success: true as const };
+	});
+
+export const revokeBadgeFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { username: string; badgeId: number }) => data)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user || user.adminLevel < 2) {
+			return { success: false as const, error: "Unauthorized" };
+		}
+
+		const target = await getUserByUsernameCanonical(data.username);
+		if (!target) {
+			return { success: false as const, error: "User not found" };
+		}
+
+		await db
+			.delete(badges)
+			.where(
+				and(eq(badges.userId, target.id), eq(badges.badgeId, data.badgeId)),
+			);
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetUserId: target.id,
+			kind: "revoke_badge",
+			note: `badge #${data.badgeId}`,
+		});
+
+		return { success: true as const };
+	});
+
+export const awardContentFn = createServerFn({ method: "POST" })
+	.inputValidator(
+		(data: { submissionId?: number; commentId?: number; kind: string }) => data,
+	)
+	.handler(async ({ data }) => {
+		const user = await getCurrentUser();
+		if (!user) {
+			return { success: false as const, error: "Not logged in" };
+		}
+
+		if (!AWARD_OPTIONS.some((option) => option.kind === data.kind)) {
+			return { success: false as const, error: "Unknown award" };
+		}
+
+		const hasSubmission = typeof data.submissionId === "number";
+		const hasComment = typeof data.commentId === "number";
+		if (hasSubmission === hasComment) {
+			return {
+				success: false as const,
+				error: "Award exactly one post or comment",
+			};
+		}
+
+		let authorId: number | undefined;
+		if (hasSubmission) {
+			const [post] = await db
+				.select({ authorId: submissions.authorId })
+				.from(submissions)
+				.where(eq(submissions.id, data.submissionId as number))
+				.limit(1);
+			authorId = post?.authorId;
+		} else {
+			const [comment] = await db
+				.select({ authorId: comments.authorId })
+				.from(comments)
+				.where(eq(comments.id, data.commentId as number))
+				.limit(1);
+			authorId = comment?.authorId;
+		}
+
+		if (authorId === undefined) {
+			return { success: false as const, error: "Content not found" };
+		}
+
+		await db.insert(awardRelationships).values({
+			userId: user.id,
+			submissionId: hasSubmission ? (data.submissionId as number) : null,
+			commentId: hasComment ? (data.commentId as number) : null,
+			kind: data.kind,
+		});
+
+		await db
+			.update(users)
+			.set({ receivedAwardCount: sql`${users.receivedAwardCount} + 1` })
+			.where(eq(users.id, authorId));
+
+		return { success: true as const };
+	});
