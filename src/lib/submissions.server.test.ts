@@ -12,8 +12,29 @@ vi.mock("@/lib/notifications.server", () => ({
 	setSubmissionSubscriptionState: vi.fn(),
 }));
 
+vi.mock("@/lib/lifecycle.server", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("@/lib/lifecycle.server")>();
+	return {
+		...actual,
+		authorDeleteSubmission: vi.fn(),
+	};
+});
+
+vi.mock("@/lib/search.server", () => ({
+	indexSubmissionBestEffort: vi.fn(),
+}));
+
 import { db } from "@/db";
-import { getSubmissionById, getSubmissions } from "@/lib/submissions.server";
+import { authorDeleteSubmission } from "@/lib/lifecycle.server";
+import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
+import { indexSubmissionBestEffort } from "@/lib/search.server";
+import {
+	deleteSubmission,
+	getSubmissionById,
+	getSubmissions,
+	updateSubmission,
+} from "@/lib/submissions.server";
 
 function createSelectOrderChain(result: unknown) {
 	const chain = {
@@ -195,5 +216,109 @@ describe("submissions.server", () => {
 		expect(moderatorResult?.isFiltered).toBe(true);
 		expect(moderatorResult?.visibilityMessage).toBeNull();
 		expect(moderatorResult?.bodyHtml).toBe("<p>body</p>");
+	});
+
+	it("rejects edits from non-authors and does not reindex", async () => {
+		vi.mocked(db.update).mockReturnValueOnce({
+			set: vi.fn(() => ({
+				where: vi.fn(() => ({
+					returning: vi.fn().mockResolvedValue([]),
+				})),
+			})),
+		} as never);
+
+		await expect(updateSubmission(7, 999, { title: "Hijacked" })).resolves.toBe(
+			false,
+		);
+		expect(indexSubmissionBestEffort).not.toHaveBeenCalled();
+	});
+
+	it("re-renders title and body HTML when the author edits", async () => {
+		const set = vi.fn(() => ({
+			where: vi.fn(() => ({
+				returning: vi.fn().mockResolvedValue([{ id: 7 }]),
+			})),
+		}));
+		vi.mocked(db.update).mockReturnValueOnce({ set } as never);
+
+		await expect(
+			updateSubmission(7, 3, { title: " New title ", body: "**new**" }),
+		).resolves.toBe(true);
+
+		expect(set).toHaveBeenCalledWith(
+			expect.objectContaining({
+				title: "New title",
+				titleHtml: renderPostTitleHtml("New title"),
+				body: "**new**",
+				bodyHtml: renderPostBodyMarkdown("**new**"),
+				editedUtc: expect.any(Number),
+			}),
+		);
+		expect(indexSubmissionBestEffort).toHaveBeenCalledWith(7);
+	});
+
+	it("delegates deletes to authorDeleteSubmission and propagates rejection", async () => {
+		vi.mocked(authorDeleteSubmission).mockResolvedValueOnce(false);
+		await expect(deleteSubmission(7, 999)).resolves.toBe(false);
+		expect(authorDeleteSubmission).toHaveBeenCalledWith(7, 999);
+
+		vi.mocked(authorDeleteSubmission).mockResolvedValueOnce(true);
+		await expect(deleteSubmission(7, 3)).resolves.toBe(true);
+	});
+
+	it("maps author-deleted and removed posts to placeholders for normal viewers", async () => {
+		const baseRow = {
+			id: 9,
+			title: "Gone",
+			titleHtml: "Gone",
+			createdUtc: 1,
+			authorId: 4,
+			authorName: "author",
+			url: null,
+			body: "secret body",
+			bodyHtml: "<p>secret body</p>",
+			upvotes: 1,
+			downvotes: 0,
+			commentCount: 0,
+			thumbUrl: null,
+			flair: null,
+			isPinned: false,
+			isNsfw: false,
+			stickied: null,
+			embedUrl: null,
+			editedUtc: 0,
+			views: 0,
+			distinguishLevel: 0,
+			stateUserDeletedUtc: null as Date | null,
+			stateMod: "VISIBLE",
+			stateModSetBy: null as string | null,
+			userVoteType: null,
+			savedSubmissionId: null,
+			subscribedSubmissionId: null,
+			blockedTargetId: null,
+		};
+		vi.mocked(db.select)
+			.mockReturnValueOnce(
+				createSelectLimitChain([
+					{ ...baseRow, stateUserDeletedUtc: new Date(1000) },
+				]) as never,
+			)
+			.mockReturnValueOnce(
+				createSelectLimitChain([
+					{ ...baseRow, stateMod: "REMOVED", stateModSetBy: "mod" },
+				]) as never,
+			);
+
+		const deleted = await getSubmissionById(9, 5);
+		expect(deleted?.isDeleted).toBe(true);
+		expect(deleted?.visibilityMessage).toBe("Deleted by author");
+		expect(deleted?.bodyHtml).toBe("<p>[deleted by author]</p>");
+		expect(deleted?.bodyHtml).not.toContain("secret body");
+
+		const removed = await getSubmissionById(9, 5);
+		expect(removed?.isRemoved).toBe(true);
+		expect(removed?.visibilityMessage).toBe("Removed by moderator");
+		expect(removed?.bodyHtml).toBe("<p>[removed by moderator]</p>");
+		expect(removed?.bodyHtml).not.toContain("secret body");
 	});
 });

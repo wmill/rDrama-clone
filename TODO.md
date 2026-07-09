@@ -8,7 +8,7 @@
 4. Run the *Verify* commands. **Never check a box unless they pass.**
 5. Check the box, then commit with a message starting with the task ID, e.g. `T03: add votes.server tests`. One task per commit.
 
-Baseline before any task: `pnpm check && pnpm test --run` passes (27 test files, 121 tests as of 2026-07-09).
+Baseline before any task: `pnpm check && pnpm test --run` passes (34 test files, 195 tests as of 2026-07-09, after T03–T08).
 
 ### Project orientation (read once)
 
@@ -66,7 +66,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
   - *Done when*: tests cover signup→login→logout, login rejected for `isBanned` users, and that consuming a password reset invalidates existing sessions.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T08: Post-lifecycle permission-boundary tests**
+- [x] **T08: Post-lifecycle permission-boundary tests** *(done 2026-07-09: submissions — non-author edit/delete rejected, author edit re-renders HTML, deleted/removed posts map to placeholders; admin-actions — remove/sticky/pin/ban/distinguish all rejected for adminLevel 0 users with no DB writes)*
   - *Why*: Author-vs-moderator boundaries (author delete, mod remove/unremove, sticky/distinguish permission levels, deleted-post visibility) are asserted nowhere.
   - *Files*: extend `src/lib/submissions.server.test.ts` and `src/lib/admin-actions.server.test.ts`.
   - *Done when*: non-author edit/delete rejected; non-mod remove/sticky/distinguish rejected; deleted/removed posts map to placeholder visibility for normal viewers.

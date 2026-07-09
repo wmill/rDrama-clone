@@ -526,6 +526,49 @@ describe("admin-actions.server", () => {
 		});
 	});
 
+	it("rejects remove/sticky/pin/ban/distinguish from regular users", async () => {
+		const regular: SafeUser = {
+			...moderator,
+			id: 5,
+			username: "pleb",
+			adminLevel: 0,
+		};
+		vi.mocked(getCurrentUser).mockResolvedValue(regular);
+
+		await expect(
+			removeSubmissionFn({ data: { id: 1, removed: true } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			stickySubmissionFn({ data: { id: 1, stickied: true } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			setSubmissionModerationStateFn({ data: { id: 1, state: "REMOVED" } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			removeCommentFn({ data: { id: 5, removed: true } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			pinCommentFn({ data: { id: 6, pinned: true } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			banUserFn({ data: { userId: 9, reason: "grudge" } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			distinguishSubmissionFn({ data: { id: 40 } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(distinguishCommentFn({ data: { id: 50 } })).resolves.toEqual({
+			success: false,
+			error: "Unauthorized",
+		});
+
+		expect(setSubmissionRemovedState).not.toHaveBeenCalled();
+		expect(setSubmissionStickyState).not.toHaveBeenCalled();
+		expect(setCommentRemovedState).not.toHaveBeenCalled();
+		expect(setCommentPinnedState).not.toHaveBeenCalled();
+		expect(dbMock.update).not.toHaveBeenCalled();
+		expect(dbMock.insert).not.toHaveBeenCalled();
+	});
+
 	it("toggles submission distinguish state with author and moderator permissions", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValueOnce(null);
 		await expect(
