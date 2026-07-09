@@ -16,6 +16,11 @@ import {
 	type TimeFilter,
 	TimeFilters,
 } from "@/lib/constants";
+import {
+	type ClientSessionInfo,
+	listSessionsFn,
+	logoutOtherSessionsFn,
+} from "@/lib/session-actions.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import {
 	getUserSettingsById,
@@ -125,12 +130,17 @@ export const Route = createFileRoute("/me")({
 	loader: async () => {
 		const user = await getCurrentUserFn();
 		const settings = await getCurrentUserSettingsFn();
-		return { user, settings };
+		const sessionsResult = await listSessionsFn();
+		return {
+			user,
+			settings,
+			sessions: sessionsResult.success ? sessionsResult.sessions : [],
+		};
 	},
 });
 
 function MePage() {
-	const { user, settings } = Route.useLoaderData();
+	const { user, settings, sessions } = Route.useLoaderData();
 
 	if (!user || !settings) {
 		return (
@@ -148,10 +158,16 @@ function MePage() {
 		);
 	}
 
-	return <SettingsForm settings={settings} />;
+	return <SettingsForm settings={settings} sessions={sessions} />;
 }
 
-function SettingsForm({ settings }: { settings: UserSettings }) {
+function SettingsForm({
+	settings,
+	sessions,
+}: {
+	settings: UserSettings;
+	sessions: ClientSessionInfo[];
+}) {
 	const router = useRouter();
 	const [form, setForm] = useState<SettingsInput>({
 		bio: settings.bio,
@@ -518,8 +534,106 @@ function SettingsForm({ settings }: { settings: UserSettings }) {
 						</Button>
 					</div>
 				</form>
+
+				<SessionsCard sessions={sessions} />
 			</div>
 		</div>
+	);
+}
+
+function SessionsCard({ sessions }: { sessions: ClientSessionInfo[] }) {
+	const router = useRouter();
+	const [message, setMessage] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [isWorking, setIsWorking] = useState(false);
+	const otherSessionCount = sessions.filter((s) => !s.isCurrent).length;
+
+	const handleLogoutOthers = async () => {
+		setMessage(null);
+		setError(null);
+		setIsWorking(true);
+		try {
+			const result = await logoutOtherSessionsFn();
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			setMessage(
+				result.removed === 0
+					? "No other sessions to log out."
+					: `Logged out ${result.removed} other session${result.removed === 1 ? "" : "s"}.`,
+			);
+			await router.invalidate();
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "An unexpected error occurred",
+			);
+		} finally {
+			setIsWorking(false);
+		}
+	};
+
+	return (
+		<section className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+			<div className="mb-4 flex items-center justify-between gap-4">
+				<div>
+					<h2 className="text-xl font-semibold text-white">Active sessions</h2>
+					<p className="text-sm text-slate-400">
+						Everywhere you are currently logged in. Log out other sessions if
+						you see a device you don't recognize.
+					</p>
+				</div>
+				<Button
+					variant="destructive"
+					onClick={handleLogoutOthers}
+					disabled={isWorking || otherSessionCount === 0}
+				>
+					{isWorking ? "Logging out..." : "Log out other sessions"}
+				</Button>
+			</div>
+
+			{error && (
+				<div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300">
+					{error}
+				</div>
+			)}
+			{message && (
+				<div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+					{message}
+				</div>
+			)}
+
+			<ul className="space-y-3">
+				{sessions.map((session) => (
+					<li
+						key={session.key}
+						className="flex items-start justify-between gap-4 rounded-lg border border-slate-800 bg-slate-950/50 p-4"
+					>
+						<div className="min-w-0">
+							<div className="flex items-center gap-2">
+								<span className="font-mono text-sm text-slate-300">
+									{session.key}…
+								</span>
+								{session.isCurrent && (
+									<span className="rounded-full border border-cyan-500/50 bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-300">
+										This device
+									</span>
+								)}
+							</div>
+							<p className="mt-1 truncate text-sm text-slate-400">
+								{session.userAgent ?? "Unknown device"}
+							</p>
+						</div>
+						<div className="shrink-0 text-right text-sm text-slate-400">
+							<div>{new Date(session.createdAt).toLocaleString()}</div>
+							<div className="text-xs text-slate-500">
+								{session.ipAddress ?? "IP unknown"}
+							</div>
+						</div>
+					</li>
+				))}
+			</ul>
+		</section>
 	);
 }
 

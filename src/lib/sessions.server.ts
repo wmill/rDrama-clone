@@ -92,6 +92,74 @@ export async function deleteSession(sessionId: string): Promise<void> {
 	await pipeline.exec();
 }
 
+export type UserSessionInfo = {
+	id: string;
+	createdAt: Date;
+	userAgent: string | null;
+	ipAddress: string | null;
+	isCurrent: boolean;
+};
+
+export async function listUserSessions(
+	userId: number,
+	currentSessionId?: string,
+): Promise<UserSessionInfo[]> {
+	const sessionIds = await redis.smembers(userSessionsKey(userId));
+	if (sessionIds.length === 0) return [];
+
+	const values = await redis.mget(...sessionIds.map(sessionKey));
+	const sessions: UserSessionInfo[] = [];
+	const staleIds: string[] = [];
+
+	sessionIds.forEach((sessionId, index) => {
+		const data = values[index];
+		if (!data) {
+			// session expired via TTL but its id is still in the set
+			staleIds.push(sessionId);
+			return;
+		}
+
+		const parsed = JSON.parse(data) as {
+			userId: number;
+			createdAt: string;
+			userAgent?: string;
+			ipAddress?: string;
+		};
+
+		sessions.push({
+			id: sessionId,
+			createdAt: new Date(parsed.createdAt),
+			userAgent: parsed.userAgent ?? null,
+			ipAddress: parsed.ipAddress ?? null,
+			isCurrent: sessionId === currentSessionId,
+		});
+	});
+
+	if (staleIds.length > 0) {
+		await redis.srem(userSessionsKey(userId), ...staleIds);
+	}
+
+	return sessions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function deleteOtherUserSessions(
+	userId: number,
+	currentSessionId: string,
+): Promise<number> {
+	const sessionIds = await redis.smembers(userSessionsKey(userId));
+	const otherIds = sessionIds.filter((id) => id !== currentSessionId);
+	if (otherIds.length === 0) return 0;
+
+	const pipeline = redis.pipeline();
+	for (const id of otherIds) {
+		pipeline.del(sessionKey(id));
+	}
+	pipeline.srem(userSessionsKey(userId), ...otherIds);
+	await pipeline.exec();
+
+	return otherIds.length;
+}
+
 export async function deleteAllUserSessions(userId: number): Promise<void> {
 	const sessionIds = await redis.smembers(userSessionsKey(userId));
 

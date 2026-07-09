@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => {
 	return {
 		redis: {
 			get: vi.fn(),
+			mget: vi.fn(),
 			smembers: vi.fn(),
+			srem: vi.fn(),
 			expire: vi.fn(),
 			pipeline: vi.fn(() => pipeline),
 		},
@@ -43,10 +45,12 @@ vi.mock("@tanstack/react-start/server", () => ({
 import {
 	createSession,
 	deleteAllUserSessions,
+	deleteOtherUserSessions,
 	deleteSession,
 	getCurrentUser,
 	getSessionById,
 	getUserFromSession,
+	listUserSessions,
 } from "@/lib/sessions.server";
 
 function sessionJson(userId: number) {
@@ -166,6 +170,79 @@ describe("sessions.server", () => {
 
 		await deleteAllUserSessions(7);
 
+		expect(mocks.redis.pipeline).not.toHaveBeenCalled();
+	});
+
+	it("lists sessions newest-first, marks the current one, and prunes stale ids", async () => {
+		mocks.redis.smembers.mockResolvedValueOnce(["old", "cur", "stale"]);
+		mocks.redis.mget.mockResolvedValueOnce([
+			JSON.stringify({
+				userId: 7,
+				createdAt: "2026-07-01T00:00:00.000Z",
+				userAgent: "laptop",
+			}),
+			JSON.stringify({
+				userId: 7,
+				createdAt: "2026-07-09T00:00:00.000Z",
+				userAgent: "phone",
+				ipAddress: "10.0.0.2",
+			}),
+			null,
+		]);
+
+		const sessions = await listUserSessions(7, "cur");
+
+		expect(mocks.redis.mget).toHaveBeenCalledWith(
+			"session:old",
+			"session:cur",
+			"session:stale",
+		);
+		expect(sessions).toEqual([
+			{
+				id: "cur",
+				createdAt: new Date("2026-07-09T00:00:00.000Z"),
+				userAgent: "phone",
+				ipAddress: "10.0.0.2",
+				isCurrent: true,
+			},
+			{
+				id: "old",
+				createdAt: new Date("2026-07-01T00:00:00.000Z"),
+				userAgent: "laptop",
+				ipAddress: null,
+				isCurrent: false,
+			},
+		]);
+		expect(mocks.redis.srem).toHaveBeenCalledWith("user_sessions:7", "stale");
+	});
+
+	it("returns an empty session list without touching Redis further", async () => {
+		mocks.redis.smembers.mockResolvedValueOnce([]);
+
+		await expect(listUserSessions(7, "cur")).resolves.toEqual([]);
+		expect(mocks.redis.mget).not.toHaveBeenCalled();
+	});
+
+	it("logs out every session except the current one", async () => {
+		mocks.redis.smembers.mockResolvedValueOnce(["cur", "o1", "o2"]);
+
+		await expect(deleteOtherUserSessions(7, "cur")).resolves.toBe(2);
+
+		expect(mocks.pipeline.del).toHaveBeenCalledWith("session:o1");
+		expect(mocks.pipeline.del).toHaveBeenCalledWith("session:o2");
+		expect(mocks.pipeline.del).not.toHaveBeenCalledWith("session:cur");
+		expect(mocks.pipeline.srem).toHaveBeenCalledWith(
+			"user_sessions:7",
+			"o1",
+			"o2",
+		);
+		expect(mocks.pipeline.exec).toHaveBeenCalledTimes(1);
+	});
+
+	it("is a no-op when the current session is the only one", async () => {
+		mocks.redis.smembers.mockResolvedValueOnce(["cur"]);
+
+		await expect(deleteOtherUserSessions(7, "cur")).resolves.toBe(0);
 		expect(mocks.redis.pipeline).not.toHaveBeenCalled();
 	});
 

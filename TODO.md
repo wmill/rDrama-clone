@@ -74,7 +74,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
 
 ## Account security hardening
 
-- [ ] **T09: Session management — "log out other sessions"**
+- [x] **T09: Session management — "log out other sessions"** *(done 2026-07-09: listUserSessions + deleteOtherUserSessions in sessions.server.ts (with stale-id pruning), session-actions.server.ts server fns (client only ever sees truncated session-id prefixes), "Active sessions" card in me.tsx with per-device list + log-out-others button; 9 new server tests. Manual two-browser check still worthwhile when the stack is up.)*
   - *Why*: Users cannot revoke other active sessions (P1 security parity item; 2FA is explicitly out of scope).
   - *Files*: `src/lib/sessions.server.ts` (read it first to learn the session store — sessions are keyed via Redis/`src/lib/redis.ts` and the schema has a `login_nonce` column on `users` for mass invalidation), a new action in an existing `*-actions.server.ts` or new `session-actions.server.ts`, and UI in `src/routes/me.tsx`.
   - *Done when*: settings page shows a "Log out other sessions" control; invoking it invalidates every session except the current one (verified by a server test).
