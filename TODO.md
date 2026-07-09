@@ -38,7 +38,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
 
 ## Test coverage gaps
 
-- [ ] **T03: Tests for `src/lib/votes.server.ts`**
+- [x] **T03: Tests for `src/lib/votes.server.ts`** *(done 2026-07-09: 11 tests — new/toggle/switch/remove vote, counter effects, missing-row and error fallbacks)*
   - *Why*: Core voting logic has zero direct tests.
   - *Files*: create `src/lib/votes.server.test.ts`; mock the `db` import the same way `src/lib/social.server.test.ts` does; exercise `voteOnSubmission` / `voteOnComment` (new vote, change vote, remove vote, score/upvote/downvote counter effects, not-logged-in / invalid input).
   - *Done when*: each exported function has happy-path + at least one boundary test.
