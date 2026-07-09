@@ -31,6 +31,7 @@ import { Route as CommentIdRouteImport } from './routes/comment.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-posts'
 import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
+import { Route as AdminFilteredRouteImport } from './routes/admin.filtered'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
 import { Route as UUsernameFollowingRouteImport } from './routes/u.$username_.following'
@@ -150,6 +151,11 @@ const AdminReportedCommentsRoute = AdminReportedCommentsRouteImport.update({
   path: '/reported-comments',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFilteredRoute = AdminFilteredRouteImport.update({
+  id: '/filtered',
+  path: '/filtered',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AtusernamePostsRoute = AtusernamePostsRouteImport.update({
   id: '/@$username_/posts',
   path: '/@$username/posts',
@@ -207,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/filtered': typeof AdminFilteredRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username/posts': typeof AtusernamePostsRoute
+  '/admin/filtered': typeof AdminFilteredRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -271,6 +279,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
+  '/admin/filtered': typeof AdminFilteredRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -305,6 +314,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/filtered'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
     | '/admin/users'
@@ -336,6 +346,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username/posts'
+    | '/admin/filtered'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
     | '/admin/users'
@@ -368,6 +379,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/submit'
     | '/@$username_/posts'
+    | '/admin/filtered'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
     | '/admin/users'
@@ -570,6 +582,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminReportedCommentsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/filtered': {
+      id: '/admin/filtered'
+      path: '/filtered'
+      fullPath: '/admin/filtered'
+      preLoaderRoute: typeof AdminFilteredRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/@$username_/posts': {
       id: '/@$username_/posts'
       path: '/@$username/posts'
@@ -630,6 +649,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminFilteredRoute: typeof AdminFilteredRoute
   AdminReportedCommentsRoute: typeof AdminReportedCommentsRoute
   AdminReportedPostsRoute: typeof AdminReportedPostsRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -637,6 +657,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminFilteredRoute: AdminFilteredRoute,
   AdminReportedCommentsRoute: AdminReportedCommentsRoute,
   AdminReportedPostsRoute: AdminReportedPostsRoute,
   AdminUsersRoute: AdminUsersRoute,

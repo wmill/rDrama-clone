@@ -84,7 +84,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
 
 Pattern for all admin pages: route guard comes free by nesting under `src/routes/admin.tsx`; copy the structure of `src/routes/admin.reported-posts.tsx` (loader calling a `src/lib/admin.server.ts` query, actions via `src/lib/admin-actions.server.ts`, add nav link wherever the existing admin pages register theirs).
 
-- [ ] **T10: Filtered/removed/shadowbanned content queues**
+- [x] **T10: Filtered/removed/shadowbanned content queues** *(done 2026-07-09: getModQueueSubmissions/getModQueueComments in admin.server.ts (FILTERED/REMOVED by stateMod, SHADOWBANNED = visible content from shadowbanned authors), tabbed /admin/filtered page reusing setSubmission/setCommentModerationStateFn for approve/remove, data-driven admin nav, 3 new query tests)*
   - *Why*: Mods can only see *reported* content; content in FILTERED/REMOVED state or from shadowbanned users has no review surface.
   - *Files*: new `src/routes/admin.filtered.tsx` (or similar); queries in `src/lib/admin.server.ts` filtering `submissions`/`comments` by `stateMod` enum (`FILTERED`/`REMOVED`) and authors with `shadowBanned` set; reuse existing remove/unremove/approve actions from `src/lib/admin-actions.server.ts`.
   - *Done when*: each queue lists matching content with working approve/remove actions; non-admins are redirected.

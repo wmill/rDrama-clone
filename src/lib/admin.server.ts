@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNotNull, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
@@ -159,6 +159,101 @@ export async function getReportedComments(): Promise<ReportedComment[]> {
 			reason: f.reason,
 		})),
 	}));
+}
+
+export type ModQueueKind = "FILTERED" | "REMOVED" | "SHADOWBANNED";
+
+export type ModQueueSubmission = {
+	id: number;
+	titleHtml: string;
+	authorId: number;
+	authorName: string;
+	authorShadowBanned: string | null;
+	createdUtc: number;
+	stateMod: string;
+	stateModSetBy: string | null;
+};
+
+export type ModQueueComment = {
+	id: number;
+	bodyHtml: string;
+	authorId: number;
+	authorName: string;
+	authorShadowBanned: string | null;
+	createdUtc: number;
+	stateMod: string;
+	stateModSetBy: string | null;
+	parentSubmissionId: number | null;
+	parentSubmissionTitle: string | null;
+};
+
+const MOD_QUEUE_LIMIT = 100;
+
+export async function getModQueueSubmissions(
+	queue: ModQueueKind,
+): Promise<ModQueueSubmission[]> {
+	const condition =
+		queue === "SHADOWBANNED"
+			? and(
+					isNotNull(users.shadowBanned),
+					eq(submissions.stateMod, "VISIBLE"),
+					isNull(submissions.stateUserDeletedUtc),
+				)
+			: and(
+					eq(submissions.stateMod, queue),
+					isNull(submissions.stateUserDeletedUtc),
+				);
+
+	return db
+		.select({
+			id: submissions.id,
+			titleHtml: submissions.titleHtml,
+			authorId: submissions.authorId,
+			authorName: users.username,
+			authorShadowBanned: users.shadowBanned,
+			createdUtc: submissions.createdUtc,
+			stateMod: submissions.stateMod,
+			stateModSetBy: submissions.stateModSetBy,
+		})
+		.from(submissions)
+		.innerJoin(users, eq(submissions.authorId, users.id))
+		.where(condition)
+		.orderBy(desc(submissions.createdUtc))
+		.limit(MOD_QUEUE_LIMIT);
+}
+
+export async function getModQueueComments(
+	queue: ModQueueKind,
+): Promise<ModQueueComment[]> {
+	const author = alias(users, "author");
+	const condition =
+		queue === "SHADOWBANNED"
+			? and(
+					isNotNull(author.shadowBanned),
+					eq(comments.stateMod, "VISIBLE"),
+					isNull(comments.stateUserDeletedUtc),
+				)
+			: and(eq(comments.stateMod, queue), isNull(comments.stateUserDeletedUtc));
+
+	return db
+		.select({
+			id: comments.id,
+			bodyHtml: comments.bodyHtml,
+			authorId: comments.authorId,
+			authorName: author.username,
+			authorShadowBanned: author.shadowBanned,
+			createdUtc: comments.createdUtc,
+			stateMod: comments.stateMod,
+			stateModSetBy: comments.stateModSetBy,
+			parentSubmissionId: comments.parentSubmission,
+			parentSubmissionTitle: submissions.title,
+		})
+		.from(comments)
+		.innerJoin(author, eq(comments.authorId, author.id))
+		.leftJoin(submissions, eq(comments.parentSubmission, submissions.id))
+		.where(condition)
+		.orderBy(desc(comments.createdUtc))
+		.limit(MOD_QUEUE_LIMIT);
 }
 
 export async function searchUsers(

@@ -11,6 +11,8 @@ vi.mock("@/db", () => ({
 
 import { db } from "@/db";
 import {
+	getModQueueComments,
+	getModQueueSubmissions,
 	getReportedComments,
 	getReportedSubmissions,
 	getUserAdminDetails,
@@ -134,6 +136,81 @@ describe("getReportedComments", () => {
 		expect(result[0].flags).toEqual([
 			{ userId: 20, reporterName: "carol", reason: "rude" },
 		]);
+	});
+});
+
+describe("getModQueueSubmissions", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns submissions in the requested moderation state", async () => {
+		const rows = [
+			{
+				id: 3,
+				titleHtml: "Held post",
+				authorId: 7,
+				authorName: "alice",
+				authorShadowBanned: null,
+				createdUtc: 100,
+				stateMod: "FILTERED",
+				stateModSetBy: "AUTOMATIC",
+			},
+		];
+		vi.mocked(db.select).mockReturnValueOnce(
+			createChain("limit", rows) as never,
+		);
+
+		await expect(getModQueueSubmissions("FILTERED")).resolves.toEqual(rows);
+		expect(db.select).toHaveBeenCalledTimes(1);
+	});
+
+	it("returns visible submissions from shadowbanned authors", async () => {
+		const rows = [
+			{
+				id: 4,
+				titleHtml: "Sneaky post",
+				authorId: 8,
+				authorName: "bob",
+				authorShadowBanned: "shadowbanned",
+				createdUtc: 200,
+				stateMod: "VISIBLE",
+				stateModSetBy: null,
+			},
+		];
+		vi.mocked(db.select).mockReturnValueOnce(
+			createChain("limit", rows) as never,
+		);
+
+		await expect(getModQueueSubmissions("SHADOWBANNED")).resolves.toEqual(rows);
+	});
+});
+
+describe("getModQueueComments", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns comments in the requested moderation state with their parent post", async () => {
+		const rows = [
+			{
+				id: 9,
+				bodyHtml: "<p>removed comment</p>",
+				authorId: 7,
+				authorName: "alice",
+				authorShadowBanned: null,
+				createdUtc: 100,
+				stateMod: "REMOVED",
+				stateModSetBy: "modbob",
+				parentSubmissionId: 42,
+				parentSubmissionTitle: "A post",
+			},
+		];
+		vi.mocked(db.select).mockReturnValueOnce(
+			createChain("limit", rows) as never,
+		);
+
+		await expect(getModQueueComments("REMOVED")).resolves.toEqual(rows);
 	});
 });
 
