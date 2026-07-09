@@ -31,6 +31,7 @@ const ADMIN_NAV_LINKS = [
 	{ to: "/admin/users", label: "Users" },
 	{ to: "/admin/banned-domains", label: "Banned Domains" },
 	{ to: "/admin/badges", label: "Badges" },
+	{ to: "/admin/settings", label: "Settings" },
 ] as const;
 
 function AdminLayout() {

@@ -114,7 +114,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: an admin can define a badge, grant it to a user, and it renders on the profile; actions are tested.
   - *Verify*: `pnpm test --run && pnpm check`; manual grant in dev.
 
-- [ ] **T15: Site settings / config toggles**
+- [x] **T15: Site settings / config toggles** *(done 2026-07-09: two toggles — signups_enabled (default on) and read_only (default off) — metadata in constants.ts, values in Redis under site_setting:* via site-settings.server.ts (no migration needed); /admin/settings page with switches via site-settings-actions.server.ts (admin-gated updateSiteSettingFn, logs update_site_setting mod action); enforced in createUser (signup), submitAction (post create), createCommentFn, and both vote fns in VoteButtons.tsx; edits/deletes intentionally left allowed in read-only mode. 9 new tests incl. signup-disabled and read-only-comment rejections.)*
   - *Why*: There is no runtime kill-switch for signups or site-wide read-only mode.
   - *Files*: **first enumerate** which toggles are worth having (suggested minimum: `signups_enabled`, `read_only`); store in Redis (`src/lib/redis.ts`) or a small new table (migration via `pnpm db:generate`); admin page `src/routes/admin.settings.tsx`; enforce in `src/lib/auth.server.ts` (signup) and the write-path server fns.
   - *Done when*: toggling each setting changes behavior immediately and is covered by a server test.

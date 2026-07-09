@@ -29,6 +29,7 @@ import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as PostIdRouteImport } from './routes/post.$id'
 import { Route as CommentIdRouteImport } from './routes/comment.$id'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-posts'
 import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
 import { Route as AdminModLogRouteImport } from './routes/admin.mod-log'
@@ -145,6 +146,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminReportedPostsRoute = AdminReportedPostsRouteImport.update({
   id: '/reported-posts',
   path: '/reported-posts',
@@ -243,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
@@ -279,6 +286,7 @@ export interface FileRoutesByTo {
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
@@ -317,6 +325,7 @@ export interface FileRoutesById {
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
   '/admin/reported-posts': typeof AdminReportedPostsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/comment/$id': typeof CommentIdRoute
   '/post/$id': typeof PostIdRoute
@@ -356,6 +365,7 @@ export interface FileRouteTypes {
     | '/admin/mod-log'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
+    | '/admin/settings'
     | '/admin/users'
     | '/comment/$id'
     | '/post/$id'
@@ -392,6 +402,7 @@ export interface FileRouteTypes {
     | '/admin/mod-log'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
+    | '/admin/settings'
     | '/admin/users'
     | '/comment/$id'
     | '/post/$id'
@@ -429,6 +440,7 @@ export interface FileRouteTypes {
     | '/admin/mod-log'
     | '/admin/reported-comments'
     | '/admin/reported-posts'
+    | '/admin/settings'
     | '/admin/users'
     | '/comment/$id'
     | '/post/$id'
@@ -616,6 +628,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/reported-posts': {
       id: '/admin/reported-posts'
       path: '/reported-posts'
@@ -731,6 +750,7 @@ interface AdminRouteChildren {
   AdminModLogRoute: typeof AdminModLogRoute
   AdminReportedCommentsRoute: typeof AdminReportedCommentsRoute
   AdminReportedPostsRoute: typeof AdminReportedPostsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminUsersIdRoute: typeof AdminUsersIdRoute
@@ -743,6 +763,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminModLogRoute: AdminModLogRoute,
   AdminReportedCommentsRoute: AdminReportedCommentsRoute,
   AdminReportedPostsRoute: AdminReportedPostsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminUsersIdRoute: AdminUsersIdRoute,

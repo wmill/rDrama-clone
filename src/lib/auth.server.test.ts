@@ -10,12 +10,18 @@ vi.mock("@/db", () => ({
 	},
 }));
 
+vi.mock("@/lib/site-settings.server", () => ({
+	getSiteSetting: vi.fn().mockResolvedValue(true),
+	SIGNUPS_DISABLED_MESSAGE: "Signups are currently disabled.",
+}));
+
 import { db } from "@/db";
 import {
 	authenticateUser,
 	createUser,
 	verifyPassword,
 } from "@/lib/auth.server";
+import { getSiteSetting } from "@/lib/site-settings.server";
 
 const PASSWORD = "hunter22-strong";
 let passhash: string;
@@ -61,6 +67,20 @@ function makeUserRow(overrides: Record<string, unknown> = {}) {
 describe("createUser", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(getSiteSetting).mockResolvedValue(true);
+	});
+
+	it("rejects signups while the signups_enabled toggle is off", async () => {
+		vi.mocked(getSiteSetting).mockResolvedValue(false);
+
+		await expect(
+			createUser("newname", "new@example.com", PASSWORD),
+		).resolves.toEqual({
+			success: false,
+			error: "Signups are currently disabled.",
+		});
+		expect(db.select).not.toHaveBeenCalled();
+		expect(db.insert).not.toHaveBeenCalled();
 	});
 
 	function mockLookups(usernameMatch: unknown[], emailMatch: unknown[]) {

@@ -8,6 +8,7 @@ import {
 } from "@/lib/comments.server";
 import { setCommentSavedState } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 
 export const createCommentFn = createServerFn({ method: "POST" })
 	.inputValidator(
@@ -30,6 +31,9 @@ export const createCommentFn = createServerFn({ method: "POST" })
 			const user = await getCurrentUser();
 			if (!user) {
 				return { success: false as const, error: "Not logged in" };
+			}
+			if (await isSiteReadOnly()) {
+				return { success: false as const, error: READ_ONLY_MESSAGE };
 			}
 			try {
 				const id = await createComment({

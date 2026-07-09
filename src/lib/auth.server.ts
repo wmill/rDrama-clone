@@ -3,6 +3,10 @@ import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import {
+	getSiteSetting,
+	SIGNUPS_DISABLED_MESSAGE,
+} from "@/lib/site-settings.server";
 
 const SALT_ROUNDS = 12;
 const DEFAULT_THEME = "TheMotte";
@@ -141,6 +145,11 @@ export async function createUser(
 	email: string,
 	password: string,
 ): Promise<SignupResult> {
+	const signupsEnabled = await getSiteSetting("signups_enabled");
+	if (!signupsEnabled) {
+		return { success: false, error: SIGNUPS_DISABLED_MESSAGE };
+	}
+
 	const normalizedUsername = normalizeUsername(username);
 	const normalizedEmail = normalizeEmail(email);
 

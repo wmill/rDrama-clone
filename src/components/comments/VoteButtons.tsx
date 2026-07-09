@@ -5,6 +5,7 @@ import arrowBigUpUrl from "lucide-static/icons/arrow-big-up.svg?url";
 import { useState } from "react";
 import { IconMask } from "@/components/ui/icon-mask";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 import {
 	type VoteType,
 	voteOnComment,
@@ -28,6 +29,14 @@ const voteSubmissionFn = createServerFn({ method: "POST" })
 					userVote: 0 as VoteType,
 				};
 			}
+			if (await isSiteReadOnly()) {
+				return {
+					success: false,
+					error: READ_ONLY_MESSAGE,
+					newScore: 0,
+					userVote: 0 as VoteType,
+				};
+			}
 			return voteOnSubmission(user.id, data.submissionId, data.voteType);
 		},
 	);
@@ -41,6 +50,14 @@ const voteCommentFn = createServerFn({ method: "POST" })
 				return {
 					success: false,
 					error: "Not logged in",
+					newScore: 0,
+					userVote: 0 as VoteType,
+				};
+			}
+			if (await isSiteReadOnly()) {
+				return {
+					success: false,
+					error: READ_ONLY_MESSAGE,
 					newScore: 0,
 					userVote: 0 as VoteType,
 				};

@@ -26,6 +26,12 @@ vi.mock("@/lib/lifecycle.server", () => ({
 	setCommentSavedState: vi.fn(),
 }));
 
+vi.mock("@/lib/site-settings.server", () => ({
+	isSiteReadOnly: vi.fn().mockResolvedValue(false),
+	READ_ONLY_MESSAGE:
+		"The site is currently in read-only mode. Try again later.",
+}));
+
 import type { SafeUser } from "@/lib/auth.server";
 import {
 	createCommentFn,
@@ -43,6 +49,7 @@ import {
 } from "@/lib/comments.server";
 import { setCommentSavedState } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { isSiteReadOnly } from "@/lib/site-settings.server";
 
 const mockUser: SafeUser = {
 	id: 11,
@@ -66,6 +73,22 @@ const mockUser: SafeUser = {
 describe("comment-actions.server", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(isSiteReadOnly).mockResolvedValue(false);
+	});
+
+	it("rejects comment creation while the site is read-only", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		vi.mocked(isSiteReadOnly).mockResolvedValue(true);
+
+		await expect(
+			createCommentFn({
+				data: { body: "hello", parentSubmissionId: 3 },
+			}),
+		).resolves.toEqual({
+			success: false,
+			error: "The site is currently in read-only mode. Try again later.",
+		});
+		expect(createComment).not.toHaveBeenCalled();
 	});
 
 	it("rejects comment creation when logged out", async () => {

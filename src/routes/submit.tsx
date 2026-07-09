@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 import { createSubmission } from "@/lib/submissions.server";
 
 const submitSchema = z
@@ -49,6 +50,10 @@ const submitAction = createServerFn({ method: "POST" })
 
 		if (user.isBanned > 0) {
 			return { success: false as const, error: "You are banned from posting" };
+		}
+
+		if (await isSiteReadOnly()) {
+			return { success: false as const, error: READ_ONLY_MESSAGE };
 		}
 
 		try {
