@@ -329,6 +329,135 @@ export async function searchUsers(
 		.limit(20);
 }
 
+export type UserRecentSubmission = {
+	id: number;
+	title: string;
+	createdUtc: number;
+	stateMod: string;
+	stateReport: string;
+	isDeleted: boolean;
+};
+
+export type UserRecentComment = {
+	id: number;
+	bodyHtml: string;
+	createdUtc: number;
+	stateMod: string;
+	stateReport: string;
+	isDeleted: boolean;
+	parentSubmissionId: number | null;
+	parentSubmissionTitle: string | null;
+};
+
+export type UserRecentActivity = {
+	submissions: UserRecentSubmission[];
+	comments: UserRecentComment[];
+};
+
+const USER_ACTIVITY_LIMIT = 20;
+
+export async function getUserRecentActivity(
+	userId: number,
+): Promise<UserRecentActivity> {
+	const recentSubmissions = await db
+		.select({
+			id: submissions.id,
+			title: submissions.title,
+			createdUtc: submissions.createdUtc,
+			stateMod: submissions.stateMod,
+			stateReport: submissions.stateReport,
+			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
+		})
+		.from(submissions)
+		.where(eq(submissions.authorId, userId))
+		.orderBy(desc(submissions.createdUtc))
+		.limit(USER_ACTIVITY_LIMIT);
+
+	const recentComments = await db
+		.select({
+			id: comments.id,
+			bodyHtml: comments.bodyHtml,
+			createdUtc: comments.createdUtc,
+			stateMod: comments.stateMod,
+			stateReport: comments.stateReport,
+			stateUserDeletedUtc: comments.stateUserDeletedUtc,
+			parentSubmissionId: comments.parentSubmission,
+			parentSubmissionTitle: submissions.title,
+		})
+		.from(comments)
+		.leftJoin(submissions, eq(comments.parentSubmission, submissions.id))
+		.where(eq(comments.authorId, userId))
+		.orderBy(desc(comments.createdUtc))
+		.limit(USER_ACTIVITY_LIMIT);
+
+	return {
+		submissions: recentSubmissions.map(({ stateUserDeletedUtc, ...row }) => ({
+			...row,
+			isDeleted: stateUserDeletedUtc !== null,
+		})),
+		comments: recentComments.map(({ stateUserDeletedUtc, ...row }) => ({
+			...row,
+			isDeleted: stateUserDeletedUtc !== null,
+		})),
+	};
+}
+
+export type UserReportHistoryEntry = {
+	type: "post" | "comment";
+	targetId: number;
+	targetLabel: string;
+	reporterName: string;
+	reason: string | null;
+	createdDatetimez: Date;
+};
+
+const USER_REPORT_HISTORY_LIMIT = 50;
+
+export async function getUserReportHistory(
+	userId: number,
+): Promise<UserReportHistoryEntry[]> {
+	const reporter = alias(users, "reporter");
+
+	const postReports = await db
+		.select({
+			targetId: flags.postId,
+			targetLabel: submissions.title,
+			reporterName: reporter.username,
+			reason: flags.reason,
+			createdDatetimez: flags.createdDatetimez,
+		})
+		.from(flags)
+		.innerJoin(submissions, eq(flags.postId, submissions.id))
+		.innerJoin(reporter, eq(flags.userId, reporter.id))
+		.where(eq(submissions.authorId, userId))
+		.orderBy(desc(flags.createdDatetimez))
+		.limit(USER_REPORT_HISTORY_LIMIT);
+
+	const commentReports = await db
+		.select({
+			targetId: commentFlags.commentId,
+			targetLabel: comments.bodyHtml,
+			reporterName: reporter.username,
+			reason: commentFlags.reason,
+			createdDatetimez: commentFlags.createdDatetimez,
+		})
+		.from(commentFlags)
+		.innerJoin(comments, eq(commentFlags.commentId, comments.id))
+		.innerJoin(reporter, eq(commentFlags.userId, reporter.id))
+		.where(eq(comments.authorId, userId))
+		.orderBy(desc(commentFlags.createdDatetimez))
+		.limit(USER_REPORT_HISTORY_LIMIT);
+
+	return [
+		...postReports.map((r) => ({ ...r, type: "post" as const })),
+		...commentReports.map((r) => ({ ...r, type: "comment" as const })),
+	].sort(
+		(a, b) =>
+			new Date(b.createdDatetimez).getTime() -
+			new Date(a.createdDatetimez).getTime(),
+	);
+}
+
 export async function getUserAdminDetails(
 	userId: number,
 ): Promise<UserAdminDetails | null> {

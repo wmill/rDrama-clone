@@ -96,7 +96,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: paginated, newest-first mod log page exists under `/admin`.
   - *Verify*: `pnpm test --run && pnpm check`; perform a mod action in dev and see it appear.
 
-- [ ] **T12: User investigation view**
+- [x] **T12: User investigation view** *(done 2026-07-09: /admin/users/$id page (admin.users_.$id.tsx) with status badges, mod-note list + add form (existing createUserNoteFn), report history against the user (flags + commentFlags via new getUserReportHistory), recent posts/comments via getUserRecentActivity with state badges; "Investigate" link from user search; 2 new query tests. Only the fields the page needs are sent to the client — not the full users row.)*
   - *Why*: `src/routes/admin.users.tsx` exists but lacks context for decisions: notes, recent activity, report history.
   - *Files*: extend `src/routes/admin.users.tsx` (or add `admin.users.$id.tsx`); `userNotes` table in `src/db/schema.ts`; queries in `src/lib/admin.server.ts` for the user's recent submissions/comments, reports filed against them (`flags`/`commentFlags`), and CRUD for `userNotes`.
   - *Done when*: an admin can open a user and see notes (add/view), recent activity, and report history in one place.

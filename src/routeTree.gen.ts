@@ -37,6 +37,7 @@ import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
 import { Route as UUsernamePostsRouteImport } from './routes/u.$username_.posts'
 import { Route as UUsernameFollowingRouteImport } from './routes/u.$username_.following'
 import { Route as UUsernameFollowersRouteImport } from './routes/u.$username_.followers'
+import { Route as AdminUsersIdRouteImport } from './routes/admin.users_.$id'
 import { Route as AtusernameSavedPostsRouteImport } from './routes/@$username_.saved.posts'
 import { Route as AtusernameSavedCommentsRouteImport } from './routes/@$username_.saved.comments'
 import { Route as UUsernameSavedPostsRouteImport } from './routes/u.$username_.saved.posts'
@@ -182,6 +183,11 @@ const UUsernameFollowersRoute = UUsernameFollowersRouteImport.update({
   path: '/u/$username/followers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersIdRoute = AdminUsersIdRouteImport.update({
+  id: '/users_/$id',
+  path: '/users/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AtusernameSavedPostsRoute = AtusernameSavedPostsRouteImport.update({
   id: '/@$username_/saved/posts',
   path: '/@$username/saved/posts',
@@ -231,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/@$username/saved/comments': typeof AtusernameSavedCommentsRoute
   '/@$username/saved/posts': typeof AtusernameSavedPostsRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
   '/u/$username/followers': typeof UUsernameFollowersRoute
   '/u/$username/following': typeof UUsernameFollowingRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/@$username/saved/comments': typeof AtusernameSavedCommentsRoute
   '/@$username/saved/posts': typeof AtusernameSavedPostsRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
   '/u/$username/followers': typeof UUsernameFollowersRoute
   '/u/$username/following': typeof UUsernameFollowingRoute
   '/u/$username/posts': typeof UUsernamePostsRoute
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/@$username_/saved/comments': typeof AtusernameSavedCommentsRoute
   '/@$username_/saved/posts': typeof AtusernameSavedPostsRoute
+  '/admin/users_/$id': typeof AdminUsersIdRoute
   '/u/$username_/followers': typeof UUsernameFollowersRoute
   '/u/$username_/following': typeof UUsernameFollowingRoute
   '/u/$username_/posts': typeof UUsernamePostsRoute
@@ -335,6 +344,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/@$username/saved/comments'
     | '/@$username/saved/posts'
+    | '/admin/users/$id'
     | '/u/$username/followers'
     | '/u/$username/following'
     | '/u/$username/posts'
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/@$username/saved/comments'
     | '/@$username/saved/posts'
+    | '/admin/users/$id'
     | '/u/$username/followers'
     | '/u/$username/following'
     | '/u/$username/posts'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/@$username_/saved/comments'
     | '/@$username_/saved/posts'
+    | '/admin/users_/$id'
     | '/u/$username_/followers'
     | '/u/$username_/following'
     | '/u/$username_/posts'
@@ -636,6 +648,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UUsernameFollowersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users_/$id': {
+      id: '/admin/users_/$id'
+      path: '/users/$id'
+      fullPath: '/admin/users/$id'
+      preLoaderRoute: typeof AdminUsersIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/@$username_/saved/posts': {
       id: '/@$username_/saved/posts'
       path: '/@$username/saved/posts'
@@ -674,6 +693,7 @@ interface AdminRouteChildren {
   AdminReportedPostsRoute: typeof AdminReportedPostsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminUsersIdRoute: typeof AdminUsersIdRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -683,6 +703,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminReportedPostsRoute: AdminReportedPostsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminUsersIdRoute: AdminUsersIdRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

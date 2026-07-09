@@ -163,6 +163,14 @@ function UserRow({ initialUser }: { initialUser: AdminUserSearchResult }) {
 					{initialUser.username}
 				</Link>
 
+				<Link
+					to="/admin/users/$id"
+					params={{ id: String(initialUser.id) }}
+					className="text-xs text-slate-400 underline hover:text-slate-200"
+				>
+					Investigate
+				</Link>
+
 				{initialUser.adminLevel > 0 && (
 					<span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">
 						Admin L{initialUser.adminLevel}

@@ -17,6 +17,8 @@ import {
 	getReportedComments,
 	getReportedSubmissions,
 	getUserAdminDetails,
+	getUserRecentActivity,
+	getUserReportHistory,
 	MOD_LOG_PER_PAGE,
 	searchUsers,
 } from "@/lib/admin.server";
@@ -294,6 +296,99 @@ describe("searchUsers", () => {
 		);
 
 		await expect(searchUsers("ali")).resolves.toEqual(rows);
+	});
+});
+
+describe("getUserRecentActivity", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("maps stateUserDeletedUtc onto an isDeleted flag", async () => {
+		vi.mocked(db.select)
+			.mockReturnValueOnce(
+				createChain("limit", [
+					{
+						id: 1,
+						title: "Live post",
+						createdUtc: 100,
+						stateMod: "VISIBLE",
+						stateReport: "UNREPORTED",
+						stateUserDeletedUtc: null,
+					},
+					{
+						id: 2,
+						title: "Deleted post",
+						createdUtc: 90,
+						stateMod: "VISIBLE",
+						stateReport: "UNREPORTED",
+						stateUserDeletedUtc: new Date(500),
+					},
+				]) as never,
+			)
+			.mockReturnValueOnce(
+				createChain("limit", [
+					{
+						id: 9,
+						bodyHtml: "<p>hi</p>",
+						createdUtc: 80,
+						stateMod: "REMOVED",
+						stateReport: "REPORTED",
+						stateUserDeletedUtc: null,
+						parentSubmissionId: 1,
+						parentSubmissionTitle: "Live post",
+					},
+				]) as never,
+			);
+
+		const result = await getUserRecentActivity(7);
+
+		expect(result.submissions.map((s) => s.isDeleted)).toEqual([false, true]);
+		expect(result.submissions[0]).not.toHaveProperty("stateUserDeletedUtc");
+		expect(result.comments[0]).toMatchObject({
+			id: 9,
+			isDeleted: false,
+			stateMod: "REMOVED",
+		});
+	});
+});
+
+describe("getUserReportHistory", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("merges post and comment reports newest-first", async () => {
+		vi.mocked(db.select)
+			.mockReturnValueOnce(
+				createChain("limit", [
+					{
+						targetId: 1,
+						targetLabel: "A post",
+						reporterName: "carol",
+						reason: "spam",
+						createdDatetimez: new Date(1000),
+					},
+				]) as never,
+			)
+			.mockReturnValueOnce(
+				createChain("limit", [
+					{
+						targetId: 9,
+						targetLabel: "<p>rude</p>",
+						reporterName: "dave",
+						reason: null,
+						createdDatetimez: new Date(2000),
+					},
+				]) as never,
+			);
+
+		const result = await getUserReportHistory(7);
+
+		expect(result.map((r) => [r.type, r.targetId])).toEqual([
+			["comment", 9],
+			["post", 1],
+		]);
 	});
 });
 
