@@ -116,7 +116,11 @@ export async function authenticateUser(
 		return { success: false, error: "Invalid username or password" };
 	}
 
-	if (user.isBanned > 0 && user.unbanUtc > Math.floor(Date.now() / 1000)) {
+	// unbanUtc of 0 means the ban is permanent (see banUserFn in admin-actions.server.ts)
+	const isBanActive =
+		user.isBanned > 0 &&
+		(user.unbanUtc === 0 || user.unbanUtc > Math.floor(Date.now() / 1000));
+	if (isBanActive) {
 		return {
 			success: false,
 			error: user.banReason

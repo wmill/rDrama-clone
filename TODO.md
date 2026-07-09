@@ -60,7 +60,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
   - *Files*: create `src/lib/admin.server.test.ts` and `src/lib/reporting-actions.server.test.ts`; for the latter copy the createServerFn mock setup from `src/lib/comment-actions.server.test.ts` and cover not-logged-in rejection + delegation to `reporting.server.ts`.
   - *Verify*: `pnpm test --run src/lib/admin.server.test.ts src/lib/reporting-actions.server.test.ts && pnpm check`
 
-- [ ] **T07: Auth integration tests**
+- [x] **T07: Auth integration tests** *(done 2026-07-09: auth.server tests — signup validation, signup→login hash round-trip, ban rejection incl. permanent bans; sessions.server tests — create/lookup/logout/delete-all/getCurrentUser. Also FIXED a real bug: authenticateUser let permanently banned users (unbanUtc=0) log in. Reset-invalidates-sessions was already covered in password-reset.server.test.ts.)*
   - *Why*: Signup/login/logout, banned-user login rejection, and session invalidation after password reset are the highest-risk untested flows.
   - *Files*: extend/create tests next to `src/lib/auth.server.ts` and `src/lib/sessions.server.ts`; `src/lib/password-reset.server.test.ts` already exists as the pattern for reset-token mocking.
   - *Done when*: tests cover signup→login→logout, login rejected for `isBanned` users, and that consuming a password reset invalidates existing sessions.
