@@ -55,7 +55,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
   - *Files*: create `src/lib/users.server.test.ts`; cover profile fetch, settings updates (including that `bio` updates also write `bioHtml`), and any username/availability logic.
   - *Verify*: `pnpm test --run src/lib/users.server.test.ts && pnpm check`
 
-- [ ] **T06: Tests for `src/lib/admin.server.ts` and `src/lib/reporting-actions.server.ts`**
+- [x] **T06: Tests for `src/lib/admin.server.ts` and `src/lib/reporting-actions.server.ts`** *(done 2026-07-09: 15 tests — reported-post/comment flag grouping, user search, admin user details + notes; report fns auth rejection, delegation, not-found and error mapping)*
   - *Why*: Admin queries and the report server-fns are untested (only `admin-actions.server.ts` and `reporting.server.ts` are).
   - *Files*: create `src/lib/admin.server.test.ts` and `src/lib/reporting-actions.server.test.ts`; for the latter copy the createServerFn mock setup from `src/lib/comment-actions.server.test.ts` and cover not-logged-in rejection + delegation to `reporting.server.ts`.
   - *Verify*: `pnpm test --run src/lib/admin.server.test.ts src/lib/reporting-actions.server.test.ts && pnpm check`
