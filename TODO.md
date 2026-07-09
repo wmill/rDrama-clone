@@ -24,7 +24,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
 
 ## Docs reconciliation
 
-- [ ] **T01: Fix stale CLAUDE.md**
+- [x] **T01: Fix stale CLAUDE.md** *(done 2026-07-09: full rewrite — real schema, Redis/Elasticsearch/Playwright, env vars, data-layer + testing patterns)*
   - *Why*: CLAUDE.md claims the schema is "a basic todos table" and says `demo.*` files exist — both false, and they mislead every future agent session.
   - *Files*: `CLAUDE.md`; ground truth in `src/db/schema.ts` and `src/routes/`.
   - *Done when*: the "Database Schema" section describes the real schema (full rDrama-compatible model: users, submissions, comments, votes, notifications, mod actions, etc.); the "Demo Files" section is removed (no demo files remain in the repo).

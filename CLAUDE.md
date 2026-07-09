@@ -2,45 +2,55 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Core Technologies
+## What This Is
 
-This is a full-stack Reddit/drama community clone built with:
-- **TanStack Start** - React framework with file-based routing
-- **React 19** - UI framework with latest features
-- **Drizzle ORM** - TypeScript-first database toolkit
-- **PostgreSQL** - Database
-- **Tailwind CSS** - Styling framework
-- **Shadcn/ui** - Component library
-- **Sentry** - Error tracking and performance monitoring
-- **Biome** - Linting and formatting
-- **Vitest** - Testing framework
+rDreamer is a full-stack Reddit/drama community clone (an rDrama rewrite) built with:
+- **TanStack Start** - React framework with file-based routing and server functions
+- **React 19** - UI framework
+- **Drizzle ORM + PostgreSQL** - Full ~30-table rDrama-compatible schema in `src/db/schema.ts`
+- **Redis (ioredis)** - Sessions and password-reset tokens (`src/lib/redis.ts`)
+- **Elasticsearch 7.17** - Post/comment search (`src/lib/search.server.ts`)
+- **Tailwind CSS v4 + Shadcn/ui** - Styling and components
+- **Zustand** - Client state (e.g. `src/stores/modals`)
+- **Sentry** - Error tracking (`instrument.server.mjs`, configured in `src/router.tsx`)
+- **Biome** - Linting and formatting (tab indentation, double quotes)
+- **Vitest + Testing Library** - Unit/component tests; **Playwright** for e2e (`e2e/`)
+
+`TODO.md` is the agent-ready work queue for remaining tasks — read its preamble before picking up a task.
 
 ## Development Commands
 
 ### Build & Development
 ```bash
 pnpm install          # Install dependencies
-pnpm dev              # Start development server on port 3000
-pnpm build            # Build for production
+pnpm dev              # Dev server on port 3000 (loads Sentry instrumentation)
+pnpm build            # Production build
 pnpm serve            # Preview production build
-pnpm start            # Start production server
+pnpm start            # Run production server
 ```
 
-### Code Quality
+### Code Quality & Tests
 ```bash
-pnpm lint             # Run Biome linter
-pnpm format           # Format code with Biome
-pnpm check            # Run comprehensive Biome checks
-pnpm test             # Run Vitest tests
+pnpm check            # Biome check + tsc --noEmit (run before committing)
+pnpm lint             # Biome lint only
+pnpm format           # Biome format
+pnpm typecheck        # tsc --noEmit only
+pnpm test             # Run Vitest once (vitest run)
+pnpm test:watch       # Vitest watch mode
+pnpm test:coverage    # Coverage report
+pnpm e2e              # Playwright smoke tests (needs running stack)
 ```
 
-### Database Operations
+### Database & Data
 ```bash
 pnpm db:generate      # Generate Drizzle migrations
 pnpm db:migrate       # Run migrations
 pnpm db:push          # Push schema changes directly
-pnpm db:pull          # Pull schema from database
 pnpm db:studio        # Open Drizzle Studio
+pnpm generate-data    # Seed fake data (scripts/generate-data.ts)
+pnpm create-user      # Create a user (scripts/create-user.ts)
+pnpm reindex-search   # Rebuild the Elasticsearch index
+pnpm recalculate-user-counts
 ```
 
 ### Adding UI Components
@@ -48,76 +58,57 @@ pnpm db:studio        # Open Drizzle Studio
 pnpx shadcn@latest add button    # Add specific components
 ```
 
+## Environment Setup
+
+Copy `.env.local.sample` to `.env.local` (see README). Backing services run via `docker-compose up` (Postgres 17, Redis 7, Elasticsearch 7.17, nginx).
+
+Environment variables:
+- `DATABASE_URL` - PostgreSQL connection
+- `REDIS_URL` - Redis connection (sessions, password reset)
+- `ELASTICSEARCH_URL` - Search backend
+- `AUTH_BASE_URL` - Base URL used in auth links (password-reset emails)
+- `VITE_SENTRY_DSN` - Optional, error monitoring
+- `VITE_RESULTS_PER_PAGE_COMMENTS` - Optional, comment pagination size
+
 ## Architecture Overview
 
 ### File Structure
-- `src/routes/` - File-based routing (TanStack Router)
-- `src/components/` - React components
-- `src/components/ui/` - Shadcn/ui components
-- `src/db/` - Database schema and connection
-- `src/lib/` - Utility functions
-- `src/integrations/` - Third-party integrations
-- `prototyping-data/` - Sample data for development
+- `src/routes/` - File-based routing (TanStack Router); root layout in `__root.tsx`; route tree auto-generated as `src/routeTree.gen.ts` (never edit)
+- `src/components/` - React components (`ui/` = Shadcn, `comments/` = comment tree UI)
+- `src/db/` - Drizzle schema (`schema.ts`) and connection
+- `src/lib/` - Data layer and utilities (see pattern below)
+- `src/stores/` - Zustand stores
+- `src/hooks/`, `src/middleware/`, `src/integrations/`
+- `scripts/` - CLI utilities run with tsx
+- `bruno/` - Bruno API collection (smoke requests against a running server)
+- `e2e/` - Playwright specs
+- `prototyping-data/` - JSON fixtures for data generation
 
-### Database Schema
-Database schema is defined in `src/db/schema.ts` using Drizzle ORM with PostgreSQL. Current schema includes a basic todos table structure that will be extended for the drama community features.
+### Data-Layer Pattern (src/lib)
+Two-file convention per domain:
+- `*.server.ts` (e.g. `comments.server.ts`, `submissions.server.ts`, `admin.server.ts`) - data functions hitting the DB; unit-tested by mocking `@/db`
+- `*-actions.server.ts` (e.g. `comment-actions.server.ts`) - `createServerFn` wrappers callable from the client; they authenticate via `getCurrentUser()` from `sessions.server.ts` and delegate to the data layer
 
-### Routing System
-- File-based routing in `src/routes/`
-- Root layout in `src/routes/__root.tsx`
-- Route tree auto-generated as `src/routeTree.gen.ts`
-- SSR and client-side navigation support
+### Markdown Rendering
+`src/lib/markdown.ts` (markdown-it with `html: false` for XSS safety, plus spoiler `||text||` and @user-mention plugins). Raw markdown is stored in `body` columns and server-rendered HTML in `bodyHtml` columns. **The server is the single source of truth for rendered HTML** — after create/edit, return the re-fetched record and display its `bodyHtml`; never display raw markdown client-side.
 
-### State Management
-- TanStack Query for server state
-- TanStack Store available for complex client state
-- React Context for component-level state
-
-### Styling Approach
-- Tailwind CSS with v4 configuration
-- Shadcn/ui component system
-- Dark mode support built into components
-- Custom CSS in `src/styles.css`
-
-### Error Monitoring
-- Sentry integration configured in `src/router.tsx`
-- Server function instrumentation with `Sentry.startSpan`
-- Automatic error collection in production
-
-## Development Patterns
-
-### Adding New Routes
-Create files in `src/routes/` - TanStack Router automatically generates route configuration.
+### Routing & State
+- Admin routes nest under the guard in `src/routes/admin.tsx`
+- TanStack Query for server state; Zustand for cross-component client state (modals)
+- SSR with client-side navigation
 
 ### Database Changes
 1. Modify `src/db/schema.ts`
-2. Run `pnpm db:generate` to create migration
-3. Run `pnpm db:migrate` to apply changes
+2. Run `pnpm db:generate` to create a migration
+3. Run `pnpm db:migrate` to apply it
 
-### Component Development
-- Use existing Shadcn/ui components from `src/components/ui/`
-- Follow established patterns in existing components
-- Import utilities from `@/lib/utils`
+## Testing Patterns
+- Server-fn tests mock `@tanstack/react-start` with a `createServerFn` chain stub (see `src/lib/comment-actions.server.test.ts`)
+- Data-layer tests mock `@/db` (see `src/lib/social.server.test.ts`)
+- Component tests mock `@tanstack/react-router` (Link as `<a>`) and any `*-actions.server` imports (see `src/components/comments/Comment.test.tsx`)
+- JSDOM browser environment; Playwright e2e in `e2e/` needs the full docker-compose stack
 
-### Server Functions
-- Wrap lengthy operations with Sentry instrumentation
-- Use TanStack Start's server function patterns
-- See demo files for examples
-
-### Code Style
-- Biome handles formatting (tab indentation, double quotes)
+## Code Style
+- Biome handles formatting (tab indentation, double quotes) — run `pnpm check` before committing
 - TypeScript strict mode enabled
-- Path aliases configured (`@/*` maps to `./src/*`)
-
-## Demo Files
-Files prefixed with `demo.` can be safely deleted - they provide examples for TanStack features and development patterns.
-
-## Environment Setup
-- Requires PostgreSQL database
-- Set `DATABASE_URL` environment variable
-- Sentry DSN in `VITE_SENTRY_DSN` for monitoring
-
-## Testing Strategy
-- Vitest for unit and integration tests
-- Testing Library for React component testing
-- JSDOM for browser environment simulation
+- Path alias `@/*` maps to `./src/*`
