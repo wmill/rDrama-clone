@@ -58,7 +58,11 @@ export const updateCommentFn = createServerFn({ method: "POST" })
 			return { success: false as const, error: "Not logged in" };
 		}
 		const result = await updateComment(data.id, user.id, data.body);
-		return { success: result };
+		if (!result) {
+			return { success: false as const, error: "Failed to update comment" };
+		}
+		const comment = await getCommentById(data.id, user.id);
+		return { success: true as const, comment };
 	});
 
 export const deleteCommentFn = createServerFn({ method: "POST" })

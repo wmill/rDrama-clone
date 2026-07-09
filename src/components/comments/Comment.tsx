@@ -301,8 +301,8 @@ export const Comment = memo(function Comment({
 											const result = await updateCommentFn({
 												data: { id: comment.id, body: text },
 											});
-											if (result.success) {
-												setCurrentBody(text);
+											if (result.success && result.comment) {
+												setCurrentBody(result.comment.bodyHtml);
 												setIsEditing(false);
 											}
 											return result;
@@ -320,7 +320,7 @@ export const Comment = memo(function Comment({
 											className="prose prose-invert prose-sm max-w-none text-slate-300"
 											// biome-ignore lint/security/noDangerouslySetInnerHtml: Content sanitized server-side
 											dangerouslySetInnerHTML={{
-												__html: isContentHidden ? currentBody : currentBody,
+												__html: currentBody,
 											}}
 										/>
 									</>

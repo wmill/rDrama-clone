@@ -143,12 +143,27 @@ describe("comment-actions.server", () => {
 
 		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
 		vi.mocked(updateComment).mockResolvedValue(true);
+		vi.mocked(getCommentById).mockResolvedValue({
+			id: 5,
+			body: "edit",
+			bodyHtml: "<p>edit</p>",
+		} as never);
 		await expect(
 			updateCommentFn({ data: { id: 5, body: "edit" } }),
 		).resolves.toEqual({
 			success: true,
+			comment: { id: 5, body: "edit", bodyHtml: "<p>edit</p>" },
 		});
 		expect(updateComment).toHaveBeenCalledWith(5, 11, "edit");
+		expect(getCommentById).toHaveBeenCalledWith(5, 11);
+
+		vi.mocked(updateComment).mockResolvedValue(false);
+		await expect(
+			updateCommentFn({ data: { id: 5, body: "edit" } }),
+		).resolves.toEqual({
+			success: false,
+			error: "Failed to update comment",
+		});
 
 		vi.mocked(getCurrentUser).mockResolvedValueOnce(null);
 		await expect(deleteCommentFn({ data: { id: 6 } })).resolves.toEqual({
