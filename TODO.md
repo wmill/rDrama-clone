@@ -50,7 +50,7 @@ Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunt
   - *Done when*: those functions are covered including permission-denial cases.
   - *Verify*: `pnpm test --run src/lib/comments.server.test.ts && pnpm check`
 
-- [ ] **T05: Tests for `src/lib/users.server.ts`**
+- [x] **T05: Tests for `src/lib/users.server.ts`** *(done 2026-07-09: 10 tests — canonical username lookup, settings fetch null-mapping, bio→bioHtml + customTitle rendering on update, profile privacy/block/owner gating)*
   - *Why*: Profile/settings writes are untested.
   - *Files*: create `src/lib/users.server.test.ts`; cover profile fetch, settings updates (including that `bio` updates also write `bioHtml`), and any username/availability logic.
   - *Verify*: `pnpm test --run src/lib/users.server.test.ts && pnpm check`
