@@ -10,7 +10,12 @@ vi.mock("@/db", () => ({
 	},
 }));
 
+vi.mock("@/lib/notifications.server", () => ({
+	createSimpleNotification: vi.fn(),
+}));
+
 import { db } from "@/db";
+import { createSimpleNotification } from "@/lib/notifications.server";
 import {
 	getSocialViewerContext,
 	getUserRelationship,
@@ -154,6 +159,17 @@ describe("social.server", () => {
 		expect(noopTx.update).not.toHaveBeenCalled();
 		expect(updateChainC.set).toHaveBeenCalled();
 		expect(updateChainD.set).toHaveBeenCalled();
+
+		// Only the first (new) follow emits a notification; the idempotent
+		// re-follow and the unfollow do not.
+		expect(createSimpleNotification).toHaveBeenCalledTimes(1);
+		expect(createSimpleNotification).toHaveBeenCalledWith({
+			userId: 8,
+			actorId: 2,
+			type: "follow",
+			body: "followed you",
+			tx: followTx,
+		});
 	});
 
 	it("rejects self-follow and self-block", async () => {

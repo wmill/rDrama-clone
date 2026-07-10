@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { fail, requireAdmin, requireUser } from "@/lib/auth-guards.server";
 import { AWARD_OPTIONS } from "@/lib/constants";
+import { createSimpleNotification } from "@/lib/notifications.server";
 import { getUserByUsernameCanonical } from "@/lib/users.server";
 import { idSchema } from "@/lib/validation";
 
@@ -160,7 +161,10 @@ export const awardContentFn = createServerFn({ method: "POST" })
 		}
 		const user = guard.user;
 
-		if (!AWARD_OPTIONS.some((option) => option.kind === data.kind)) {
+		const awardOption = AWARD_OPTIONS.find(
+			(option) => option.kind === data.kind,
+		);
+		if (!awardOption) {
 			return fail("Unknown award");
 		}
 
@@ -202,6 +206,18 @@ export const awardContentFn = createServerFn({ method: "POST" })
 			.update(users)
 			.set({ receivedAwardCount: sql`${users.receivedAwardCount} + 1` })
 			.where(eq(users.id, authorId));
+
+		await createSimpleNotification({
+			userId: authorId,
+			actorId: user.id,
+			type: "award",
+			body: hasSubmission
+				? `gave your post a ${awardOption.title} award`
+				: `gave your comment a ${awardOption.title} award`,
+			url: hasSubmission
+				? `/post/${data.submissionId}`
+				: `/comment/${data.commentId}`,
+		});
 
 		return { success: true as const };
 	});

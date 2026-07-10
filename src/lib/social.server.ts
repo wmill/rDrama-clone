@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { type AppDbExecutor, db } from "@/db";
 import { follows, userBlocks, users } from "@/db/schema";
 import type { SafeUser } from "@/lib/auth.server";
+import { createSimpleNotification } from "@/lib/notifications.server";
 
 const DEFAULT_PAGE_SIZE = 25;
 
@@ -148,6 +149,13 @@ export async function setFollowState(input: {
 					storedSubscriberCount: sql`${users.storedSubscriberCount} + 1`,
 				})
 				.where(eq(users.id, input.targetUserId));
+			await createSimpleNotification({
+				userId: input.targetUserId,
+				actorId: input.userId,
+				type: "follow",
+				body: "followed you",
+				tx,
+			});
 			return;
 		}
 

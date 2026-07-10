@@ -68,10 +68,10 @@ function NotificationsPage() {
 	const { page } = Route.useSearch();
 	const [busyAction, setBusyAction] = useState<string | null>(null);
 
-	const handleMarkRead = async (commentId: number) => {
-		setBusyAction(`read-${commentId}`);
+	const handleMarkRead = async (notificationId: number) => {
+		setBusyAction(`read-${notificationId}`);
 		try {
-			await markNotificationReadFn({ data: { commentId } });
+			await markNotificationReadFn({ data: { notificationId } });
 			await router.invalidate();
 		} finally {
 			setBusyAction(null);
@@ -106,7 +106,8 @@ function NotificationsPage() {
 						<div>
 							<h1 className="text-2xl font-bold text-white">Notifications</h1>
 							<p className="mt-1 text-sm text-slate-400">
-								Replies, mentions, and subscribed-thread activity.
+								Replies, mentions, follows, awards, and subscribed-thread
+								activity.
 							</p>
 						</div>
 
@@ -135,10 +136,10 @@ function NotificationsPage() {
 					{notifications.items.length > 0 ? (
 						notifications.items.map((item) => (
 							<NotificationCard
-								key={`${item.commentId}-${item.createdUtc}`}
+								key={item.id}
 								item={item}
-								onMarkRead={() => handleMarkRead(item.commentId)}
-								isBusy={busyAction === `read-${item.commentId}`}
+								onMarkRead={() => handleMarkRead(item.id)}
+								isBusy={busyAction === `read-${item.id}`}
 							/>
 						))
 					) : (
@@ -218,14 +219,18 @@ function NotificationCard({
 						<span>{formatRelativeTime(item.createdUtc)}</span>
 					</div>
 
-					<Link
-						to={item.href as "/"}
-						className="mt-2 block text-lg font-semibold text-white hover:text-cyan-400"
-					>
-						{item.postTitle}
-					</Link>
+					{item.postTitle && (
+						<Link
+							to={item.href as "/"}
+							className="mt-2 block text-lg font-semibold text-white hover:text-cyan-400"
+						>
+							{item.postTitle}
+						</Link>
+					)}
 
-					<p className="mt-2 text-sm text-slate-300">{item.commentSnippet}</p>
+					{item.commentSnippet && (
+						<p className="mt-2 text-sm text-slate-300">{item.commentSnippet}</p>
+					)}
 				</div>
 
 				<div className="flex items-center gap-2">

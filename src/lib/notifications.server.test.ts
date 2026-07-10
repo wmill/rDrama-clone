@@ -22,6 +22,7 @@ import { getCommentViewerContext } from "@/lib/comment-visibility.server";
 import {
 	clearReadNotifications,
 	createNotificationsForComment,
+	createSimpleNotification,
 	getNotificationsPage,
 	getUnreadNotificationCount,
 	isSubmissionSubscribed,
@@ -142,6 +143,7 @@ describe("notifications.server", () => {
 			.mockReturnValueOnce(
 				createSelectChain([
 					{
+						notificationId: 101,
 						commentId: 1,
 						read: false,
 						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
@@ -164,6 +166,7 @@ describe("notifications.server", () => {
 						submissionStateUserDeletedUtc: null,
 					},
 					{
+						notificationId: 102,
 						commentId: 2,
 						read: false,
 						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
@@ -186,6 +189,7 @@ describe("notifications.server", () => {
 						submissionStateUserDeletedUtc: null,
 					},
 					{
+						notificationId: 103,
 						commentId: 3,
 						read: false,
 						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
@@ -208,6 +212,7 @@ describe("notifications.server", () => {
 						submissionStateUserDeletedUtc: null,
 					},
 					{
+						notificationId: 104,
 						commentId: 4,
 						read: false,
 						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
@@ -230,9 +235,35 @@ describe("notifications.server", () => {
 						submissionStateUserDeletedUtc: null,
 					},
 				]) as never,
+			)
+			.mockReturnValueOnce(
+				createSelectChain([
+					{
+						notificationId: 105,
+						type: "follow",
+						body: "followed you",
+						url: null,
+						read: false,
+						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
+						actorId: 6,
+						actorName: "carol",
+						actorShadowBanned: null,
+					},
+					{
+						notificationId: 106,
+						type: "follow",
+						body: "followed you",
+						url: null,
+						read: false,
+						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
+						actorId: 9,
+						actorName: "blocked",
+						actorShadowBanned: null,
+					},
+				]) as never,
 			);
 
-		await expect(getUnreadNotificationCount(5)).resolves.toBe(2);
+		await expect(getUnreadNotificationCount(5)).resolves.toBe(3);
 	});
 
 	it("builds notification list rows with reply precedence and deleted placeholders", async () => {
@@ -249,6 +280,7 @@ describe("notifications.server", () => {
 			.mockReturnValueOnce(
 				createSelectChain([
 					{
+						notificationId: 208,
 						commentId: 8,
 						read: false,
 						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
@@ -271,7 +303,8 @@ describe("notifications.server", () => {
 						submissionStateUserDeletedUtc: null,
 					},
 				]) as never,
-			);
+			)
+			.mockReturnValueOnce(createSelectChain([]) as never);
 
 		const page = await getNotificationsPage({
 			userId: 5,
@@ -281,6 +314,8 @@ describe("notifications.server", () => {
 
 		expect(page.items).toEqual([
 			{
+				id: 208,
+				type: "comment",
 				commentId: 8,
 				read: false,
 				createdUtc: 1_778_198_400,
@@ -291,6 +326,123 @@ describe("notifications.server", () => {
 				href: "/comment/8",
 			},
 		]);
+	});
+
+	it("merges follow and award notifications into the page, newest first", async () => {
+		vi.mocked(getCommentViewerContext).mockResolvedValue({
+			viewerId: 5,
+			adminLevel: 0,
+			canModerate: false,
+			canSeeShadowbanned: false,
+			blockedAuthorIds: new Set<number>(),
+		});
+		vi.mocked(extractUserMentionsFromMarkdown).mockReturnValue([]);
+		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectChain([{ username: "alice" }]) as never)
+			.mockReturnValueOnce(
+				createSelectChain([
+					{
+						notificationId: 301,
+						commentId: 8,
+						read: false,
+						notificationCreatedAt: new Date("2026-05-08T00:00:00Z"),
+						commentAuthorId: 2,
+						commentAuthorName: "bob",
+						commentAuthorShadowBanned: null,
+						commentBody: "hi",
+						commentBodyHtml: "<p>hi</p>",
+						commentCreatedUtc: 1,
+						commentStateMod: "VISIBLE",
+						commentStateUserDeletedUtc: null,
+						parentCommentId: null,
+						parentCommentAuthorId: null,
+						submissionId: 7,
+						submissionTitle: "Interesting Post",
+						submissionAuthorId: 5,
+						submissionPrivate: false,
+						submissionStateMod: "VISIBLE",
+						submissionStateUserDeletedUtc: null,
+					},
+				]) as never,
+			)
+			.mockReturnValueOnce(
+				createSelectChain([
+					{
+						notificationId: 302,
+						type: "award",
+						body: "gave your post a Gold award",
+						url: "/post/7",
+						read: false,
+						notificationCreatedAt: new Date("2026-05-09T00:00:00Z"),
+						actorId: 6,
+						actorName: "carol",
+						actorShadowBanned: null,
+					},
+					{
+						notificationId: 303,
+						type: "follow",
+						body: "followed you",
+						url: null,
+						read: true,
+						notificationCreatedAt: new Date("2026-05-07T00:00:00Z"),
+						actorId: 6,
+						actorName: "carol",
+						actorShadowBanned: null,
+					},
+				]) as never,
+			);
+
+		const page = await getNotificationsPage({
+			userId: 5,
+			page: 1,
+			pageSize: 10,
+		});
+
+		expect(page.items.map((item) => item.id)).toEqual([302, 301, 303]);
+
+		expect(page.items[0]).toMatchObject({
+			type: "award",
+			actorUsername: "carol",
+			label: "gave your post a Gold award",
+			href: "/post/7",
+			commentId: null,
+		});
+		expect(page.items[2]).toMatchObject({
+			type: "follow",
+			actorUsername: "carol",
+			label: "followed you",
+			href: "/u/carol",
+			read: true,
+		});
+	});
+
+	it("inserts simple notifications but never self-notifies", async () => {
+		const insertValues = vi.fn().mockResolvedValue(undefined);
+		vi.mocked(db.insert).mockReturnValue({ values: insertValues } as never);
+
+		await createSimpleNotification({
+			userId: 4,
+			actorId: 4,
+			type: "follow",
+			body: "followed you",
+		});
+		expect(db.insert).not.toHaveBeenCalled();
+
+		await createSimpleNotification({
+			userId: 8,
+			actorId: 4,
+			type: "award",
+			body: "gave your post a Gold award",
+			url: "/post/1",
+		});
+		expect(insertValues).toHaveBeenCalledWith({
+			userId: 8,
+			actorId: 4,
+			type: "award",
+			body: "gave your post a Gold award",
+			url: "/post/1",
+			read: false,
+		});
 	});
 
 	it("marks notifications read, clears read notifications, and toggles subscriptions", async () => {
@@ -306,7 +458,7 @@ describe("notifications.server", () => {
 			createSelectChain([{ userId: 3 }]) as never,
 		);
 
-		await markNotificationRead({ userId: 1, commentId: 2 });
+		await markNotificationRead({ userId: 1, notificationId: 2 });
 		await markAllNotificationsRead(1);
 		await clearReadNotifications(1);
 		await setSubmissionSubscriptionState({

@@ -9,11 +9,11 @@ import {
 import { idSchema } from "@/lib/validation";
 
 export const markNotificationReadInputSchema = z.object({
-	commentId: idSchema,
+	notificationId: idSchema,
 });
 
 export const markNotificationReadFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { commentId: number }) =>
+	.inputValidator((data: { notificationId: number }) =>
 		markNotificationReadInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
@@ -23,7 +23,10 @@ export const markNotificationReadFn = createServerFn({ method: "POST" })
 		}
 		const user = guard.user;
 
-		await markNotificationRead({ userId: user.id, commentId: data.commentId });
+		await markNotificationRead({
+			userId: user.id,
+			notificationId: data.notificationId,
+		});
 		return { success: true as const };
 	});
 

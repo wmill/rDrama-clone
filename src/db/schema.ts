@@ -12,6 +12,7 @@ import {
 	text,
 	time,
 	timestamp,
+	unique,
 	varchar,
 } from "drizzle-orm/pg-core";
 
@@ -479,15 +480,22 @@ export const modActions = pgTable("modactions", {
 		.defaultNow(),
 });
 
+// Deviation from rDrama: rDrama keeps comment_id NOT NULL and models
+// non-comment notifications as comments authored by a system user. We
+// instead allow comment_id to be null and carry type/actor/body/url on
+// the row itself, which avoids the system-user machinery entirely.
 export const notifications = pgTable(
 	"notifications",
 	{
+		id: serial("id").primaryKey(),
 		userId: integer("user_id")
 			.notNull()
 			.references(() => users.id),
-		commentId: integer("comment_id")
-			.notNull()
-			.references(() => comments.id),
+		commentId: integer("comment_id").references(() => comments.id),
+		type: varchar("type", { length: 20 }).notNull().default("comment"),
+		actorId: integer("actor_id").references(() => users.id),
+		body: varchar("body", { length: 500 }),
+		url: varchar("url", { length: 255 }),
 		read: boolean("read").notNull(),
 		createdDatetimez: timestamp("created_datetimez", {
 			withTimezone: true,
@@ -496,7 +504,7 @@ export const notifications = pgTable(
 			.notNull()
 			.defaultNow(),
 	},
-	(table) => [primaryKey({ columns: [table.userId, table.commentId] })],
+	(table) => [unique().on(table.userId, table.commentId)],
 );
 
 export const oauthApps = pgTable("oauth_apps", {

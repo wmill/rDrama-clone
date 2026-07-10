@@ -1,4 +1,4 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { type AppDbExecutor, db } from "@/db";
@@ -18,7 +18,8 @@ const COMMENT_REMOVED_PLACEHOLDER = "[removed by moderator]";
 const COMMENT_DELETED_PLACEHOLDER = "[deleted]";
 
 type NotificationQueryRow = {
-	commentId: number;
+	notificationId: number;
+	commentId: number | null;
 	read: boolean;
 	notificationCreatedAt: Date;
 	commentAuthorId: number;
@@ -39,8 +40,12 @@ type NotificationQueryRow = {
 	submissionStateUserDeletedUtc: Date | null;
 };
 
+export type NotificationType = "comment" | "follow" | "award";
+
 export type NotificationListItem = {
-	commentId: number;
+	id: number;
+	type: NotificationType;
+	commentId: number | null;
 	read: boolean;
 	createdUtc: number;
 	actorUsername: string;
@@ -186,6 +191,7 @@ async function loadNotificationRows(
 
 	return db
 		.select({
+			notificationId: notifications.id,
 			commentId: notifications.commentId,
 			read: notifications.read,
 			notificationCreatedAt: notifications.createdDatetimez,
@@ -221,10 +227,112 @@ async function loadNotificationRows(
 		.where(
 			and(
 				eq(notifications.userId, userId),
+				eq(notifications.type, "comment"),
 				options?.onlyUnread ? eq(notifications.read, false) : undefined,
 			),
 		)
 		.orderBy(desc(notifications.createdDatetimez));
+}
+
+type SimpleNotificationRow = {
+	notificationId: number;
+	type: string;
+	body: string | null;
+	url: string | null;
+	read: boolean;
+	notificationCreatedAt: Date;
+	actorId: number | null;
+	actorName: string | null;
+	actorShadowBanned: string | null;
+};
+
+async function loadSimpleNotificationRows(
+	userId: number,
+	options?: {
+		onlyUnread?: boolean;
+	},
+): Promise<SimpleNotificationRow[]> {
+	return db
+		.select({
+			notificationId: notifications.id,
+			type: notifications.type,
+			body: notifications.body,
+			url: notifications.url,
+			read: notifications.read,
+			notificationCreatedAt: notifications.createdDatetimez,
+			actorId: notifications.actorId,
+			actorName: users.username,
+			actorShadowBanned: users.shadowBanned,
+		})
+		.from(notifications)
+		.leftJoin(users, eq(notifications.actorId, users.id))
+		.where(
+			and(
+				eq(notifications.userId, userId),
+				ne(notifications.type, "comment"),
+				options?.onlyUnread ? eq(notifications.read, false) : undefined,
+			),
+		)
+		.orderBy(desc(notifications.createdDatetimez));
+}
+
+function canSeeSimpleNotificationRow(
+	row: SimpleNotificationRow,
+	viewer: Awaited<ReturnType<typeof getCommentViewerContext>>,
+): boolean {
+	if (row.actorId !== null && viewer.blockedAuthorIds.has(row.actorId)) {
+		return false;
+	}
+
+	if (
+		row.actorShadowBanned !== null &&
+		!viewer.canSeeShadowbanned &&
+		viewer.viewerId !== row.actorId
+	) {
+		return false;
+	}
+
+	return true;
+}
+
+function mapSimpleNotificationRow(
+	row: SimpleNotificationRow,
+): NotificationListItem {
+	const actorUsername = row.actorName ?? "[deleted]";
+	return {
+		id: row.notificationId,
+		type: row.type === "follow" || row.type === "award" ? row.type : "follow",
+		commentId: null,
+		read: row.read,
+		createdUtc: Math.floor(row.notificationCreatedAt.getTime() / 1000),
+		actorUsername,
+		label: row.body ?? "new activity",
+		postTitle: "",
+		commentSnippet: "",
+		href: row.url ?? `/u/${actorUsername}`,
+	};
+}
+
+export async function createSimpleNotification(options: {
+	userId: number;
+	actorId: number;
+	type: Exclude<NotificationType, "comment">;
+	body: string;
+	url?: string;
+	tx?: AppDbExecutor;
+}): Promise<void> {
+	if (options.userId === options.actorId) {
+		return;
+	}
+
+	await (options.tx ?? db).insert(notifications).values({
+		userId: options.userId,
+		actorId: options.actorId,
+		type: options.type,
+		body: options.body,
+		url: options.url ?? null,
+		read: false,
+	});
 }
 
 export async function createNotificationsForComment(
@@ -326,7 +434,7 @@ export async function createNotificationsForComment(
 export async function getUnreadNotificationCount(
 	userId: number,
 ): Promise<number> {
-	const [viewer, currentUserRows, rows] = await Promise.all([
+	const [viewer, currentUserRows, rows, simpleRows] = await Promise.all([
 		getCommentViewerContext(userId),
 		db
 			.select({
@@ -336,13 +444,17 @@ export async function getUnreadNotificationCount(
 			.where(eq(users.id, userId))
 			.limit(1),
 		loadNotificationRows(userId, { onlyUnread: true }),
+		loadSimpleNotificationRows(userId, { onlyUnread: true }),
 	]);
 	const currentUser = currentUserRows[0];
 	if (!currentUser) {
 		return 0;
 	}
 
-	return rows.filter((row) => canSeeNotificationRow(row, viewer)).length;
+	return (
+		rows.filter((row) => canSeeNotificationRow(row, viewer)).length +
+		simpleRows.filter((row) => canSeeSimpleNotificationRow(row, viewer)).length
+	);
 }
 
 export async function getNotificationsPage(options: {
@@ -352,7 +464,7 @@ export async function getNotificationsPage(options: {
 }): Promise<NotificationsPage> {
 	const page = Math.max(1, options.page);
 	const pageSize = Math.max(1, options.pageSize);
-	const [viewer, currentUserRows, rows] = await Promise.all([
+	const [viewer, currentUserRows, rows, simpleRows] = await Promise.all([
 		getCommentViewerContext(options.userId),
 		db
 			.select({
@@ -362,17 +474,16 @@ export async function getNotificationsPage(options: {
 			.where(eq(users.id, options.userId))
 			.limit(1),
 		loadNotificationRows(options.userId),
+		loadSimpleNotificationRows(options.userId),
 	]);
 	const currentUser = currentUserRows[0];
 	if (!currentUser) {
 		return { items: [], hasNextPage: false, page, pageSize };
 	}
 
-	const visibleRows = rows.filter((row) => canSeeNotificationRow(row, viewer));
-	const slicedRows = visibleRows.slice((page - 1) * pageSize, page * pageSize);
-
-	return {
-		items: slicedRows.map((row) => {
+	const commentItems = rows
+		.filter((row) => canSeeNotificationRow(row, viewer))
+		.map((row): NotificationListItem => {
 			const trigger = deriveNotificationTrigger(
 				row,
 				options.userId,
@@ -380,6 +491,8 @@ export async function getNotificationsPage(options: {
 			);
 
 			return {
+				id: row.notificationId,
+				type: "comment",
 				commentId: row.commentId,
 				read: row.read,
 				createdUtc: Math.floor(row.notificationCreatedAt.getTime() / 1000),
@@ -389,8 +502,22 @@ export async function getNotificationsPage(options: {
 				commentSnippet: getNotificationSnippet(row),
 				href: `/comment/${row.commentId}`,
 			};
-		}),
-		hasNextPage: visibleRows.length > page * pageSize,
+		});
+	const simpleItems = simpleRows
+		.filter((row) => canSeeSimpleNotificationRow(row, viewer))
+		.map(mapSimpleNotificationRow);
+
+	const visibleItems = [...commentItems, ...simpleItems].sort(
+		(a, b) => b.createdUtc - a.createdUtc,
+	);
+	const slicedItems = visibleItems.slice(
+		(page - 1) * pageSize,
+		page * pageSize,
+	);
+
+	return {
+		items: slicedItems,
+		hasNextPage: visibleItems.length > page * pageSize,
 		page,
 		pageSize,
 	};
@@ -398,7 +525,7 @@ export async function getNotificationsPage(options: {
 
 export async function markNotificationRead(options: {
 	userId: number;
-	commentId: number;
+	notificationId: number;
 }): Promise<void> {
 	await db
 		.update(notifications)
@@ -406,7 +533,7 @@ export async function markNotificationRead(options: {
 		.where(
 			and(
 				eq(notifications.userId, options.userId),
-				eq(notifications.commentId, options.commentId),
+				eq(notifications.id, options.notificationId),
 			),
 		);
 }

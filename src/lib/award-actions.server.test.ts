@@ -31,6 +31,10 @@ vi.mock("@/lib/users.server", () => ({
 	getUserByUsernameCanonical: vi.fn(),
 }));
 
+vi.mock("@/lib/notifications.server", () => ({
+	createSimpleNotification: vi.fn(),
+}));
+
 import type { SafeUser } from "@/lib/auth.server";
 import {
 	awardContentFn,
@@ -38,6 +42,7 @@ import {
 	grantBadgeFn,
 	revokeBadgeFn,
 } from "@/lib/award-actions.server";
+import { createSimpleNotification } from "@/lib/notifications.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getUserByUsernameCanonical } from "@/lib/users.server";
 
@@ -291,6 +296,13 @@ describe("award-actions.server", () => {
 		expect(counterUpdate.set).toHaveBeenCalledWith({
 			receivedAwardCount: expect.anything(),
 		});
+		expect(createSimpleNotification).toHaveBeenCalledWith({
+			userId: 9,
+			actorId: 5,
+			type: "award",
+			body: "gave your post a Gold award",
+			url: "/post/42",
+		});
 	});
 
 	it("awards a comment and reports missing content", async () => {
@@ -315,6 +327,13 @@ describe("award-actions.server", () => {
 			submissionId: null,
 			commentId: 7,
 			kind: "silver",
+		});
+		expect(createSimpleNotification).toHaveBeenCalledWith({
+			userId: 3,
+			actorId: 5,
+			type: "award",
+			body: "gave your comment a Silver award",
+			url: "/comment/7",
 		});
 	});
 });

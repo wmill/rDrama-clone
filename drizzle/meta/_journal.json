@@ -29,6 +29,13 @@
       "when": 1774488419531,
       "tag": "0003_stale_gorgon",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783704666051,
+      "tag": "0004_noisy_patch",
+      "breakpoints": true
     }
   ]
 }

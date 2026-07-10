@@ -61,7 +61,7 @@ describe("notification-actions.server", () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(null);
 
 		await expect(
-			markNotificationReadFn({ data: { commentId: 4 } }),
+			markNotificationReadFn({ data: { notificationId: 4 } }),
 		).resolves.toEqual({
 			success: false,
 			error: "Not logged in",
@@ -80,7 +80,7 @@ describe("notification-actions.server", () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
 
 		await expect(
-			markNotificationReadFn({ data: { commentId: 4 } }),
+			markNotificationReadFn({ data: { notificationId: 4 } }),
 		).resolves.toEqual({
 			success: true,
 		});
@@ -93,7 +93,7 @@ describe("notification-actions.server", () => {
 
 		expect(markNotificationRead).toHaveBeenCalledWith({
 			userId: 11,
-			commentId: 4,
+			notificationId: 4,
 		});
 		expect(markAllNotificationsRead).toHaveBeenCalledWith(11);
 		expect(clearReadNotifications).toHaveBeenCalledWith(11);
@@ -103,16 +103,16 @@ describe("notification-actions.server", () => {
 import { markNotificationReadInputSchema } from "@/lib/notification-actions.server";
 
 describe("notification-actions input schemas", () => {
-	it("rejects invalid comment ids", () => {
+	it("rejects invalid notification ids", () => {
 		expect(
-			markNotificationReadInputSchema.safeParse({ commentId: -5 }).success,
+			markNotificationReadInputSchema.safeParse({ notificationId: -5 }).success,
 		).toBe(false);
 		expect(markNotificationReadInputSchema.safeParse({}).success).toBe(false);
 	});
 
-	it("accepts a valid comment id", () => {
+	it("accepts a valid notification id", () => {
 		expect(
-			markNotificationReadInputSchema.safeParse({ commentId: 5 }).success,
+			markNotificationReadInputSchema.safeParse({ notificationId: 5 }).success,
 		).toBe(true);
 	});
 });
