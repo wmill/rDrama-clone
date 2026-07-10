@@ -2,9 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { db } from "@/db";
 import { modActions } from "@/db/schema";
-import { assertAdmin } from "@/lib/auth-guards.server";
+import { assertAdmin, fail, requireAdmin } from "@/lib/auth-guards.server";
 import { SITE_SETTINGS, type SiteSettingKey } from "@/lib/constants";
-import { getCurrentUser } from "@/lib/sessions.server";
 import { getAllSiteSettings, setSiteSetting } from "@/lib/site-settings.server";
 
 export const getSiteSettingsFn = createServerFn({ method: "GET" }).handler(
@@ -17,13 +16,14 @@ export const getSiteSettingsFn = createServerFn({ method: "GET" }).handler(
 export const updateSiteSettingFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { key: SiteSettingKey; value: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		if (!SITE_SETTINGS.some((setting) => setting.key === data.key)) {
-			return { success: false as const, error: "Unknown setting" };
+			return fail("Unknown setting");
 		}
 
 		await setSiteSetting(data.key, data.value);

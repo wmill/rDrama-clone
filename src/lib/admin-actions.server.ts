@@ -10,6 +10,7 @@ import {
 	userNotes,
 	users,
 } from "@/db/schema";
+import { fail, requireAdmin } from "@/lib/auth-guards.server";
 import {
 	type ModerationState,
 	setCommentModerationState,
@@ -20,7 +21,6 @@ import {
 	setSubmissionStickyState,
 } from "@/lib/lifecycle.server";
 import { renderPostTitleHtml } from "@/lib/markdown";
-import { getCurrentUser } from "@/lib/sessions.server";
 
 type QueueModerationAction = "approve" | "filtered" | "removed" | "ignored";
 
@@ -47,10 +47,11 @@ export const updateSubmissionFilterStatusFn = createServerFn({
 })
 	.inputValidator((data: { id: number; action: QueueModerationAction }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		if (data.action === "approve") {
 			await setSubmissionModerationState(
@@ -96,10 +97,11 @@ export const updateSubmissionFilterStatusFn = createServerFn({
 export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; action: QueueModerationAction }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		if (data.action === "approve") {
 			await setCommentModerationState(
@@ -145,10 +147,11 @@ export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
 export const setSubmissionModerationStateFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; state: ModerationState }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const success = await setSubmissionModerationState({
 			submissionId: data.id,
@@ -159,16 +162,17 @@ export const setSubmissionModerationStateFn = createServerFn({ method: "POST" })
 
 		return success
 			? { success: true as const, state: data.state }
-			: { success: false as const, error: "Post not found" };
+			: fail("Post not found");
 	});
 
 export const removeSubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; removed: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const success = await setSubmissionRemovedState({
 			submissionId: data.id,
@@ -177,9 +181,7 @@ export const removeSubmissionFn = createServerFn({ method: "POST" })
 			removed: data.removed,
 		});
 
-		return success
-			? { success: true as const }
-			: { success: false as const, error: "Post not found" };
+		return success ? { success: true as const } : fail("Post not found");
 	});
 
 export const updateSubmissionModerationDetailsFn = createServerFn({
@@ -189,14 +191,15 @@ export const updateSubmissionModerationDetailsFn = createServerFn({
 		(data: { id: number; title: string; flair?: string | null }) => data,
 	)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const title = data.title.trim();
 		if (!title) {
-			return { success: false as const, error: "Title is required" };
+			return fail("Title is required");
 		}
 
 		const flair = normalizeOptionalModerationText(data.flair);
@@ -218,7 +221,7 @@ export const updateSubmissionModerationDetailsFn = createServerFn({
 
 		const updated = updatedRows[0];
 		if (!updated) {
-			return { success: false as const, error: "Post not found" };
+			return fail("Post not found");
 		}
 
 		await db.insert(modActions).values({
@@ -245,10 +248,11 @@ export const updateSubmissionModerationDetailsFn = createServerFn({
 export const stickySubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; stickied: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const success = await setSubmissionStickyState({
 			submissionId: data.id,
@@ -257,18 +261,17 @@ export const stickySubmissionFn = createServerFn({ method: "POST" })
 			stickied: data.stickied,
 		});
 
-		return success
-			? { success: true as const }
-			: { success: false as const, error: "Post not found" };
+		return success ? { success: true as const } : fail("Post not found");
 	});
 
 export const setCommentModerationStateFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; state: ModerationState }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const success = await setCommentModerationState({
 			commentId: data.id,
@@ -279,16 +282,17 @@ export const setCommentModerationStateFn = createServerFn({ method: "POST" })
 
 		return success
 			? { success: true as const, state: data.state }
-			: { success: false as const, error: "Comment not found" };
+			: fail("Comment not found");
 	});
 
 export const removeCommentFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; removed: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const success = await setCommentRemovedState({
 			commentId: data.id,
@@ -297,18 +301,17 @@ export const removeCommentFn = createServerFn({ method: "POST" })
 			removed: data.removed,
 		});
 
-		return success
-			? { success: true as const }
-			: { success: false as const, error: "Comment not found" };
+		return success ? { success: true as const } : fail("Comment not found");
 	});
 
 export const pinCommentFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; pinned: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const success = await setCommentPinnedState({
 			commentId: data.id,
@@ -317,9 +320,7 @@ export const pinCommentFn = createServerFn({ method: "POST" })
 			pinned: data.pinned,
 		});
 
-		return success
-			? { success: true as const }
-			: { success: false as const, error: "Comment not found" };
+		return success ? { success: true as const } : fail("Comment not found");
 	});
 
 export const banUserFn = createServerFn({ method: "POST" })
@@ -327,10 +328,11 @@ export const banUserFn = createServerFn({ method: "POST" })
 		(data: { userId: number; reason: string; durationDays?: number }) => data,
 	)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const unbanUtc = data.durationDays
 			? Math.floor(Date.now() / 1000) + data.durationDays * 86400
@@ -354,10 +356,11 @@ export const banUserFn = createServerFn({ method: "POST" })
 export const unbanUserFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { userId: number }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await db
 			.update(users)
@@ -376,10 +379,11 @@ export const unbanUserFn = createServerFn({ method: "POST" })
 export const shadowbanUserFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { userId: number }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await db
 			.update(users)
@@ -398,10 +402,11 @@ export const shadowbanUserFn = createServerFn({ method: "POST" })
 export const unshadowbanUserFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { userId: number }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await db
 			.update(users)
@@ -429,10 +434,11 @@ export const updateUserModerationProfileFn = createServerFn({
 		}) => data,
 	)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const verified = normalizeOptionalModerationText(data.verified);
 		const verifiedColor = normalizeVerifiedColor(data.verifiedColor);
@@ -462,7 +468,7 @@ export const updateUserModerationProfileFn = createServerFn({
 
 		const updated = updatedRows[0];
 		if (!updated) {
-			return { success: false as const, error: "User not found" };
+			return fail("User not found");
 		}
 
 		await db.insert(modActions).values({
@@ -500,10 +506,11 @@ export const createUserNoteFn = createServerFn({ method: "POST" })
 		}) => data,
 	)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const validTags = [
 			"Quality",
@@ -516,7 +523,7 @@ export const createUserNoteFn = createServerFn({ method: "POST" })
 			"Bot",
 		] as const;
 		if (!validTags.includes(data.tag as (typeof validTags)[number])) {
-			return { success: false as const, error: "Invalid tag" };
+			return fail("Invalid tag");
 		}
 
 		await db.insert(userNotes).values({
@@ -555,19 +562,20 @@ export function normalizeBannedDomainInput(value: string): string | null {
 export const addBannedDomainFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { domain: string; reason: string }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const domain = normalizeBannedDomainInput(data.domain);
 		if (!domain) {
-			return { success: false as const, error: "Invalid domain" };
+			return fail("Invalid domain");
 		}
 
 		const reason = data.reason.trim();
 		if (!reason) {
-			return { success: false as const, error: "Reason is required" };
+			return fail("Reason is required");
 		}
 
 		await db
@@ -590,10 +598,11 @@ export const addBannedDomainFn = createServerFn({ method: "POST" })
 export const removeBannedDomainFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { domain: string }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await db.delete(bannedDomains).where(eq(bannedDomains.domain, data.domain));
 
@@ -609,10 +618,11 @@ export const removeBannedDomainFn = createServerFn({ method: "POST" })
 export const distinguishSubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 1) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin(1);
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const [post] = await db
 			.select({
@@ -625,11 +635,11 @@ export const distinguishSubmissionFn = createServerFn({ method: "POST" })
 			.limit(1);
 
 		if (!post) {
-			return { success: false as const, error: "Post not found" };
+			return fail("Post not found");
 		}
 
 		if (user.adminLevel < 2 && post.authorId !== user.id) {
-			return { success: false as const, error: "Unauthorized" };
+			return fail("Unauthorized");
 		}
 
 		const newLevel = post.distinguishLevel > 0 ? 0 : 1;
@@ -651,10 +661,11 @@ export const distinguishSubmissionFn = createServerFn({ method: "POST" })
 export const distinguishCommentFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 1) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin(1);
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const [comment] = await db
 			.select({
@@ -667,11 +678,11 @@ export const distinguishCommentFn = createServerFn({ method: "POST" })
 			.limit(1);
 
 		if (!comment) {
-			return { success: false as const, error: "Comment not found" };
+			return fail("Comment not found");
 		}
 
 		if (user.adminLevel < 2 && comment.authorId !== user.id) {
-			return { success: false as const, error: "Unauthorized" };
+			return fail("Unauthorized");
 		}
 
 		const newLevel = comment.distinguishLevel > 0 ? 0 : 1;

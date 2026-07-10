@@ -1,15 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { getCurrentUser } from "@/lib/sessions.server";
+import { fail, requireUser } from "@/lib/auth-guards.server";
 import { setBlockState, setFollowState } from "@/lib/social.server";
 
 export const setFollowStateFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { targetUserId: number; following: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		try {
 			await setFollowState({
@@ -18,13 +19,11 @@ export const setFollowStateFn = createServerFn({ method: "POST" })
 				following: data.following,
 			});
 		} catch (error) {
-			return {
-				success: false as const,
-				error:
-					error instanceof Error
-						? error.message
-						: "Failed to update follow state",
-			};
+			return fail(
+				error instanceof Error
+					? error.message
+					: "Failed to update follow state",
+			);
 		}
 
 		return { success: true as const };
@@ -33,10 +32,11 @@ export const setFollowStateFn = createServerFn({ method: "POST" })
 export const setBlockStateFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { targetUserId: number; blocked: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		try {
 			await setBlockState({
@@ -45,13 +45,9 @@ export const setBlockStateFn = createServerFn({ method: "POST" })
 				blocked: data.blocked,
 			});
 		} catch (error) {
-			return {
-				success: false as const,
-				error:
-					error instanceof Error
-						? error.message
-						: "Failed to update block state",
-			};
+			return fail(
+				error instanceof Error ? error.message : "Failed to update block state",
+			);
 		}
 
 		return { success: true as const };

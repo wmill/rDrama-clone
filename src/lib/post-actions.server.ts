@@ -1,9 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
+import { fail, requireUser } from "@/lib/auth-guards.server";
 import { setSubmissionSavedState } from "@/lib/lifecycle.server";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
-import { getCurrentUser } from "@/lib/sessions.server";
 import {
 	BannedDomainError,
 	deleteSubmission,
@@ -40,10 +39,11 @@ export const updateSubmissionFn = createServerFn({ method: "POST" })
 		updateSubmissionSchema.parse(data),
 	)
 	.handler(async ({ data }: { data: UpdateSubmissionInput }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		let updated: boolean;
 		try {
@@ -55,16 +55,13 @@ export const updateSubmissionFn = createServerFn({ method: "POST" })
 			});
 		} catch (err) {
 			if (err instanceof BannedDomainError) {
-				return { success: false as const, error: err.message };
+				return fail(err.message);
 			}
 			throw err;
 		}
 
 		if (!updated) {
-			return {
-				success: false as const,
-				error: "You cannot edit this post",
-			};
+			return fail("You cannot edit this post");
 		}
 
 		return { success: true as const };
@@ -73,17 +70,15 @@ export const updateSubmissionFn = createServerFn({ method: "POST" })
 export const deleteSubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number }) => data)
 	.handler(async ({ data }: { data: { id: number } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const deleted = await deleteSubmission(data.id, user.id);
 		if (!deleted) {
-			return {
-				success: false as const,
-				error: "You cannot delete this post",
-			};
+			return fail("You cannot delete this post");
 		}
 
 		return { success: true as const };
@@ -92,10 +87,11 @@ export const deleteSubmissionFn = createServerFn({ method: "POST" })
 export const saveSubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; saved: boolean }) => data)
 	.handler(async ({ data }: { data: { id: number; saved: boolean } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await setSubmissionSavedState({
 			submissionId: data.id,
@@ -109,10 +105,11 @@ export const saveSubmissionFn = createServerFn({ method: "POST" })
 export const setSubmissionSubscriptionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; subscribed: boolean }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await setSubmissionSubscriptionState({
 			userId: user.id,

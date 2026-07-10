@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { fail, requireUser } from "@/lib/auth-guards.server";
 import {
 	deleteOtherUserSessions,
-	getCurrentUser,
 	getSessionIdFromCookie,
 	listUserSessions,
 } from "@/lib/sessions.server";
@@ -17,10 +17,11 @@ export type ClientSessionInfo = {
 
 export const listSessionsFn = createServerFn({ method: "GET" }).handler(
 	async () => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const sessions = await listUserSessions(user.id, getSessionIdFromCookie());
 		return {
@@ -40,14 +41,15 @@ export const listSessionsFn = createServerFn({ method: "GET" }).handler(
 
 export const logoutOtherSessionsFn = createServerFn({ method: "POST" }).handler(
 	async () => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const currentSessionId = getSessionIdFromCookie();
 		if (!currentSessionId) {
-			return { success: false as const, error: "No active session" };
+			return fail("No active session");
 		}
 
 		const removed = await deleteOtherUserSessions(user.id, currentSessionId);

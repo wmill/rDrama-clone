@@ -128,7 +128,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: each admin GET fn rejects non-admin callers (server test per fn, or one shared parameterized test); helpers are exported for T18 to reuse.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T18: Migrate all `*-actions.server.ts` to the shared guards + shared `ActionResult<T>` type**
+- [x] **T18: Migrate all `*-actions.server.ts` to the shared guards + shared `ActionResult<T>` type** *(done 2026-07-10: all 9 actions files now use requireUser/requireAdmin (GuardResult carries a ready-to-return ActionFailure) and fail() for inline errors; ActionResult<T>/ActionFailure exported from auth-guards.server.ts; zero `success: false as const` literals remain; pure refactor — all existing action tests passed unchanged)*
   - *Why*: the `getCurrentUser()` → `"Not logged in"` / `adminLevel < 2` → `"Unauthorized"` guard block is copy-pasted ~50 times across `admin-actions`, `award-actions`, `comment-actions`, `post-actions`, `reporting-actions`, `social-actions`, `session-actions`, `site-settings-actions`, `notification-actions`; the `{ success: false as const, error }` shape is redeclared per file.
   - *Files*: all `src/lib/*-actions.server.ts`; put `ActionResult<T>` next to the T17 helpers. Pure refactor — no behavior change; existing tests must stay green.
   - *Verify*: `pnpm test --run && pnpm check`

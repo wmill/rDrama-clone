@@ -4,14 +4,24 @@ import { getCurrentUser } from "@/lib/sessions.server";
 export const NOT_LOGGED_IN_ERROR = "Not logged in";
 export const UNAUTHORIZED_ERROR = "Unauthorized";
 
+// Shared result shape for all *-actions.server.ts server fns.
+export type ActionFailure = { success: false; error: string };
+export type ActionResult<T = Record<never, never>> =
+	| ({ success: true } & T)
+	| ActionFailure;
+
+export function fail(error: string): ActionFailure {
+	return { success: false, error };
+}
+
 export type GuardResult =
 	| { ok: true; user: SafeUser }
-	| { ok: false; error: string };
+	| { ok: false; failure: ActionFailure };
 
 export async function requireUser(): Promise<GuardResult> {
 	const user = await getCurrentUser();
 	if (!user) {
-		return { ok: false, error: NOT_LOGGED_IN_ERROR };
+		return { ok: false, failure: fail(NOT_LOGGED_IN_ERROR) };
 	}
 
 	return { ok: true, user };
@@ -20,7 +30,7 @@ export async function requireUser(): Promise<GuardResult> {
 export async function requireAdmin(minAdminLevel = 2): Promise<GuardResult> {
 	const user = await getCurrentUser();
 	if (!user || user.adminLevel < minAdminLevel) {
-		return { ok: false, error: UNAUTHORIZED_ERROR };
+		return { ok: false, failure: fail(UNAUTHORIZED_ERROR) };
 	}
 
 	return { ok: true, user };
@@ -31,7 +41,7 @@ export async function requireAdmin(minAdminLevel = 2): Promise<GuardResult> {
 export async function assertAdmin(minAdminLevel = 2): Promise<SafeUser> {
 	const guard = await requireAdmin(minAdminLevel);
 	if (!guard.ok) {
-		throw new Error(guard.error);
+		throw new Error(guard.failure.error);
 	}
 
 	return guard.user;

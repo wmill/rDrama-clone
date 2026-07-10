@@ -44,7 +44,7 @@ describe("auth-guards.server", () => {
 
 			await expect(requireUser()).resolves.toEqual({
 				ok: false,
-				error: NOT_LOGGED_IN_ERROR,
+				failure: { success: false, error: NOT_LOGGED_IN_ERROR },
 			});
 		});
 
@@ -64,7 +64,7 @@ describe("auth-guards.server", () => {
 
 			await expect(requireAdmin()).resolves.toEqual({
 				ok: false,
-				error: UNAUTHORIZED_ERROR,
+				failure: { success: false, error: UNAUTHORIZED_ERROR },
 			});
 		});
 
@@ -76,7 +76,7 @@ describe("auth-guards.server", () => {
 
 			await expect(requireAdmin()).resolves.toEqual({
 				ok: false,
-				error: UNAUTHORIZED_ERROR,
+				failure: { success: false, error: UNAUTHORIZED_ERROR },
 			});
 		});
 

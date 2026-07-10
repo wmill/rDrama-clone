@@ -11,21 +11,22 @@ import {
 	submissions,
 	users,
 } from "@/db/schema";
+import { fail, requireAdmin, requireUser } from "@/lib/auth-guards.server";
 import { AWARD_OPTIONS } from "@/lib/constants";
-import { getCurrentUser } from "@/lib/sessions.server";
 import { getUserByUsernameCanonical } from "@/lib/users.server";
 
 export const createBadgeDefFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { name: string; description?: string | null }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const name = data.name.trim();
 		if (!name) {
-			return { success: false as const, error: "Name is required" };
+			return fail("Name is required");
 		}
 		const description = data.description?.trim() || null;
 
@@ -52,14 +53,15 @@ export const grantBadgeFn = createServerFn({ method: "POST" })
 		}) => data,
 	)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const target = await getUserByUsernameCanonical(data.username);
 		if (!target) {
-			return { success: false as const, error: "User not found" };
+			return fail("User not found");
 		}
 
 		const [def] = await db
@@ -68,7 +70,7 @@ export const grantBadgeFn = createServerFn({ method: "POST" })
 			.where(eq(badgeDefs.id, data.badgeId))
 			.limit(1);
 		if (!def) {
-			return { success: false as const, error: "Badge not found" };
+			return fail("Badge not found");
 		}
 
 		await db
@@ -93,14 +95,15 @@ export const grantBadgeFn = createServerFn({ method: "POST" })
 export const revokeBadgeFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { username: string; badgeId: number }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user || user.adminLevel < 2) {
-			return { success: false as const, error: "Unauthorized" };
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		const target = await getUserByUsernameCanonical(data.username);
 		if (!target) {
-			return { success: false as const, error: "User not found" };
+			return fail("User not found");
 		}
 
 		await db
@@ -124,22 +127,20 @@ export const awardContentFn = createServerFn({ method: "POST" })
 		(data: { submissionId?: number; commentId?: number; kind: string }) => data,
 	)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		if (!AWARD_OPTIONS.some((option) => option.kind === data.kind)) {
-			return { success: false as const, error: "Unknown award" };
+			return fail("Unknown award");
 		}
 
 		const hasSubmission = typeof data.submissionId === "number";
 		const hasComment = typeof data.commentId === "number";
 		if (hasSubmission === hasComment) {
-			return {
-				success: false as const,
-				error: "Award exactly one post or comment",
-			};
+			return fail("Award exactly one post or comment");
 		}
 
 		let authorId: number | undefined;
@@ -160,7 +161,7 @@ export const awardContentFn = createServerFn({ method: "POST" })
 		}
 
 		if (authorId === undefined) {
-			return { success: false as const, error: "Content not found" };
+			return fail("Content not found");
 		}
 
 		await db.insert(awardRelationships).values({

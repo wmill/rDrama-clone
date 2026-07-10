@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { fail, requireUser } from "@/lib/auth-guards.server";
 import {
 	createComment,
 	deleteComment,
@@ -28,12 +29,13 @@ export const createCommentFn = createServerFn({ method: "POST" })
 				parentCommentId?: number;
 			};
 		}) => {
-			const user = await getCurrentUser();
-			if (!user) {
-				return { success: false as const, error: "Not logged in" };
+			const guard = await requireUser();
+			if (!guard.ok) {
+				return guard.failure;
 			}
+			const user = guard.user;
 			if (await isSiteReadOnly()) {
-				return { success: false as const, error: READ_ONLY_MESSAGE };
+				return fail(READ_ONLY_MESSAGE);
 			}
 			try {
 				const id = await createComment({
@@ -45,11 +47,9 @@ export const createCommentFn = createServerFn({ method: "POST" })
 				const comment = await getCommentById(id, user.id);
 				return { success: true as const, id, comment };
 			} catch (err) {
-				return {
-					success: false as const,
-					error:
-						err instanceof Error ? err.message : "Failed to create comment",
-				};
+				return fail(
+					err instanceof Error ? err.message : "Failed to create comment",
+				);
 			}
 		},
 	);
@@ -57,13 +57,14 @@ export const createCommentFn = createServerFn({ method: "POST" })
 export const updateCommentFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; body: string }) => data)
 	.handler(async ({ data }: { data: { id: number; body: string } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 		const result = await updateComment(data.id, user.id, data.body);
 		if (!result) {
-			return { success: false as const, error: "Failed to update comment" };
+			return fail("Failed to update comment");
 		}
 		const comment = await getCommentById(data.id, user.id);
 		return { success: true as const, comment };
@@ -72,10 +73,11 @@ export const updateCommentFn = createServerFn({ method: "POST" })
 export const deleteCommentFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number }) => data)
 	.handler(async ({ data }: { data: { id: number } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 		const result = await deleteComment(data.id, user.id);
 		return { success: result };
 	});
@@ -83,10 +85,11 @@ export const deleteCommentFn = createServerFn({ method: "POST" })
 export const saveCommentFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { id: number; saved: boolean }) => data)
 	.handler(async ({ data }: { data: { id: number; saved: boolean } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await setCommentSavedState({
 			commentId: data.id,

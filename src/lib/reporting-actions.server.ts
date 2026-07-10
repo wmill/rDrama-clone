@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { fail, requireUser } from "@/lib/auth-guards.server";
 import {
 	ReportTargetNotFoundError,
 	reportComment,
 	reportSubmission,
 } from "@/lib/reporting.server";
-import { getCurrentUser } from "@/lib/sessions.server";
 
 const reportSchema = z.object({
 	id: z.number().int().positive(),
@@ -17,10 +17,11 @@ export const reportSubmissionFn = createServerFn({ method: "POST" })
 		reportSchema.parse(data),
 	)
 	.handler(async ({ data }: { data: { id: number; reason: string } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		try {
 			const result = await reportSubmission({
@@ -31,13 +32,12 @@ export const reportSubmissionFn = createServerFn({ method: "POST" })
 			return { success: true as const, message: result.message };
 		} catch (error) {
 			if (error instanceof ReportTargetNotFoundError) {
-				return { success: false as const, error: "Post not found" };
+				return fail("Post not found");
 			}
 
-			return {
-				success: false as const,
-				error: error instanceof Error ? error.message : "Failed to report post",
-			};
+			return fail(
+				error instanceof Error ? error.message : "Failed to report post",
+			);
 		}
 	});
 
@@ -46,10 +46,11 @@ export const reportCommentFn = createServerFn({ method: "POST" })
 		reportSchema.parse(data),
 	)
 	.handler(async ({ data }: { data: { id: number; reason: string } }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		try {
 			const result = await reportComment({
@@ -60,13 +61,11 @@ export const reportCommentFn = createServerFn({ method: "POST" })
 			return { success: true as const, message: result.message };
 		} catch (error) {
 			if (error instanceof ReportTargetNotFoundError) {
-				return { success: false as const, error: "Comment not found" };
+				return fail("Comment not found");
 			}
 
-			return {
-				success: false as const,
-				error:
-					error instanceof Error ? error.message : "Failed to report comment",
-			};
+			return fail(
+				error instanceof Error ? error.message : "Failed to report comment",
+			);
 		}
 	});

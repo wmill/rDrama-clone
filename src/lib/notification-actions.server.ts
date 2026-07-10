@@ -1,19 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
-
+import { requireUser } from "@/lib/auth-guards.server";
 import {
 	clearReadNotifications,
 	markAllNotificationsRead,
 	markNotificationRead,
 } from "@/lib/notifications.server";
-import { getCurrentUser } from "@/lib/sessions.server";
 
 export const markNotificationReadFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { commentId: number }) => data)
 	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			return { success: false as const, error: "Not logged in" };
+		const guard = await requireUser();
+		if (!guard.ok) {
+			return guard.failure;
 		}
+		const user = guard.user;
 
 		await markNotificationRead({ userId: user.id, commentId: data.commentId });
 		return { success: true as const };
@@ -22,10 +22,11 @@ export const markNotificationReadFn = createServerFn({ method: "POST" })
 export const markAllNotificationsReadFn = createServerFn({
 	method: "POST",
 }).handler(async () => {
-	const user = await getCurrentUser();
-	if (!user) {
-		return { success: false as const, error: "Not logged in" };
+	const guard = await requireUser();
+	if (!guard.ok) {
+		return guard.failure;
 	}
+	const user = guard.user;
 
 	await markAllNotificationsRead(user.id);
 	return { success: true as const };
@@ -34,10 +35,11 @@ export const markAllNotificationsReadFn = createServerFn({
 export const clearReadNotificationsFn = createServerFn({
 	method: "POST",
 }).handler(async () => {
-	const user = await getCurrentUser();
-	if (!user) {
-		return { success: false as const, error: "Not logged in" };
+	const guard = await requireUser();
+	if (!guard.ok) {
+		return guard.failure;
 	}
+	const user = guard.user;
 
 	await clearReadNotifications(user.id);
 	return { success: true as const };
