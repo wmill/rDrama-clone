@@ -40,6 +40,8 @@ import {
 	deleteSubmission,
 	getSubmissionById,
 	getSubmissions,
+	getSubmissionsPage,
+	HOME_FEED_PER_PAGE,
 	updateSubmission,
 } from "@/lib/submissions.server";
 
@@ -137,6 +139,59 @@ describe("submissions.server", () => {
 		expect(results).toHaveLength(1);
 		expect(results[0]?.authorName).toBe("visible");
 		expect(getSubmissionAwardCounts).toHaveBeenCalledWith([1]);
+	});
+
+	it("pages the feed via limit+1 and reports hasMore", async () => {
+		const makeRow = (id: number) => ({
+			id,
+			title: `Post ${id}`,
+			titleHtml: `Post ${id}`,
+			createdUtc: 1,
+			authorId: 2,
+			authorName: "author",
+			url: null,
+			body: null,
+			bodyHtml: null,
+			upvotes: 1,
+			downvotes: 0,
+			commentCount: 0,
+			thumbUrl: null,
+			flair: null,
+			isPinned: false,
+			isNsfw: false,
+			stickied: null,
+			userVoteType: null,
+			stateUserDeletedUtc: null,
+			stateMod: "VISIBLE",
+			stateModSetBy: null,
+			savedSubmissionId: null,
+			blockedTargetId: null,
+		});
+		const rows = Array.from({ length: HOME_FEED_PER_PAGE + 1 }, (_, i) =>
+			makeRow(i + 1),
+		);
+		const chain = createSelectOrderChain(rows);
+		vi.mocked(db.select).mockReturnValueOnce(chain as never);
+
+		const result = await getSubmissionsPage({ page: 2 });
+
+		expect(chain.limit).toHaveBeenCalledWith(HOME_FEED_PER_PAGE + 1);
+		expect(chain.offset).toHaveBeenCalledWith(HOME_FEED_PER_PAGE);
+		expect(result.submissions).toHaveLength(HOME_FEED_PER_PAGE);
+		expect(result.page).toBe(2);
+		expect(result.hasMore).toBe(true);
+	});
+
+	it("reports hasMore=false on the last page and clamps bad page numbers", async () => {
+		const chain = createSelectOrderChain([]);
+		vi.mocked(db.select).mockReturnValueOnce(chain as never);
+
+		const result = await getSubmissionsPage({ page: -3 });
+
+		expect(chain.offset).toHaveBeenCalledWith(0);
+		expect(result.page).toBe(1);
+		expect(result.submissions).toEqual([]);
+		expect(result.hasMore).toBe(false);
 	});
 
 	it("attaches batched award counts to feed submissions", async () => {

@@ -42,6 +42,7 @@ export const feedInputSchema = z.object({
 	sort: sortTypeSchema.optional(),
 	time: timeFilterSchema.optional(),
 	limit: z.number().int().min(1).max(100).optional(),
+	page: pageSchema.optional(),
 });
 export const commentFeedInputSchema = z.object({
 	sort: commentSortTypeSchema.optional(),

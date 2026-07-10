@@ -382,6 +382,37 @@ export async function getSubmissions(options: {
 	}));
 }
 
+export const HOME_FEED_PER_PAGE = 25;
+
+export type SubmissionFeedPage = {
+	submissions: SubmissionSummary[];
+	page: number;
+	hasMore: boolean;
+};
+
+export async function getSubmissionsPage(options: {
+	sort?: SortType;
+	time?: TimeFilter;
+	page?: number;
+	userId?: number;
+}): Promise<SubmissionFeedPage> {
+	const safePage = Math.max(1, Math.floor(options.page ?? 1));
+
+	const rows = await getSubmissions({
+		sort: options.sort,
+		time: options.time,
+		userId: options.userId,
+		limit: HOME_FEED_PER_PAGE + 1,
+		offset: (safePage - 1) * HOME_FEED_PER_PAGE,
+	});
+
+	return {
+		submissions: rows.slice(0, HOME_FEED_PER_PAGE),
+		page: safePage,
+		hasMore: rows.length > HOME_FEED_PER_PAGE,
+	};
+}
+
 export async function getSubmissionById(
 	id: number,
 	userId?: number,

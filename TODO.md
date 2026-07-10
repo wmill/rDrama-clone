@@ -153,7 +153,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: an awarded post/comment shows its awards in feed, post page, and comment tree; profile shows the received-award count.
   - *Verify*: `pnpm test --run && pnpm check`; grant an award in dev and see it render.
 
-- [ ] **T22: Home feed pagination**
+- [x] **T22: Home feed pagination** *(done 2026-07-10: getSubmissionsPage in submissions.server.ts (HOME_FEED_PER_PAGE=25, limit+1 hasMore per getModLog pattern, clamps bad pages); `page` search param on index.tsx (default 1) with Previous/Next controls copied from user-page.tsx; sort/time changes reset to page 1, page changes preserve sort/t; feedInputSchema gained optional page. 2 paging tests. Note: hasMore can read false at a page boundary if the 26th row's author is blocked (post-query block filtering predates this task).)*
   - *Why*: `getSubmissions` supports `limit`/`offset` but `src/routes/index.tsx` never passes them — the feed is capped at 25 with no way to see more.
   - *Files*: `src/routes/index.tsx` (page search-param or "load more"); `src/lib/submissions.server.ts` (`hasMore` via limit+1 — copy `getModLog`'s pattern in `src/lib/admin.server.ts`); keep sort/time filters intact in pagination links.
   - *Done when*: users can page through the whole feed; sort/time selections survive page changes.
