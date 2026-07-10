@@ -1,32 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dbMock } = vi.hoisted(() => ({
-	dbMock: {
-		select: vi.fn(),
-		update: vi.fn(),
-		insert: vi.fn(),
-		delete: vi.fn(),
-		transaction: vi.fn(),
-	},
+vi.mock("@tanstack/react-start", async () =>
+	(await import("@/test/mocks")).createServerFnStub(),
+);
+
+vi.mock("@/db", async () => ({
+	db: (await import("@/test/mocks")).createMockDb(),
 }));
 
-vi.mock("@tanstack/react-start", () => ({
-	createServerFn: () => {
-		const chain = {
-			inputValidator: () => chain,
-			handler: (handler: unknown) => handler,
-		};
-		return chain;
-	},
-}));
-
-vi.mock("@/db", () => ({
-	db: dbMock,
-}));
-
-vi.mock("@/lib/sessions.server", () => ({
-	getCurrentUser: vi.fn(),
-}));
+vi.mock("@/lib/sessions.server", async () =>
+	(await import("@/test/mocks")).createSessionsMock(),
+);
 
 vi.mock("@/lib/lifecycle.server", () => ({
 	setCommentPinnedState: vi.fn(),
@@ -41,6 +25,7 @@ vi.mock("@/lib/users.server", () => ({
 	getUserByUsernameCanonical: vi.fn(),
 }));
 
+import { db } from "@/db";
 import {
 	addBannedDomainFn,
 	banUserFn,
@@ -75,54 +60,27 @@ import {
 } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getUserByUsernameCanonical } from "@/lib/users.server";
+import {
+	type createMockDb,
+	createQueryChain,
+	makeSafeUser,
+} from "@/test/mocks";
 
-function createSelectChain<T>(result: T) {
-	return {
-		from: vi.fn().mockReturnThis(),
-		where: vi.fn().mockReturnThis(),
-		limit: vi.fn().mockResolvedValue(result),
-	};
-}
+const dbMock = db as unknown as ReturnType<typeof createMockDb>;
 
-function createUpdateChain() {
-	return {
-		set: vi.fn().mockReturnValue({
-			where: vi.fn().mockResolvedValue(undefined),
-		}),
-	};
-}
-
-function createInsertChain() {
-	return {
-		values: vi.fn().mockResolvedValue(undefined),
-	};
-}
-
-const moderator: SafeUser = {
+const moderator = makeSafeUser({
 	id: 2,
 	username: "mod",
 	email: "mod@example.com",
 	adminLevel: 2,
-	createdUtc: 0,
-	isActivated: true,
-	isBanned: 0,
-	banReason: null,
-	unbanUtc: 0,
-	shadowBanned: null,
-	coins: 0,
-	proCoins: 0,
-	profileUrl: null,
-	bannerUrl: null,
-	bio: null,
-	customTitle: null,
-};
+});
 
-const janitor: SafeUser = {
+const janitor = makeSafeUser({
 	...moderator,
 	id: 3,
 	username: "janitor",
 	adminLevel: 1,
-};
+});
 
 describe("admin-actions.server", () => {
 	beforeEach(() => {
@@ -234,8 +192,8 @@ describe("admin-actions.server", () => {
 
 	it("marks ignored reports directly in the database", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		const submissionUpdate = createUpdateChain();
-		const commentUpdate = createUpdateChain();
+		const submissionUpdate = createQueryChain();
+		const commentUpdate = createQueryChain();
 		dbMock.update
 			.mockReturnValueOnce(submissionUpdate)
 			.mockReturnValueOnce(commentUpdate);
@@ -314,22 +272,16 @@ describe("admin-actions.server", () => {
 
 	it("edits submission title/flair and logs both actions", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		const updateChain = {
-			set: vi.fn().mockReturnValue({
-				where: vi.fn().mockReturnValue({
-					returning: vi.fn().mockResolvedValue([
-						{
-							id: 1,
-							title: "Updated title",
-							titleHtml: "<p>Updated title</p>",
-							flair: "news",
-						},
-					]),
-				}),
-			}),
-		};
-		const firstInsert = createInsertChain();
-		const secondInsert = createInsertChain();
+		const updateChain = createQueryChain([
+			{
+				id: 1,
+				title: "Updated title",
+				titleHtml: "<p>Updated title</p>",
+				flair: "news",
+			},
+		]);
+		const firstInsert = createQueryChain();
+		const secondInsert = createQueryChain();
 		dbMock.update.mockReturnValueOnce(updateChain);
 		dbMock.insert
 			.mockReturnValueOnce(firstInsert)
@@ -362,14 +314,14 @@ describe("admin-actions.server", () => {
 
 	it("updates user ban and shadowban state with modaction logs", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		const banUpdate = createUpdateChain();
-		const unbanUpdate = createUpdateChain();
-		const shadowbanUpdate = createUpdateChain();
-		const unshadowbanUpdate = createUpdateChain();
-		const firstInsert = createInsertChain();
-		const secondInsert = createInsertChain();
-		const thirdInsert = createInsertChain();
-		const fourthInsert = createInsertChain();
+		const banUpdate = createQueryChain();
+		const unbanUpdate = createQueryChain();
+		const shadowbanUpdate = createQueryChain();
+		const unshadowbanUpdate = createQueryChain();
+		const firstInsert = createQueryChain();
+		const secondInsert = createQueryChain();
+		const thirdInsert = createQueryChain();
+		const fourthInsert = createQueryChain();
 		dbMock.update
 			.mockReturnValueOnce(banUpdate)
 			.mockReturnValueOnce(unbanUpdate)
@@ -436,23 +388,17 @@ describe("admin-actions.server", () => {
 
 	it("updates user presentation fields and logs verification/custom title actions", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		const updateChain = {
-			set: vi.fn().mockReturnValue({
-				where: vi.fn().mockReturnValue({
-					returning: vi.fn().mockResolvedValue([
-						{
-							id: 9,
-							verified: "Staff",
-							verifiedColor: "00ff00",
-							customTitlePlain: "Trusted voice",
-							customTitle: "<p>Trusted voice</p>",
-						},
-					]),
-				}),
-			}),
-		};
-		const firstInsert = createInsertChain();
-		const secondInsert = createInsertChain();
+		const updateChain = createQueryChain([
+			{
+				id: 9,
+				verified: "Staff",
+				verifiedColor: "00ff00",
+				customTitlePlain: "Trusted voice",
+				customTitle: "<p>Trusted voice</p>",
+			},
+		]);
+		const firstInsert = createQueryChain();
+		const secondInsert = createQueryChain();
 		dbMock.update.mockReturnValueOnce(updateChain);
 		dbMock.insert
 			.mockReturnValueOnce(firstInsert)
@@ -510,7 +456,7 @@ describe("admin-actions.server", () => {
 			error: "Invalid tag",
 		});
 
-		const insertChain = createInsertChain();
+		const insertChain = createQueryChain();
 		dbMock.insert.mockReturnValueOnce(insertChain);
 		vi.mocked(getCurrentUser).mockResolvedValueOnce(moderator);
 		await expect(
@@ -589,7 +535,7 @@ describe("admin-actions.server", () => {
 		});
 
 		vi.mocked(getCurrentUser).mockResolvedValueOnce(janitor);
-		dbMock.select.mockReturnValueOnce(createSelectChain([]));
+		dbMock.select.mockReturnValueOnce(createQueryChain([]));
 		await expect(
 			distinguishSubmissionFn({ data: { id: 40 } }),
 		).resolves.toEqual({
@@ -599,7 +545,7 @@ describe("admin-actions.server", () => {
 
 		vi.mocked(getCurrentUser).mockResolvedValueOnce(janitor);
 		dbMock.select.mockReturnValueOnce(
-			createSelectChain([{ id: 40, authorId: 99, distinguishLevel: 0 }]),
+			createQueryChain([{ id: 40, authorId: 99, distinguishLevel: 0 }]),
 		);
 		await expect(
 			distinguishSubmissionFn({ data: { id: 40 } }),
@@ -608,11 +554,11 @@ describe("admin-actions.server", () => {
 			error: "Unauthorized",
 		});
 
-		const updateChain = createUpdateChain();
-		const insertChain = createInsertChain();
+		const updateChain = createQueryChain();
+		const insertChain = createQueryChain();
 		vi.mocked(getCurrentUser).mockResolvedValueOnce(janitor);
 		dbMock.select.mockReturnValueOnce(
-			createSelectChain([{ id: 40, authorId: 3, distinguishLevel: 0 }]),
+			createQueryChain([{ id: 40, authorId: 3, distinguishLevel: 0 }]),
 		);
 		dbMock.update.mockReturnValueOnce(updateChain);
 		dbMock.insert.mockReturnValueOnce(insertChain);
@@ -652,12 +598,8 @@ describe("admin-actions.server", () => {
 
 	it("normalizes and upserts a banned domain, logging the mod action", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		const upsertChain = {
-			values: vi.fn().mockReturnValue({
-				onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
-			}),
-		};
-		const logChain = createInsertChain();
+		const upsertChain = createQueryChain();
+		const logChain = createQueryChain();
 		dbMock.insert
 			.mockReturnValueOnce(upsertChain)
 			.mockReturnValueOnce(logChain);
@@ -701,9 +643,9 @@ describe("admin-actions.server", () => {
 
 	it("removes a banned domain and logs the mod action", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		const deleteChain = { where: vi.fn().mockResolvedValue(undefined) };
+		const deleteChain = createQueryChain();
 		dbMock.delete.mockReturnValueOnce(deleteChain);
-		const logChain = createInsertChain();
+		const logChain = createQueryChain();
 		dbMock.insert.mockReturnValueOnce(logChain);
 
 		await expect(
@@ -719,11 +661,11 @@ describe("admin-actions.server", () => {
 	});
 
 	it("toggles comment distinguish state and logs the correct action kind", async () => {
-		const updateChain = createUpdateChain();
-		const insertChain = createInsertChain();
+		const updateChain = createQueryChain();
+		const insertChain = createQueryChain();
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
 		dbMock.select.mockReturnValueOnce(
-			createSelectChain([{ id: 50, authorId: 9, distinguishLevel: 1 }]),
+			createQueryChain([{ id: 50, authorId: 9, distinguishLevel: 1 }]),
 		);
 		dbMock.update.mockReturnValueOnce(updateChain);
 		dbMock.insert.mockReturnValueOnce(insertChain);
@@ -761,11 +703,8 @@ describe("admin-actions.server", () => {
 			id: 4,
 			username: "alice",
 		} as never);
-		const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-		const altInsert = {
-			values: vi.fn().mockReturnValue({ onConflictDoUpdate }),
-		};
-		const logInsert = createInsertChain();
+		const altInsert = createQueryChain();
+		const logInsert = createQueryChain();
 		dbMock.insert.mockReturnValueOnce(altInsert).mockReturnValueOnce(logInsert);
 
 		await expect(
@@ -816,9 +755,9 @@ describe("admin-actions.server", () => {
 			id: 12,
 			username: "bob",
 		} as never);
-		const deleteChain = { where: vi.fn().mockResolvedValue(undefined) };
+		const deleteChain = createQueryChain();
 		dbMock.delete.mockReturnValueOnce(deleteChain);
-		const logInsert = createInsertChain();
+		const logInsert = createQueryChain();
 		dbMock.insert.mockReturnValueOnce(logInsert);
 
 		await expect(

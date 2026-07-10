@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/db", () => ({
-	db: {
-		select: vi.fn(),
-		insert: vi.fn(),
-		update: vi.fn(),
-		delete: vi.fn(),
-	},
+vi.mock("@/db", async () => ({
+	db: (await import("@/test/mocks")).createMockDb(),
 }));
 
 vi.mock("@/lib/comment-visibility.server", () => ({
@@ -32,48 +27,7 @@ import {
 	type UpdateUserSettingsInput,
 	updateUserSettings,
 } from "@/lib/users.server";
-
-function createUserLookupChain(result: unknown) {
-	const where = vi.fn(() => ({
-		limit: vi.fn().mockResolvedValue(result),
-	}));
-	return { from: vi.fn(() => ({ where })), where };
-}
-
-function createCountChain(result: unknown) {
-	return {
-		from: vi.fn(() => ({
-			where: vi.fn().mockResolvedValue(result),
-		})),
-	};
-}
-
-function createProfileListChain(result: unknown) {
-	const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-	chain.from = vi.fn(() => chain);
-	chain.innerJoin = vi.fn(() => chain);
-	chain.leftJoin = vi.fn(() => chain);
-	chain.where = vi.fn(() => chain);
-	chain.orderBy = vi.fn(() => chain);
-	chain.limit = vi.fn(() => chain);
-	chain.offset = vi.fn().mockResolvedValue(result);
-	return chain;
-}
-
-function createUpdateChain() {
-	const where = vi.fn().mockResolvedValue(undefined);
-	const set = vi.fn(() => ({ where }));
-	return { set, where };
-}
-
-function createBadgesChain(result: unknown) {
-	const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-	chain.from = vi.fn(() => chain);
-	chain.innerJoin = vi.fn(() => chain);
-	chain.where = vi.fn(() => chain);
-	chain.orderBy = vi.fn().mockResolvedValue(result);
-	return chain;
-}
+import { createQueryChain, makeSafeUser } from "@/test/mocks";
 
 function makeProfileUser(
 	overrides: Record<string, unknown> = {},
@@ -88,25 +42,12 @@ function makeProfileUser(
 }
 
 function makeViewer(overrides: Partial<SafeUser> = {}): SafeUser {
-	return {
+	return makeSafeUser({
 		id: 11,
 		username: "bob",
 		email: "bob@example.com",
-		adminLevel: 0,
-		createdUtc: 0,
-		isActivated: true,
-		isBanned: 0,
-		banReason: null,
-		unbanUtc: 0,
-		shadowBanned: null,
-		coins: 0,
-		proCoins: 0,
-		profileUrl: null,
-		bannerUrl: null,
-		bio: null,
-		customTitle: null,
 		...overrides,
-	};
+	});
 }
 
 function makeSettingsInput(
@@ -140,17 +81,13 @@ describe("getUserByUsernameCanonical", () => {
 
 	it("finds a user regardless of case and surrounding whitespace", async () => {
 		const user = makeProfileUser();
-		vi.mocked(db.select).mockReturnValueOnce(
-			createUserLookupChain([user]) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([user]) as never);
 
 		await expect(getUserByUsernameCanonical("  ALICE ")).resolves.toBe(user);
 	});
 
 	it("returns null when no user matches", async () => {
-		vi.mocked(db.select).mockReturnValueOnce(
-			createUserLookupChain([]) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(getUserByUsernameCanonical("ghost")).resolves.toBeNull();
 	});
@@ -162,16 +99,14 @@ describe("getUserSettingsById", () => {
 	});
 
 	it("returns null for a missing user", async () => {
-		vi.mocked(db.select).mockReturnValueOnce(
-			createUserLookupChain([]) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(getUserSettingsById(12345)).resolves.toBeNull();
 	});
 
 	it("maps nullable profile fields to empty strings", async () => {
 		vi.mocked(db.select).mockReturnValueOnce(
-			createUserLookupChain([
+			createQueryChain([
 				{
 					id: 7,
 					username: "alice",
@@ -218,7 +153,7 @@ describe("updateUserSettings", () => {
 	});
 
 	it("renders bioHtml and customTitle from the trimmed inputs", async () => {
-		const chain = createUpdateChain();
+		const chain = createQueryChain();
 		vi.mocked(db.update).mockReturnValueOnce(chain as never);
 
 		await updateUserSettings(
@@ -240,7 +175,7 @@ describe("updateUserSettings", () => {
 	});
 
 	it("stores null for blank bio, title, and urls", async () => {
-		const chain = createUpdateChain();
+		const chain = createQueryChain();
 		vi.mocked(db.update).mockReturnValueOnce(chain as never);
 
 		await updateUserSettings(7, makeSettingsInput({ bio: "   " }));
@@ -275,9 +210,7 @@ describe("getProfilePageData", () => {
 	});
 
 	it("returns null for an unknown username", async () => {
-		vi.mocked(db.select).mockReturnValueOnce(
-			createUserLookupChain([]) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(
 			getProfilePageData({
@@ -294,10 +227,10 @@ describe("getProfilePageData", () => {
 	it("restricts a private profile for strangers and fetches nothing", async () => {
 		vi.mocked(db.select)
 			.mockReturnValueOnce(
-				createUserLookupChain([makeProfileUser({ isPrivate: true })]) as never,
+				createQueryChain([makeProfileUser({ isPrivate: true })]) as never,
 			)
-			.mockReturnValueOnce(createCountChain([{ count: 3 }]) as never)
-			.mockReturnValueOnce(createBadgesChain([]) as never);
+			.mockReturnValueOnce(createQueryChain([{ count: 3 }]) as never)
+			.mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(
 			getProfilePageData({
@@ -322,11 +255,11 @@ describe("getProfilePageData", () => {
 	it("lets the owner view their own private profile comments", async () => {
 		vi.mocked(db.select)
 			.mockReturnValueOnce(
-				createUserLookupChain([makeProfileUser({ isPrivate: true })]) as never,
+				createQueryChain([makeProfileUser({ isPrivate: true })]) as never,
 			)
-			.mockReturnValueOnce(createCountChain([{ count: 0 }]) as never)
+			.mockReturnValueOnce(createQueryChain([{ count: 0 }]) as never)
 			.mockReturnValueOnce(
-				createProfileListChain([
+				createQueryChain([
 					{
 						id: 1,
 						authorId: 7,
@@ -350,7 +283,7 @@ describe("getProfilePageData", () => {
 					},
 				]) as never,
 			)
-			.mockReturnValueOnce(createBadgesChain([]) as never);
+			.mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(
 			getProfilePageData({
@@ -383,9 +316,9 @@ describe("getProfilePageData", () => {
 			isBlocking: true,
 		});
 		vi.mocked(db.select)
-			.mockReturnValueOnce(createUserLookupChain([makeProfileUser()]) as never)
-			.mockReturnValueOnce(createCountChain([{ count: 0 }]) as never)
-			.mockReturnValueOnce(createBadgesChain([]) as never);
+			.mockReturnValueOnce(createQueryChain([makeProfileUser()]) as never)
+			.mockReturnValueOnce(createQueryChain([{ count: 0 }]) as never)
+			.mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(
 			getProfilePageData({

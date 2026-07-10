@@ -103,8 +103,9 @@ Two-file convention per domain:
 3. Run `pnpm db:migrate` to apply it
 
 ## Testing Patterns
-- Server-fn tests mock `@tanstack/react-start` with a `createServerFn` chain stub (see `src/lib/comment-actions.server.test.ts`)
-- Data-layer tests mock `@/db` (see `src/lib/social.server.test.ts`)
+- **Shared mock helpers live in `src/test/mocks.ts`** — `createMockDb` (the `@/db` mock), `createQueryChain` (chainable/awaitable drizzle query-builder mock), `createServerFnStub` (the `@tanstack/react-start` mock), `createSessionsMock`, and `makeSafeUser`. Use them in new tests; `src/lib/admin-actions.server.test.ts` and `src/lib/users.server.test.ts` show the pattern. Older tests still hand-roll equivalents and migrate opportunistically as they're touched
+- Server-fn tests mock `@tanstack/react-start` with the `createServerFn` chain stub
+- Data-layer tests mock `@/db`
 - Component tests mock `@tanstack/react-router` (Link as `<a>`) and any `*-actions.server` imports (see `src/components/comments/Comment.test.tsx`)
 - JSDOM browser environment; Playwright e2e in `e2e/` needs the full docker-compose stack
 

@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/db", () => ({
-	db: {
-		select: vi.fn(),
-		insert: vi.fn(),
-		update: vi.fn(),
-		delete: vi.fn(),
-	},
+vi.mock("@/db", async () => ({
+	db: (await import("@/test/mocks")).createMockDb(),
 }));
 
 import { db } from "@/db";
@@ -23,23 +18,7 @@ import {
 	MOD_LOG_PER_PAGE,
 	searchUsers,
 } from "@/lib/admin.server";
-
-function createChain(terminal: string, result: unknown) {
-	const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-	for (const method of [
-		"from",
-		"innerJoin",
-		"leftJoin",
-		"where",
-		"orderBy",
-		"limit",
-		"offset",
-	]) {
-		chain[method] = vi.fn(() => chain);
-	}
-	chain[terminal] = vi.fn().mockResolvedValue(result);
-	return chain;
-}
+import { createQueryChain } from "@/test/mocks";
 
 describe("getReportedSubmissions", () => {
 	beforeEach(() => {
@@ -47,9 +26,7 @@ describe("getReportedSubmissions", () => {
 	});
 
 	it("returns an empty list without querying flags when nothing is reported", async () => {
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("orderBy", []) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(getReportedSubmissions()).resolves.toEqual([]);
 		expect(db.select).toHaveBeenCalledTimes(1);
@@ -58,7 +35,7 @@ describe("getReportedSubmissions", () => {
 	it("groups reporter flags onto their submissions", async () => {
 		vi.mocked(db.select)
 			.mockReturnValueOnce(
-				createChain("orderBy", [
+				createQueryChain([
 					{
 						id: 1,
 						title: "First",
@@ -82,7 +59,7 @@ describe("getReportedSubmissions", () => {
 				]) as never,
 			)
 			.mockReturnValueOnce(
-				createChain("where", [
+				createQueryChain([
 					{ postId: 1, userId: 20, reporterName: "carol", reason: "spam" },
 					{ postId: 1, userId: 21, reporterName: "dave", reason: null },
 				]) as never,
@@ -105,9 +82,7 @@ describe("getReportedComments", () => {
 	});
 
 	it("returns an empty list without querying flags when nothing is reported", async () => {
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("orderBy", []) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(getReportedComments()).resolves.toEqual([]);
 		expect(db.select).toHaveBeenCalledTimes(1);
@@ -116,7 +91,7 @@ describe("getReportedComments", () => {
 	it("groups reporter flags onto their comments", async () => {
 		vi.mocked(db.select)
 			.mockReturnValueOnce(
-				createChain("orderBy", [
+				createQueryChain([
 					{
 						id: 9,
 						bodyHtml: "<p>rude</p>",
@@ -131,7 +106,7 @@ describe("getReportedComments", () => {
 				]) as never,
 			)
 			.mockReturnValueOnce(
-				createChain("where", [
+				createQueryChain([
 					{ commentId: 9, userId: 20, reporterName: "carol", reason: "rude" },
 				]) as never,
 			);
@@ -163,9 +138,7 @@ describe("getModQueueSubmissions", () => {
 				stateModSetBy: "AUTOMATIC",
 			},
 		];
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("limit", rows) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain(rows) as never);
 
 		await expect(getModQueueSubmissions("FILTERED")).resolves.toEqual(rows);
 		expect(db.select).toHaveBeenCalledTimes(1);
@@ -184,9 +157,7 @@ describe("getModQueueSubmissions", () => {
 				stateModSetBy: null,
 			},
 		];
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("limit", rows) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain(rows) as never);
 
 		await expect(getModQueueSubmissions("SHADOWBANNED")).resolves.toEqual(rows);
 	});
@@ -212,9 +183,7 @@ describe("getModQueueComments", () => {
 				parentSubmissionTitle: "A post",
 			},
 		];
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("limit", rows) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain(rows) as never);
 
 		await expect(getModQueueComments("REMOVED")).resolves.toEqual(rows);
 	});
@@ -243,9 +212,7 @@ describe("getModLog", () => {
 
 	it("returns entries without hasMore when under a full page", async () => {
 		const rows = [makeEntry(2), makeEntry(1)];
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("offset", rows) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain(rows) as never);
 
 		await expect(getModLog(1)).resolves.toEqual({
 			entries: rows,
@@ -258,9 +225,7 @@ describe("getModLog", () => {
 		const rows = Array.from({ length: MOD_LOG_PER_PAGE + 1 }, (_, i) =>
 			makeEntry(MOD_LOG_PER_PAGE + 1 - i),
 		);
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("offset", rows) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain(rows) as never);
 
 		const result = await getModLog(1);
 		expect(result.entries).toHaveLength(MOD_LOG_PER_PAGE);
@@ -268,9 +233,7 @@ describe("getModLog", () => {
 	});
 
 	it("clamps invalid page numbers to 1", async () => {
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("offset", []) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
 		const result = await getModLog(-3);
 		expect(result.page).toBe(1);
@@ -292,9 +255,7 @@ describe("searchUsers", () => {
 				shadowBanned: null,
 			},
 		];
-		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("limit", rows) as never,
-		);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain(rows) as never);
 
 		await expect(searchUsers("ali")).resolves.toEqual(rows);
 	});
@@ -308,7 +269,7 @@ describe("getUserRecentActivity", () => {
 	it("maps stateUserDeletedUtc onto an isDeleted flag", async () => {
 		vi.mocked(db.select)
 			.mockReturnValueOnce(
-				createChain("limit", [
+				createQueryChain([
 					{
 						id: 1,
 						title: "Live post",
@@ -328,7 +289,7 @@ describe("getUserRecentActivity", () => {
 				]) as never,
 			)
 			.mockReturnValueOnce(
-				createChain("limit", [
+				createQueryChain([
 					{
 						id: 9,
 						bodyHtml: "<p>hi</p>",
@@ -362,7 +323,7 @@ describe("getUserReportHistory", () => {
 	it("merges post and comment reports newest-first", async () => {
 		vi.mocked(db.select)
 			.mockReturnValueOnce(
-				createChain("limit", [
+				createQueryChain([
 					{
 						targetId: 1,
 						targetLabel: "A post",
@@ -373,7 +334,7 @@ describe("getUserReportHistory", () => {
 				]) as never,
 			)
 			.mockReturnValueOnce(
-				createChain("limit", [
+				createQueryChain([
 					{
 						targetId: 9,
 						targetLabel: "<p>rude</p>",
@@ -399,7 +360,7 @@ describe("getUserAdminDetails", () => {
 	});
 
 	it("returns null for an unknown user", async () => {
-		vi.mocked(db.select).mockReturnValueOnce(createChain("limit", []) as never);
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
 		await expect(getUserAdminDetails(12345)).resolves.toBeNull();
 		expect(db.select).toHaveBeenCalledTimes(1);
@@ -419,8 +380,8 @@ describe("getUserAdminDetails", () => {
 			},
 		];
 		vi.mocked(db.select)
-			.mockReturnValueOnce(createChain("limit", [user]) as never)
-			.mockReturnValueOnce(createChain("orderBy", notes) as never);
+			.mockReturnValueOnce(createQueryChain([user]) as never)
+			.mockReturnValueOnce(createQueryChain(notes) as never);
 
 		await expect(getUserAdminDetails(7)).resolves.toEqual({ user, notes });
 	});
@@ -433,7 +394,7 @@ describe("getUserAlts", () => {
 
 	it("returns linked alts regardless of pair order", async () => {
 		vi.mocked(db.select).mockReturnValueOnce(
-			createChain("orderBy", [
+			createQueryChain([
 				{ id: 4, username: "alice", isManual: true },
 				{ id: 12, username: "bob", isManual: false },
 			]) as never,

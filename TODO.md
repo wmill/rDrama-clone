@@ -13,7 +13,7 @@ Baseline before any task: `pnpm check && pnpm test --run` passes (43 test files,
 ### Project orientation (read once)
 
 - TanStack Start app. Server data layer lives in `src/lib/*.server.ts`; client-callable wrappers using `createServerFn` live in `src/lib/*-actions.server.ts`. Routes are file-based in `src/routes/`.
-- Tests are colocated (`foo.server.test.ts` next to `foo.server.ts`). Server-fn tests mock `@tanstack/react-start`'s `createServerFn` and the underlying `*.server` modules — copy the mock setup from `src/lib/comment-actions.server.test.ts`. Component tests mock `@tanstack/react-router` and server-fn modules — copy `src/components/comments/Comment.test.tsx`.
+- Tests are colocated (`foo.server.test.ts` next to `foo.server.ts`). Shared mock helpers (`createMockDb`, `createQueryChain`, `createServerFnStub`, `createSessionsMock`, `makeSafeUser`) live in `src/test/mocks.ts` — use them for new tests; `src/lib/admin-actions.server.test.ts` shows the pattern. Component tests mock `@tanstack/react-router` and server-fn modules — copy `src/components/comments/Comment.test.tsx`.
 - Auth: `getCurrentUser` from `src/lib/sessions.server.ts`. Admin gating pattern: see `src/routes/admin.tsx` (guard) and `src/routes/admin.reported-posts.tsx` (a full admin page).
 - DB schema: `src/db/schema.ts` (Drizzle, ~30 rDrama-compatible tables). Guiding rule: preserve rDrama database compatibility unless a migration clearly simplifies things. Schema changes: edit schema, `pnpm db:generate`, `pnpm db:migrate`.
 - Markdown: always store both raw (`body`) and rendered (`bodyHtml`) via `src/lib/markdown.ts` render functions; never render markdown ad hoc.
@@ -198,7 +198,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Files*: extract a shared `deriveVisibility(state, viewer)` (natural home: generalize `comment-visibility.server.ts`); migrate both callers. Pure refactor; existing tests stay green.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T29: Shared test-mock helpers**
+- [x] **T29: Shared test-mock helpers** *(done 2026-07-10: src/test/mocks.ts with createMockDb, createQueryChain (chainable + thenable — awaiting anywhere in the builder chain resolves the configured result, so one helper replaces every terminal-specific variant), createServerFnStub, createSessionsMock, makeSafeUser; migrated admin-actions.server.test.ts (~90 lines of boilerplate gone), admin.server.test.ts, users.server.test.ts; testing notes updated in CLAUDE.md and this file's orientation. Remaining files migrate opportunistically as touched.)*
   - *Why*: 15 test files hand-roll the same chainable `@/db` mock, 12 duplicate the `createServerFn` stub, 13 the sessions mock — the largest test files are mostly this boilerplate.
   - *Files*: new `src/test/mocks.ts` exporting the chainable-db builder, the `createServerFn` stub, and the sessions mock; migrate the 2–3 biggest test files (`src/lib/admin-actions.server.test.ts`, `src/lib/admin.server.test.ts`, `src/lib/users.server.test.ts`) as the pattern; remaining files migrate opportunistically as they're touched. Update the testing notes in `CLAUDE.md`/this file's orientation section to point at the helpers.
   - *Verify*: `pnpm test --run && pnpm check`
