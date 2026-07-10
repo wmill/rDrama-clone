@@ -9,6 +9,7 @@ import {
 	updateComment,
 } from "@/lib/comments.server";
 import { setCommentSavedState } from "@/lib/lifecycle.server";
+import { enforceRateLimit } from "@/lib/rate-limit.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 import { idInputSchema, idSchema } from "@/lib/validation";
@@ -57,6 +58,10 @@ export const createCommentFn = createServerFn({ method: "POST" })
 			const user = guard.user;
 			if (await isSiteReadOnly()) {
 				return fail(READ_ONLY_MESSAGE);
+			}
+			const rate = await enforceRateLimit("create_comment", String(user.id));
+			if (!rate.allowed) {
+				return fail(rate.error);
 			}
 			try {
 				const id = await createComment({

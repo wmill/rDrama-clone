@@ -55,3 +55,15 @@ export const AWARD_OPTIONS = [
 	},
 ] as const;
 export type AwardKind = (typeof AWARD_OPTIONS)[number]["kind"];
+
+// Sliding-window rate limits enforced via src/lib/rate-limit.server.ts.
+export const RATE_LIMITS = {
+	login: { limit: 10, windowSeconds: 5 * 60 },
+	signup: { limit: 5, windowSeconds: 60 * 60 },
+	password_reset_request: { limit: 3, windowSeconds: 15 * 60 },
+	password_reset_consume: { limit: 10, windowSeconds: 15 * 60 },
+	create_post: { limit: 6, windowSeconds: 10 * 60 },
+	create_comment: { limit: 20, windowSeconds: 10 * 60 },
+	vote: { limit: 60, windowSeconds: 60 },
+} as const;
+export type RateLimitName = keyof typeof RATE_LIMITS;

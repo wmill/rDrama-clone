@@ -262,3 +262,41 @@ describe("signup, login, and ban enforcement", () => {
 		).resolves.toMatchObject({ success: true });
 	});
 });
+
+vi.mock("@/lib/rate-limit.server", () => ({
+	enforceRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+	getClientIp: vi.fn().mockReturnValue(null),
+}));
+
+import { enforceRateLimit } from "@/lib/rate-limit.server";
+
+describe("auth rate limiting", () => {
+	beforeEach(() => {
+		vi.mocked(enforceRateLimit).mockResolvedValue({ allowed: true });
+	});
+
+	it("rejects logins once the login rate limit is hit", async () => {
+		vi.mocked(enforceRateLimit).mockResolvedValueOnce({
+			allowed: false,
+			error: "Too many attempts",
+		});
+
+		await expect(authenticateUser("alice", "hunter22")).resolves.toEqual({
+			success: false,
+			error: "Too many attempts",
+		});
+		expect(enforceRateLimit).toHaveBeenCalledWith("login", "alice");
+	});
+
+	it("rejects signups once the signup rate limit is hit", async () => {
+		vi.mocked(enforceRateLimit).mockResolvedValueOnce({
+			allowed: false,
+			error: "Too many attempts",
+		});
+
+		await expect(
+			createUser("newuser", "new@example.com", "password123"),
+		).resolves.toEqual({ success: false, error: "Too many attempts" });
+		expect(enforceRateLimit).toHaveBeenCalledWith("signup", "new@example.com");
+	});
+});

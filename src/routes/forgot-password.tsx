@@ -19,8 +19,7 @@ const forgotPasswordAction = createServerFn({ method: "POST" })
 		forgotPasswordSchema.parse(data),
 	)
 	.handler(async ({ data }: { data: ForgotPasswordInput }) => {
-		await requestPasswordReset(data.email);
-		return { success: true as const };
+		return requestPasswordReset(data.email);
 	});
 
 export const Route = createFileRoute("/forgot-password")({
@@ -40,8 +39,12 @@ function ForgotPasswordPage() {
 		setIsLoading(true);
 
 		try {
-			await forgotPasswordAction({ data: { email } });
-			setSubmitted(true);
+			const res = await forgotPasswordAction({ data: { email } });
+			if (res.success) {
+				setSubmitted(true);
+			} else {
+				setError(res.error);
+			}
 		} catch (err) {
 			setError(
 				err instanceof Error ? err.message : "Failed to request password reset",

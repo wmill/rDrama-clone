@@ -291,3 +291,32 @@ describe("comment-actions input schemas", () => {
 		).toBe(true);
 	});
 });
+
+vi.mock("@/lib/rate-limit.server", () => ({
+	enforceRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
+import { enforceRateLimit } from "@/lib/rate-limit.server";
+
+describe("comment rate limiting", () => {
+	beforeEach(() => {
+		vi.mocked(enforceRateLimit).mockResolvedValue({ allowed: true });
+	});
+
+	it("rejects comment creation once the rate limit is hit", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		vi.mocked(enforceRateLimit).mockResolvedValueOnce({
+			allowed: false,
+			error: "Too many comments",
+		});
+
+		await expect(
+			createCommentFn({ data: { body: "hello", parentSubmissionId: 3 } }),
+		).resolves.toEqual({ success: false, error: "Too many comments" });
+		expect(createComment).not.toHaveBeenCalled();
+		expect(enforceRateLimit).toHaveBeenCalledWith(
+			"create_comment",
+			String(mockUser.id),
+		);
+	});
+});

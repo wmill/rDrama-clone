@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { enforceRateLimit, getClientIp } from "@/lib/rate-limit.server";
 import {
 	getSiteSetting,
 	SIGNUPS_DISABLED_MESSAGE,
@@ -107,6 +108,14 @@ export async function authenticateUser(
 	usernameOrEmail: string,
 	password: string,
 ): Promise<LoginResult> {
+	const rate = await enforceRateLimit(
+		"login",
+		getClientIp() ?? usernameOrEmail.trim().toLowerCase(),
+	);
+	if (!rate.allowed) {
+		return { success: false, error: rate.error };
+	}
+
 	const user = usernameOrEmail.includes("@")
 		? await getUserByEmail(usernameOrEmail)
 		: await getUserByUsername(usernameOrEmail);
@@ -145,6 +154,14 @@ export async function createUser(
 	email: string,
 	password: string,
 ): Promise<SignupResult> {
+	const rate = await enforceRateLimit(
+		"signup",
+		getClientIp() ?? normalizeEmail(email),
+	);
+	if (!rate.allowed) {
+		return { success: false, error: rate.error };
+	}
+
 	const signupsEnabled = await getSiteSetting("signups_enabled");
 	if (!signupsEnabled) {
 		return { success: false, error: SIGNUPS_DISABLED_MESSAGE };

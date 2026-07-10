@@ -4,6 +4,7 @@ import arrowBigDownUrl from "lucide-static/icons/arrow-big-down.svg?url";
 import arrowBigUpUrl from "lucide-static/icons/arrow-big-up.svg?url";
 import { useState } from "react";
 import { IconMask } from "@/components/ui/icon-mask";
+import { enforceRateLimit } from "@/lib/rate-limit.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 import {
@@ -43,6 +44,15 @@ const voteSubmissionFn = createServerFn({ method: "POST" })
 					userVote: 0 as VoteType,
 				};
 			}
+			const rate = await enforceRateLimit("vote", String(user.id));
+			if (!rate.allowed) {
+				return {
+					success: false,
+					error: rate.error,
+					newScore: 0,
+					userVote: 0 as VoteType,
+				};
+			}
 			return voteOnSubmission(user.id, data.submissionId, data.voteType);
 		},
 	);
@@ -66,6 +76,15 @@ const voteCommentFn = createServerFn({ method: "POST" })
 				return {
 					success: false,
 					error: READ_ONLY_MESSAGE,
+					newScore: 0,
+					userVote: 0 as VoteType,
+				};
+			}
+			const rate = await enforceRateLimit("vote", String(user.id));
+			if (!rate.allowed) {
+				return {
+					success: false,
+					error: rate.error,
 					newScore: 0,
 					userVote: 0 as VoteType,
 				};

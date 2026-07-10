@@ -91,3 +91,7 @@ describe("VoteButtons", () => {
 		});
 	});
 });
+
+vi.mock("@/lib/rate-limit.server", () => ({
+	enforceRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+}));

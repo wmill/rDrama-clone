@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
+import { enforceRateLimit } from "@/lib/rate-limit.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 import { createSubmission } from "@/lib/submissions.server";
@@ -54,6 +55,11 @@ const submitAction = createServerFn({ method: "POST" })
 
 		if (await isSiteReadOnly()) {
 			return { success: false as const, error: READ_ONLY_MESSAGE };
+		}
+
+		const rate = await enforceRateLimit("create_post", String(user.id));
+		if (!rate.allowed) {
+			return { success: false as const, error: rate.error };
 		}
 
 		try {

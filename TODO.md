@@ -139,7 +139,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: `grep -rn "inputValidator((data" src/lib src/routes` finds only zod-parsing validators; at least one invalid-input test added per migrated file.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T20: Rate limiting on auth + write endpoints**
+- [x] **T20: Rate limiting on auth + write endpoints** *(done 2026-07-10: rate-limit.server.ts — Redis sorted-set sliding window (enforceRateLimit + getClientIp), fail-open on Redis errors; limits in RATE_LIMITS in constants.ts (login 10/5m, signup 5/1h, reset request 3/15m + consume 10/15m, post 6/10m, comment 20/10m, vote 60/1m); enforced in authenticateUser/createUser (keyed by IP with identifier fallback), requestPasswordReset/resetPasswordWithToken, submitAction, createCommentFn, and both vote fns (keyed by user id); requestPasswordReset now returns a result union surfaced by forgot-password.tsx; 9 limiter unit tests (limit-hit, window-reset, fail-open, IP parsing) + 5 enforcement tests)*
   - *Why*: no throttling anywhere — login, signup, password reset, and content creation are all unlimited. Redis is already available.
   - *Files*: new `src/lib/rate-limit.server.ts` (sliding window or token bucket on `src/lib/redis.ts`); enforce in `src/lib/auth.server.ts` (login/signup), `src/lib/password-reset.server.ts` (request + consume), and the create-post/create-comment/vote server fns. Limits as constants in `src/lib/constants.ts`.
   - *Done when*: exceeding a limit returns a friendly error; unit tests with mocked Redis cover limit-hit and window-reset.

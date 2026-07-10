@@ -224,3 +224,43 @@ describe("password reset", () => {
 		expect(deleteAllUserSessions).toHaveBeenCalledWith(99);
 	});
 });
+
+vi.mock("@/lib/rate-limit.server", () => ({
+	enforceRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+	getClientIp: vi.fn().mockReturnValue(null),
+}));
+
+import { enforceRateLimit } from "@/lib/rate-limit.server";
+
+describe("password reset rate limiting", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(enforceRateLimit).mockResolvedValue({ allowed: true });
+	});
+
+	it("rejects reset requests once the limit is hit, before any lookup", async () => {
+		vi.mocked(enforceRateLimit).mockResolvedValueOnce({
+			allowed: false,
+			error: "Too many attempts",
+		});
+
+		await expect(requestPasswordReset("user@example.com")).resolves.toEqual({
+			success: false,
+			error: "Too many attempts",
+		});
+		expect(mocks.auth.getUserByEmail).not.toHaveBeenCalled();
+		expect(sendMail).not.toHaveBeenCalled();
+	});
+
+	it("rejects token consumption once the limit is hit", async () => {
+		vi.mocked(enforceRateLimit).mockResolvedValueOnce({
+			allowed: false,
+			error: "Too many attempts",
+		});
+
+		await expect(
+			resetPasswordWithToken("some-token", "newpassword1"),
+		).resolves.toEqual({ success: false, error: "Too many attempts" });
+		expect(mocks.redisGet).not.toHaveBeenCalled();
+	});
+});

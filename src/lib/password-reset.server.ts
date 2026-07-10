@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { enforceRateLimit, getClientIp } from "@/lib/rate-limit.server";
 import { redis } from "@/lib/redis";
 import { deleteAllUserSessions } from "@/lib/sessions.server";
 import {
@@ -99,11 +100,23 @@ async function deletePasswordResetToken(
 	await pipeline.exec();
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
+export async function requestPasswordReset(
+	email: string,
+): Promise<{ success: true } | { success: false; error: string }> {
 	const normalizedEmail = normalizeEmail(email);
+
+	const rate = await enforceRateLimit(
+		"password_reset_request",
+		getClientIp() ?? normalizedEmail,
+	);
+	if (!rate.allowed) {
+		return { success: false, error: rate.error };
+	}
+
 	const user = await getUserByEmail(normalizedEmail);
 	if (!user?.email) {
-		return;
+		// Deliberately indistinguishable from success (no account enumeration).
+		return { success: true };
 	}
 
 	const token = await storePasswordResetToken(user.id, user.loginNonce);
@@ -129,6 +142,8 @@ export async function requestPasswordReset(email: string): Promise<void> {
 			"<p>If you did not request this, you can ignore this email.</p>",
 		].join(""),
 	});
+
+	return { success: true };
 }
 
 export async function validatePasswordResetToken(
@@ -156,6 +171,14 @@ export async function resetPasswordWithToken(
 	token: string,
 	password: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
+	const rate = await enforceRateLimit(
+		"password_reset_consume",
+		getClientIp() ?? token.slice(0, 16),
+	);
+	if (!rate.allowed) {
+		return { success: false, error: rate.error };
+	}
+
 	const payload = await getPasswordResetPayload(token);
 	if (!payload) {
 		return { success: false, error: "Reset link is invalid or has expired" };
