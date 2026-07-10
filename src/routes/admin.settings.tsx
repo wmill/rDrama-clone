@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Switch } from "@/components/ui/switch";
@@ -16,8 +16,8 @@ export const Route = createFileRoute("/admin/settings")({
 });
 
 function SiteSettingsPage() {
-	const initialSettings = Route.useLoaderData();
-	const [settings, setSettings] = useState(initialSettings);
+	const settings = Route.useLoaderData();
+	const router = useRouter();
 	const [pendingKey, setPendingKey] = useState<SiteSettingKey | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +27,7 @@ function SiteSettingsPage() {
 		try {
 			const res = await updateSiteSettingFn({ data: { key, value } });
 			if (res.success) {
-				setSettings((prev) => ({ ...prev, [key]: res.value }));
+				await router.invalidate();
 			} else {
 				setError(res.error);
 			}

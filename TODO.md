@@ -213,7 +213,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Files*: `src/lib/comments.server.ts` — one typed row-mapper per query shape replacing the scattered casts; small enum-parse helpers (`VoteType`, `ModerationState`, `SortType`) reusable by `src/lib/votes.server.ts`, `src/lib/profile-route.ts`, and `src/components/comments/VoteButtons.tsx`.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T32: One post-mutation refresh convention**
+- [x] **T32: One post-mutation refresh convention** *(done 2026-07-10: standardized on router.invalidate() + loader data; converted the loader-mirroring admin pages — reported-posts, reported-comments, filtered queues, users_.$id (notes + alts, which previously faked a note row client-side with id Date.now()), banned-domains, badges, settings; convention documented in CLAUDE.md's data-layer section. admin.users.tsx UserRow state intentionally kept: its rows come from an on-page search server-fn call, not the loader, so invalidate() would not refresh them. Manual click-through of the admin queues in dev still worthwhile.)*
   - *Why*: `router.invalidate()` (19 call sites) coexists with manual `useState` patching of loader data (the admin pages) — confusing precedent for every future feature.
   - *Files*: standardize on `router.invalidate()` + loader data (the majority pattern); convert the admin pages' local-state mirrors (`src/routes/admin.reported-posts.tsx` etc.); document the convention in CLAUDE.md's data-layer section.
   - *Verify*: `pnpm test --run && pnpm check`; click through the admin queues in dev.

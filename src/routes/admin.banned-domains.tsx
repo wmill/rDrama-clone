@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { type BannedDomain, listBannedDomains } from "@/lib/admin.server";
+import { listBannedDomains } from "@/lib/admin.server";
 import {
 	addBannedDomainFn,
 	removeBannedDomainFn,
@@ -26,8 +26,8 @@ export const Route = createFileRoute("/admin/banned-domains")({
 });
 
 function BannedDomainsPage() {
-	const initialDomains = Route.useLoaderData();
-	const [domains, setDomains] = useState<BannedDomain[]>(initialDomains);
+	const domains = Route.useLoaderData();
+	const router = useRouter();
 	const [domainInput, setDomainInput] = useState("");
 	const [reasonInput, setReasonInput] = useState("");
 	const [isPending, setIsPending] = useState(false);
@@ -42,14 +42,9 @@ function BannedDomainsPage() {
 				data: { domain: domainInput, reason: reasonInput },
 			});
 			if (res.success) {
-				setDomains((prev) =>
-					[
-						...prev.filter((d) => d.domain !== res.domain),
-						{ domain: res.domain, reason: res.reason },
-					].sort((a, b) => a.domain.localeCompare(b.domain)),
-				);
 				setDomainInput("");
 				setReasonInput("");
+				await router.invalidate();
 			} else {
 				setError(res.error);
 			}
@@ -64,7 +59,7 @@ function BannedDomainsPage() {
 		try {
 			const res = await removeBannedDomainFn({ data: { domain } });
 			if (res.success) {
-				setDomains((prev) => prev.filter((d) => d.domain !== domain));
+				await router.invalidate();
 			} else {
 				setError(res.error);
 			}

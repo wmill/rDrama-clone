@@ -1,4 +1,9 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Link,
+	notFound,
+	useRouter,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
@@ -99,15 +104,7 @@ export const Route = createFileRoute("/admin/users_/$id")({
 });
 
 function UserInvestigationPage() {
-	const {
-		user,
-		notes: initialNotes,
-		activity,
-		reports,
-		alts: initialAlts,
-	} = Route.useLoaderData();
-	const [notes, setNotes] = useState(initialNotes);
-	const [alts, setAlts] = useState(initialAlts);
+	const { user, notes, activity, reports, alts } = Route.useLoaderData();
 
 	return (
 		<div className="space-y-4">
@@ -146,28 +143,9 @@ function UserInvestigationPage() {
 				</p>
 			</div>
 
-			<NotesSection
-				userId={user.id}
-				notes={notes}
-				onNoteAdded={(note) => setNotes((prev) => [...prev, note])}
-			/>
+			<NotesSection userId={user.id} notes={notes} />
 
-			<AltsSection
-				userId={user.id}
-				alts={alts}
-				onAltLinked={(alt) =>
-					setAlts((prev) =>
-						prev.some((existing) => existing.id === alt.id)
-							? prev.map((existing) =>
-									existing.id === alt.id ? alt : existing,
-								)
-							: [...prev, alt],
-					)
-				}
-				onAltUnlinked={(username) =>
-					setAlts((prev) => prev.filter((alt) => alt.username !== username))
-				}
-			/>
+			<AltsSection userId={user.id} alts={alts} />
 
 			<ReportsSection reports={reports} />
 
@@ -179,12 +157,11 @@ function UserInvestigationPage() {
 function NotesSection({
 	userId,
 	notes,
-	onNoteAdded,
 }: {
 	userId: number;
 	notes: UserAdminDetails["notes"];
-	onNoteAdded: (note: UserAdminDetails["notes"][number]) => void;
 }) {
+	const router = useRouter();
 	const [noteText, setNoteText] = useState("");
 	const [tag, setTag] = useState<(typeof NOTE_TAGS)[number]>("Comment");
 	const [isPending, setIsPending] = useState(false);
@@ -199,16 +176,8 @@ function NotesSection({
 		try {
 			const res = await createUserNoteFn({ data: { userId, note, tag } });
 			if (res.success) {
-				onNoteAdded({
-					id: Date.now(),
-					note,
-					tag,
-					authorName: "you",
-					createdDatetimez: new Date(),
-					referencePost: null,
-					referenceComment: null,
-				});
 				setNoteText("");
+				await router.invalidate();
 			} else {
 				setError(res.error);
 			}
@@ -278,17 +247,8 @@ function NotesSection({
 	);
 }
 
-function AltsSection({
-	userId,
-	alts,
-	onAltLinked,
-	onAltUnlinked,
-}: {
-	userId: number;
-	alts: UserAlt[];
-	onAltLinked: (alt: UserAlt) => void;
-	onAltUnlinked: (username: string) => void;
-}) {
+function AltsSection({ userId, alts }: { userId: number; alts: UserAlt[] }) {
+	const router = useRouter();
 	const [username, setUsername] = useState("");
 	const [isPending, setIsPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -302,8 +262,8 @@ function AltsSection({
 		try {
 			const res = await linkUserAltFn({ data: { userId, username: name } });
 			if (res.success) {
-				onAltLinked(res.alt);
 				setUsername("");
+				await router.invalidate();
 			} else {
 				setError(res.error);
 			}
@@ -320,7 +280,7 @@ function AltsSection({
 				data: { userId, username: altUsername },
 			});
 			if (res.success) {
-				onAltUnlinked(altUsername);
+				await router.invalidate();
 			} else {
 				setError(res.error);
 			}

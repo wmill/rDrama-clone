@@ -89,6 +89,8 @@ Two-file convention per domain:
 - `*.server.ts` (e.g. `comments.server.ts`, `submissions.server.ts`, `admin.server.ts`) - data functions hitting the DB; unit-tested by mocking `@/db`
 - `*-actions.server.ts` (e.g. `comment-actions.server.ts`) - `createServerFn` wrappers callable from the client; they authenticate via `getCurrentUser()` from `sessions.server.ts` and delegate to the data layer
 
+**Post-mutation refresh convention**: after a successful mutation, call `await router.invalidate()` and render from loader data — do not mirror loader data into `useState` and patch it locally. Local `useState` is fine for form inputs, pending flags, and UI-only state (tabs, collapsed), just not as a copy of what the loader returns.
+
 ### Markdown Rendering
 `src/lib/markdown.ts` (markdown-it with `html: false` for XSS safety, plus spoiler `||text||` and @user-mention plugins). Raw markdown is stored in `body` columns and server-rendered HTML in `bodyHtml` columns. **The server is the single source of truth for rendered HTML** — after create/edit, return the re-fetched record and display its `bodyHtml`; never display raw markdown client-side.
 

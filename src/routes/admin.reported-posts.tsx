@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,12 +31,8 @@ export const Route = createFileRoute("/admin/reported-posts")({
 });
 
 function ReportedPostsPage() {
-	const { entries: initialPosts, page, hasMore } = Route.useLoaderData();
-	const [posts, setPosts] = useState<ReportedSubmission[]>(initialPosts);
-
-	useEffect(() => {
-		setPosts(initialPosts);
-	}, [initialPosts]);
+	const { entries: posts, page, hasMore } = Route.useLoaderData();
+	const router = useRouter();
 
 	const handleAction = async (
 		id: number,
@@ -46,7 +42,7 @@ function ReportedPostsPage() {
 			data: { id, action },
 		});
 		if (result.success) {
-			setPosts((prev) => prev.filter((p) => p.id !== id));
+			await router.invalidate();
 		}
 	};
 

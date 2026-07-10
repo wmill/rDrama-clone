@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
@@ -27,12 +27,11 @@ export const Route = createFileRoute("/admin/badges")({
 });
 
 function BadgesPage() {
-	const initialDefs = Route.useLoaderData();
-	const [defs, setDefs] = useState<BadgeDef[]>(initialDefs);
+	const defs = Route.useLoaderData();
 
 	return (
 		<div className="space-y-4">
-			<CreateBadgeCard onCreated={(def) => setDefs((prev) => [...prev, def])} />
+			<CreateBadgeCard />
 			<GrantBadgeCard defs={defs} />
 			<div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
 				<h3 className="mb-3 text-base font-semibold text-white">
@@ -67,11 +66,8 @@ function BadgesPage() {
 	);
 }
 
-function CreateBadgeCard({
-	onCreated,
-}: {
-	onCreated: (def: BadgeDef) => void;
-}) {
+function CreateBadgeCard() {
+	const router = useRouter();
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
 	const [isPending, setIsPending] = useState(false);
@@ -84,9 +80,9 @@ function CreateBadgeCard({
 		try {
 			const res = await createBadgeDefFn({ data: { name, description } });
 			if (res.success) {
-				onCreated(res.badgeDef);
 				setName("");
 				setDescription("");
+				await router.invalidate();
 			} else {
 				setError(res.error);
 			}

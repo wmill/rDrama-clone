@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
@@ -72,8 +72,8 @@ const QUEUE_TABS: { kind: ModQueueKind; label: string; blurb: string }[] = [
 ];
 
 function ContentQueuesPage() {
-	const initialQueues = Route.useLoaderData();
-	const [queues, setQueues] = useState(initialQueues);
+	const queues = Route.useLoaderData();
+	const router = useRouter();
 	const [activeTab, setActiveTab] = useState<ModQueueKind>("FILTERED");
 
 	const handlePostAction = async (id: number, state: "VISIBLE" | "REMOVED") => {
@@ -81,13 +81,7 @@ function ContentQueuesPage() {
 			data: { id, state },
 		});
 		if (result.success) {
-			setQueues((prev) => ({
-				...prev,
-				[activeTab]: {
-					...prev[activeTab],
-					posts: prev[activeTab].posts.filter((p) => p.id !== id),
-				},
-			}));
+			await router.invalidate();
 		}
 	};
 
@@ -97,13 +91,7 @@ function ContentQueuesPage() {
 	) => {
 		const result = await setCommentModerationStateFn({ data: { id, state } });
 		if (result.success) {
-			setQueues((prev) => ({
-				...prev,
-				[activeTab]: {
-					...prev[activeTab],
-					comments: prev[activeTab].comments.filter((c) => c.id !== id),
-				},
-			}));
+			await router.invalidate();
 		}
 	};
 

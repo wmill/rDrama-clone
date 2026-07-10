@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getReportedComments, type ReportedComment } from "@/lib/admin.server";
@@ -28,13 +28,8 @@ export const Route = createFileRoute("/admin/reported-comments")({
 });
 
 function ReportedCommentsPage() {
-	const { entries: initialComments, page, hasMore } = Route.useLoaderData();
-	const [commentsList, setCommentsList] =
-		useState<ReportedComment[]>(initialComments);
-
-	useEffect(() => {
-		setCommentsList(initialComments);
-	}, [initialComments]);
+	const { entries: commentsList, page, hasMore } = Route.useLoaderData();
+	const router = useRouter();
 
 	const handleAction = async (
 		id: number,
@@ -44,7 +39,7 @@ function ReportedCommentsPage() {
 			data: { id, action },
 		});
 		if (result.success) {
-			setCommentsList((prev) => prev.filter((c) => c.id !== id));
+			await router.invalidate();
 		}
 	};
 
