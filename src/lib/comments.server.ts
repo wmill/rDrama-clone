@@ -26,6 +26,7 @@ import {
 	getCommentVisibility,
 	shouldIncludeCommentInFeed,
 } from "@/lib/comment-visibility.server";
+import { parseModerationState, parseVoteType } from "@/lib/enums";
 import { authorDeleteComment } from "@/lib/lifecycle.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
 import { createNotificationsForComment } from "@/lib/notifications.server";
@@ -203,8 +204,8 @@ function mapCommentRow(row: RawCommentRow): CommentFlat {
 		isPinned: row.pinnedBy !== null,
 		isSaved: row.savedCommentId !== null,
 		isModHidden: false,
-		userVote: (row.userVoteType as VoteType) ?? 0,
-		stateMod: (row.stateMod ?? "VISIBLE") as ModerationState,
+		userVote: parseVoteType(row.userVoteType),
+		stateMod: parseModerationState(row.stateMod),
 		stateModSetBy: row.stateModSetBy,
 	};
 }
@@ -474,6 +475,59 @@ async function getRawCommentRowById(
 	};
 }
 
+// Snake_case row shape produced by the raw subtree SQL below.
+type RawCommentSqlRow = {
+	id: number;
+	author_id: number;
+	author_name: string;
+	author_shadow_banned: string | null;
+	body: string | null;
+	body_html: string;
+	created_utc: number;
+	edited_utc: number;
+	upvotes: number;
+	downvotes: number;
+	level: number;
+	parent_comment_id: number | null;
+	parent_submission: number | null;
+	descendant_count: number;
+	is_pinned: string | null;
+	distinguish_level: number;
+	state_user_deleted_utc: Date | null;
+	state_mod: string | null;
+	state_mod_set_by: string | null;
+	user_vote_type: number | null;
+	saved_comment_id: number | null;
+	blocked_target_id: number | null;
+};
+
+function mapRawCommentSqlRow(row: RawCommentSqlRow): RawCommentRow {
+	return {
+		id: row.id,
+		authorId: row.author_id,
+		authorName: row.author_name,
+		authorShadowBanned: row.author_shadow_banned,
+		body: row.body,
+		bodyHtml: row.body_html,
+		createdUtc: row.created_utc,
+		editedUtc: row.edited_utc,
+		upvotes: row.upvotes,
+		downvotes: row.downvotes,
+		level: row.level,
+		parentCommentId: row.parent_comment_id,
+		parentSubmissionId: row.parent_submission,
+		descendantCount: row.descendant_count,
+		pinnedBy: row.is_pinned,
+		distinguishLevel: row.distinguish_level,
+		stateUserDeletedUtc: row.state_user_deleted_utc,
+		stateMod: row.state_mod,
+		stateModSetBy: row.state_mod_set_by,
+		userVoteType: row.user_vote_type,
+		savedCommentId: row.saved_comment_id,
+		isBlocking: row.blocked_target_id !== null,
+	};
+}
+
 async function getRawCommentSubtreeRows(
 	id: number,
 	userId?: number,
@@ -518,30 +572,9 @@ async function getRawCommentSubtreeRows(
 		ORDER BY c.level ASC, c.created_utc DESC, c.id DESC`,
 	);
 
-	return (result.rows as Array<Record<string, unknown>>).map((row) => ({
-		id: row.id as number,
-		authorId: row.author_id as number,
-		authorName: row.author_name as string,
-		authorShadowBanned: row.author_shadow_banned as string | null,
-		body: row.body as string | null,
-		bodyHtml: row.body_html as string,
-		createdUtc: row.created_utc as number,
-		editedUtc: row.edited_utc as number,
-		upvotes: row.upvotes as number,
-		downvotes: row.downvotes as number,
-		level: row.level as number,
-		parentCommentId: row.parent_comment_id as number | null,
-		parentSubmissionId: row.parent_submission as number | null,
-		descendantCount: row.descendant_count as number,
-		pinnedBy: row.is_pinned as string | null,
-		distinguishLevel: row.distinguish_level as number,
-		stateUserDeletedUtc: row.state_user_deleted_utc as Date | null,
-		stateMod: row.state_mod as string | null,
-		stateModSetBy: row.state_mod_set_by as string | null,
-		userVoteType: row.user_vote_type as number | null,
-		savedCommentId: row.saved_comment_id as number | null,
-		isBlocking: row.blocked_target_id !== null,
-	}));
+	// Single typed boundary for the raw subtree SQL: the column list above
+	// defines this shape; keep the two in sync when editing the query.
+	return (result.rows as RawCommentSqlRow[]).map(mapRawCommentSqlRow);
 }
 
 async function attachCommentAwards(
@@ -676,8 +709,8 @@ export async function getRecentComments(
 		isPinned: row.pinnedBy !== null,
 		isSaved: false,
 		isModHidden: false,
-		userVote: 0 as VoteType,
-		stateMod: "VISIBLE" as ModerationState,
+		userVote: 0 as const,
+		stateMod: "VISIBLE" as const,
 		stateModSetBy: null,
 	}));
 }
@@ -848,8 +881,8 @@ export async function getCommentsFeed(
 			isRemoved: false,
 			isFiltered: row.stateMod === "FILTERED",
 			isSaved: row.savedCommentId !== null,
-			userVote: (row.userVoteType as VoteType) ?? 0,
-			stateMod: (row.stateMod ?? "VISIBLE") as ModerationState,
+			userVote: parseVoteType(row.userVoteType),
+			stateMod: parseModerationState(row.stateMod),
 			stateModSetBy: row.stateModSetBy,
 		}));
 }

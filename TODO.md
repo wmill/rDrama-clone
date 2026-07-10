@@ -208,7 +208,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Files*: add limit + pagination (copy `getModLog`'s limit+1/`hasMore` pattern in the same file); wire page controls into `src/routes/admin.reported-posts.tsx` and `admin.reported-comments.tsx`.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T31: Type the raw-SQL rows in `comments.server.ts`**
+- [x] **T31: Type the raw-SQL rows in `comments.server.ts`** *(done 2026-07-10: RawCommentSqlRow type + mapRawCommentSqlRow give the raw subtree SQL a single typed boundary (one cast at the query, replacing ~22 scattered field casts); new src/lib/enums.ts with parseEnum/parseVoteType/parseModerationState/parseSortType/parseTimeFilter/parseCommentFeedSortType — now used by comments.server.ts, submissions.server.ts, votes.server.ts, profile-route.ts (its three parse fns delegate), and VoteButtons.tsx (NO_VOTE constant replaces the `0 as VoteType` casts); enums.test.ts covers fallbacks.)*
   - *Why*: ~31 `as` casts on `Record<string, unknown>` rows in the largest lib file (1100 lines) — the main type-safety hotspot.
   - *Files*: `src/lib/comments.server.ts` — one typed row-mapper per query shape replacing the scattered casts; small enum-parse helpers (`VoteType`, `ModerationState`, `SortType`) reusable by `src/lib/votes.server.ts`, `src/lib/profile-route.ts`, and `src/components/comments/VoteButtons.tsx`.
   - *Verify*: `pnpm test --run && pnpm check`

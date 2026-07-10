@@ -1,11 +1,13 @@
-import {
-	type CommentFeedSortType,
-	CommentSortTypes,
-	type SortType,
-	SortTypes,
-	type TimeFilter,
-	TimeFilters,
+import type {
+	CommentFeedSortType,
+	SortType,
+	TimeFilter,
 } from "@/lib/constants";
+import {
+	parseCommentFeedSortType,
+	parseSortType,
+	parseTimeFilter,
+} from "@/lib/enums";
 
 export type ProfileCommentsSearch = {
 	sort: CommentFeedSortType;
@@ -40,27 +42,15 @@ export const DEFAULT_RELATIONSHIP_PROFILE_SEARCH: ProfileRelationshipSearch = {
 };
 
 export function parseProfileTime(value: unknown): TimeFilter {
-	if (typeof value === "string" && TimeFilters.includes(value as TimeFilter)) {
-		return value as TimeFilter;
-	}
-	return "all";
+	return parseTimeFilter(value);
 }
 
 export function parseCommentsProfileSort(value: unknown): CommentFeedSortType {
-	if (
-		typeof value === "string" &&
-		CommentSortTypes.includes(value as CommentFeedSortType)
-	) {
-		return value as CommentFeedSortType;
-	}
-	return "new";
+	return parseCommentFeedSortType(value);
 }
 
 export function parsePostsProfileSort(value: unknown): SortType {
-	if (typeof value === "string" && SortTypes.includes(value as SortType)) {
-		return value as SortType;
-	}
-	return "hot";
+	return parseSortType(value);
 }
 
 export function parseProfilePage(value: unknown): number {

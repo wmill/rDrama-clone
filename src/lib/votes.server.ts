@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { comments, commentVotes, submissions, votes } from "@/db/schema";
+import { parseVoteType } from "@/lib/enums";
 
 export type VoteType = 1 | -1 | 0; // 1 = upvote, -1 = downvote, 0 = remove vote
 
@@ -27,7 +28,7 @@ export async function getCommentVote(
 		)
 		.limit(1);
 
-	return (vote?.voteType as VoteType) ?? 0;
+	return parseVoteType(vote?.voteType);
 }
 
 async function getSubmissionVoteInternal(
@@ -40,7 +41,7 @@ async function getSubmissionVoteInternal(
 		.where(and(eq(votes.userId, userId), eq(votes.submissionId, submissionId)))
 		.limit(1);
 
-	return (vote?.voteType as VoteType) ?? 0;
+	return parseVoteType(vote?.voteType);
 }
 
 export async function voteOnSubmission(

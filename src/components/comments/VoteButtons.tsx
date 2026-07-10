@@ -17,6 +17,8 @@ import {
 	voteOnSubmission,
 } from "@/lib/votes.server";
 
+const NO_VOTE: VoteType = 0;
+
 const voteSubmissionFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { submissionId: number; voteType: VoteType }) =>
 		submissionVoteInputSchema.parse(data),
@@ -33,7 +35,7 @@ const voteSubmissionFn = createServerFn({ method: "POST" })
 					success: false,
 					error: "Not logged in",
 					newScore: 0,
-					userVote: 0 as VoteType,
+					userVote: NO_VOTE,
 				};
 			}
 			if (await isSiteReadOnly()) {
@@ -41,7 +43,7 @@ const voteSubmissionFn = createServerFn({ method: "POST" })
 					success: false,
 					error: READ_ONLY_MESSAGE,
 					newScore: 0,
-					userVote: 0 as VoteType,
+					userVote: NO_VOTE,
 				};
 			}
 			const rate = await enforceRateLimit("vote", String(user.id));
@@ -50,7 +52,7 @@ const voteSubmissionFn = createServerFn({ method: "POST" })
 					success: false,
 					error: rate.error,
 					newScore: 0,
-					userVote: 0 as VoteType,
+					userVote: NO_VOTE,
 				};
 			}
 			return voteOnSubmission(user.id, data.submissionId, data.voteType);
@@ -69,7 +71,7 @@ const voteCommentFn = createServerFn({ method: "POST" })
 					success: false,
 					error: "Not logged in",
 					newScore: 0,
-					userVote: 0 as VoteType,
+					userVote: NO_VOTE,
 				};
 			}
 			if (await isSiteReadOnly()) {
@@ -77,7 +79,7 @@ const voteCommentFn = createServerFn({ method: "POST" })
 					success: false,
 					error: READ_ONLY_MESSAGE,
 					newScore: 0,
-					userVote: 0 as VoteType,
+					userVote: NO_VOTE,
 				};
 			}
 			const rate = await enforceRateLimit("vote", String(user.id));
@@ -86,7 +88,7 @@ const voteCommentFn = createServerFn({ method: "POST" })
 					success: false,
 					error: rate.error,
 					newScore: 0,
-					userVote: 0 as VoteType,
+					userVote: NO_VOTE,
 				};
 			}
 			return voteOnComment(user.id, data.commentId, data.voteType);

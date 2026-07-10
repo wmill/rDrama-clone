@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { type AwardCount, getSubmissionAwardCounts } from "@/lib/awards.server";
 import { deriveModerationVisibility } from "@/lib/comment-visibility.server";
+import { parseVoteType } from "@/lib/enums";
 import {
 	authorDeleteSubmission,
 	DELETED_BY_AUTHOR_MESSAGE,
@@ -137,7 +138,7 @@ function mapSubmissionRow<T extends SubmissionRow>(
 			: row.bodyHtml,
 		embedUrl: showBlockedPlaceholder ? null : row.embedUrl,
 		score: row.upvotes - row.downvotes,
-		userVote: (row.userVoteType as VoteType) ?? 0,
+		userVote: parseVoteType(row.userVoteType),
 		isStickied: row.stickied !== null,
 		isDeleted: moderation.isDeleted,
 		isRemoved: moderation.isRemoved,
