@@ -18,7 +18,7 @@ Baseline before any task: `pnpm check && pnpm test --run` passes (38 test files,
 - DB schema: `src/db/schema.ts` (Drizzle, ~30 rDrama-compatible tables). Guiding rule: preserve rDrama database compatibility unless a migration clearly simplifies things. Schema changes: edit schema, `pnpm db:generate`, `pnpm db:migrate`.
 - Markdown: always store both raw (`body`) and rendered (`bodyHtml`) via `src/lib/markdown.ts` render functions; never render markdown ad hoc.
 
-Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunteer janitor, static pages (rules/about/RSS).
+Out of scope for v1 (do not start): 2FA, messaging/chat, OAuth app flows, volunteer janitor, static pages (rules/about/RSS), coins economy / award shop / marseys / hats, polls, holes/sub-communities.
 
 ---
 
@@ -120,17 +120,113 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: toggling each setting changes behavior immediately and is covered by a server test.
   - *Verify*: `pnpm test --run && pnpm check`; flip each toggle in dev and confirm.
 
-## API smoke coverage
+## Security hardening (priority)
 
-- [ ] **T16: Extend bruno collection to write flows**
-  - *Why*: `bruno/` only covers GET smoke (home feed, comments, search) — no write path is exercised.
-  - *Files*: `bruno/` (existing requests + `bruno/environments/local.yml` show the conventions); add authenticated flows: signup/login, submit post, comment, vote, report, and one mod action.
-  - *Done when*: the collection runs green against `pnpm dev` with a seeded admin (`scripts/create-user.ts`).
-  - *Verify*: run the collection with the bruno CLI (`bru run`) against a local dev server.
+- [ ] **T17: Server-side auth for admin GET server-fns + `requireUser`/`requireAdmin` helpers**
+  - *Why*: the admin GET server-fns (`admin.reported-posts.tsx`, `admin.reported-comments.tsx`, `admin.mod-log.tsx`, `admin.users.tsx`, `admin.badges.tsx`, `admin.banned-domains.tsx`, `admin.filtered.tsx`) do no server-side auth — only the layout-loader guard in `admin.tsx` protects them, but they are directly callable RPC endpoints. A non-admin can fetch mod logs, reported content, and user search by hitting the endpoint directly.
+  - *Files*: new `src/lib/auth-guards.server.ts` with `requireUser()` and `requireAdmin()` (wrap `getCurrentUser` from `src/lib/sessions.server.ts`; throw or return a typed result); apply to every GET fn in `src/routes/admin.*.tsx`.
+  - *Done when*: each admin GET fn rejects non-admin callers (server test per fn, or one shared parameterized test); helpers are exported for T18 to reuse.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T18: Migrate all `*-actions.server.ts` to the shared guards + shared `ActionResult<T>` type**
+  - *Why*: the `getCurrentUser()` → `"Not logged in"` / `adminLevel < 2` → `"Unauthorized"` guard block is copy-pasted ~50 times across `admin-actions`, `award-actions`, `comment-actions`, `post-actions`, `reporting-actions`, `social-actions`, `session-actions`, `site-settings-actions`, `notification-actions`; the `{ success: false as const, error }` shape is redeclared per file.
+  - *Files*: all `src/lib/*-actions.server.ts`; put `ActionResult<T>` next to the T17 helpers. Pure refactor — no behavior change; existing tests must stay green.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T19: Real input validation (zod) on all server fns**
+  - *Why*: most `.inputValidator((data) => data)` calls are identity passthroughs that only type-assert — untrusted client input reaches DB writes unvalidated. Only `reporting-actions.server.ts` and `post-actions.server.ts` use zod today.
+  - *Files*: every `src/lib/*-actions.server.ts` (and route-local server fns) with a passthrough validator; copy the zod pattern from `src/lib/reporting-actions.server.ts`.
+  - *Done when*: `grep -rn "inputValidator((data" src/lib src/routes` finds only zod-parsing validators; at least one invalid-input test added per migrated file.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T20: Rate limiting on auth + write endpoints**
+  - *Why*: no throttling anywhere — login, signup, password reset, and content creation are all unlimited. Redis is already available.
+  - *Files*: new `src/lib/rate-limit.server.ts` (sliding window or token bucket on `src/lib/redis.ts`); enforce in `src/lib/auth.server.ts` (login/signup), `src/lib/password-reset.server.ts` (request + consume), and the create-post/create-comment/vote server fns. Limits as constants in `src/lib/constants.ts`.
+  - *Done when*: exceeding a limit returns a friendly error; unit tests with mocked Redis cover limit-hit and window-reset.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+## Feature completion (finish half-built)
+
+- [ ] **T21: Render awards on posts, comments, and profiles**
+  - *Why*: `awardContentFn` inserts `awardRelationships` and bumps `receivedAwardCount`, but nothing ever displays them — award-in, no award-out.
+  - *Files*: batched queries joining `awardRelationships` in `src/lib/submissions.server.ts` / `src/lib/comments.server.ts` (one query per list, not per row); display icons + counts on `src/routes/post.$id.tsx`, `src/components/comments/Comment.tsx`, `src/components/recent-submissions.tsx`; show `receivedAwardCount` on `src/components/profile/user-page.tsx`. Award kinds/icons come from `AWARD_OPTIONS` in `src/lib/constants.ts`.
+  - *Done when*: an awarded post/comment shows its awards in feed, post page, and comment tree; profile shows the received-award count.
+  - *Verify*: `pnpm test --run && pnpm check`; grant an award in dev and see it render.
+
+- [ ] **T22: Home feed pagination**
+  - *Why*: `getSubmissions` supports `limit`/`offset` but `src/routes/index.tsx` never passes them — the feed is capped at 25 with no way to see more.
+  - *Files*: `src/routes/index.tsx` (page search-param or "load more"); `src/lib/submissions.server.ts` (`hasMore` via limit+1 — copy `getModLog`'s pattern in `src/lib/admin.server.ts`); keep sort/time filters intact in pagination links.
+  - *Done when*: users can page through the whole feed; sort/time selections survive page changes.
+  - *Verify*: `pnpm test --run && pnpm check`; seed >25 posts (`pnpm generate-data`) and page through in dev.
+
+- [ ] **T23: Generalize notifications beyond comments (follow + award notifications)**
+  - *Why*: the `notifications` table is keyed on `commentId` only, so non-comment notification types are structurally impossible; follows and awards are silent today.
+  - *Files*: `src/db/schema.ts` (make `commentId` nullable + add a type/body column — check how rDrama models this first, per the schema-compat guiding rule; then `pnpm db:generate` + `pnpm db:migrate`); emit in `src/lib/social.server.ts` (on follow) and `src/lib/award-actions.server.ts` (on award); render the new types in `src/routes/notifications.tsx`; unread-count logic in `src/lib/notifications.server.ts` should keep working unchanged.
+  - *Done when*: following a user and awarding their content each produce a notification; existing reply/mention/subscription notifications unaffected.
+  - *Verify*: `pnpm test --run && pnpm check`; follow + award in dev and see both notifications.
+
+- [ ] **T24: Manual alt-linking for admins**
+  - *Why*: the `alts` table renders in `src/components/modals/BanModal.tsx` but nothing can ever write rows; `isManual` is never set.
+  - *Files*: link/unlink actions in `src/lib/admin-actions.server.ts` (set `isManual`, write a mod-log entry); UI on the user investigation page `src/routes/admin.users_.$id.tsx` (list alts there too).
+  - *Done when*: an admin can link/unlink two accounts as alts; the link shows in both BanModal and the investigation page; actions are tested.
+  - *Verify*: `pnpm test --run && pnpm check`; link two users in dev and check both surfaces.
+
+## Customization & settings
+
+- [ ] **T25: Expose dormant user settings — theme, over18, slur replacer**
+  - *Why*: `users.theme`, `users.over18`, `users.slurReplacer` columns exist with no UI or enforcement.
+  - *Files*: `src/routes/me.tsx` + the settings update in `src/lib/users.server.ts` (follow the existing toggle patterns); theme applied in `src/routes/__root.tsx`; over18 gates NSFW-marked submissions in feed/post queries; slur replacer applied at render time. **Scope-check first**: if a piece has no backing data (e.g. no NSFW flag actually set on submissions), note it in the close-out and skip that toggle rather than shipping a dead switch.
+  - *Done when*: each shipped toggle visibly changes behavior and has a server test.
+  - *Verify*: `pnpm test --run && pnpm check`; flip each toggle in dev.
+
+- [ ] **T26: Mod-assigned user flair / custom title**
+  - *Why*: `customTitle` (HTML) vs `customTitlePlain` and `flairChanged` exist, but only self-service plain titles work — mods cannot assign or lock a title.
+  - *Files*: admin action in `src/lib/admin-actions.server.ts` (set title, set `flairChanged` lock, mod-logged; render via `src/lib/markdown.ts` — never ad hoc); UI on `src/routes/admin.users_.$id.tsx`; `src/routes/me.tsx` blocks self-edit while `flairChanged` is set; title renders through the existing profile/comment display paths.
+  - *Done when*: a mod can set + lock a user's title; the user can't override it while locked; action is tested.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T27: Profile CSS (`users.profileCss`)**
+  - *Why*: the column exists and it's a signature rDrama feature. **Security-sensitive**: CSS must be sanitized/scoped — strip `@import`/`url()` exfiltration vectors, scope selectors under the profile container, and inject only on profile pages, never globally.
+  - *Files*: editor field in `src/routes/me.tsx`, update + sanitization in `src/lib/users.server.ts`, injection in `src/components/profile/user-page.tsx`. Research a CSS sanitization approach first; if nothing is satisfyingly safe, ship behind an admin-approval flag and say so in the close-out note.
+  - *Done when*: a user can set profile CSS that styles only their profile page; sanitizer unit tests include hostile-CSS cases (`@import`, `url()`, selector escape attempts).
+  - *Verify*: `pnpm test --run && pnpm check`
+
+## Codebase quality
+
+- [ ] **T28: Unify submission/comment visibility derivation**
+  - *Why*: the same REMOVED/FILTERED/user-deleted state machine is implemented twice — inline in `src/lib/submissions.server.ts` (~lines 104–160) and in `src/lib/comment-visibility.server.ts` (~lines 82–147) — with separately maintained message constants.
+  - *Files*: extract a shared `deriveVisibility(state, viewer)` (natural home: generalize `comment-visibility.server.ts`); migrate both callers. Pure refactor; existing tests stay green.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T29: Shared test-mock helpers**
+  - *Why*: 15 test files hand-roll the same chainable `@/db` mock, 12 duplicate the `createServerFn` stub, 13 the sessions mock — the largest test files are mostly this boilerplate.
+  - *Files*: new `src/test/mocks.ts` exporting the chainable-db builder, the `createServerFn` stub, and the sessions mock; migrate the 2–3 biggest test files (`src/lib/admin-actions.server.test.ts`, `src/lib/admin.server.test.ts`, `src/lib/users.server.test.ts`) as the pattern; remaining files migrate opportunistically as they're touched. Update the testing notes in `CLAUDE.md`/this file's orientation section to point at the helpers.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T30: Bound the unbounded admin queries**
+  - *Why*: `getReportedSubmissions` / `getReportedComments` in `src/lib/admin.server.ts` have no `.limit()` — they load the entire reported set.
+  - *Files*: add limit + pagination (copy `getModLog`'s limit+1/`hasMore` pattern in the same file); wire page controls into `src/routes/admin.reported-posts.tsx` and `admin.reported-comments.tsx`.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T31: Type the raw-SQL rows in `comments.server.ts`**
+  - *Why*: ~31 `as` casts on `Record<string, unknown>` rows in the largest lib file (1100 lines) — the main type-safety hotspot.
+  - *Files*: `src/lib/comments.server.ts` — one typed row-mapper per query shape replacing the scattered casts; small enum-parse helpers (`VoteType`, `ModerationState`, `SortType`) reusable by `src/lib/votes.server.ts`, `src/lib/profile-route.ts`, and `src/components/comments/VoteButtons.tsx`.
+  - *Verify*: `pnpm test --run && pnpm check`
+
+- [ ] **T32: One post-mutation refresh convention**
+  - *Why*: `router.invalidate()` (19 call sites) coexists with manual `useState` patching of loader data (the admin pages) — confusing precedent for every future feature.
+  - *Files*: standardize on `router.invalidate()` + loader data (the majority pattern); convert the admin pages' local-state mirrors (`src/routes/admin.reported-posts.tsx` etc.); document the convention in CLAUDE.md's data-layer section.
+  - *Verify*: `pnpm test --run && pnpm check`; click through the admin queues in dev.
+
+- [ ] **T33: Stop swallowing Elasticsearch index failures**
+  - *Why*: `src/lib/search.server.ts` (~lines 772–786) catches index failures and only `console.error`s — silent divergence between Postgres and the search index.
+  - *Files*: `src/lib/search.server.ts` — report to Sentry (`captureException`) at minimum, consider a single retry; mention `pnpm reindex-search` as the recovery path in the error log message.
+  - *Verify*: `pnpm test --run && pnpm check`
 
 ---
 
 ## Recently completed (context, not tasks)
 
+- 2026-07-10: Dropped T16 (bruno write-flow coverage) — TanStack Start server-fn endpoints are awkward to drive from bruno; revisit API smoke testing later if needed. The T16 ID stays retired.
 - 2026-07-09: Fixed comment-edit markdown bug — `updateCommentFn` now returns the re-rendered comment and `Comment.tsx` displays `bodyHtml` instead of raw markdown after edit; regression test in `src/components/comments/Comment.test.tsx`.
 - Search (Elasticsearch) is **fully implemented and tested** (`src/lib/search.server.ts`, `src/routes/search.tsx`) — an older TODOS.md wrongly listed it as missing.
