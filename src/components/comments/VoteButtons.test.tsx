@@ -32,6 +32,19 @@ vi.mock("@/lib/votes.server", () => ({
 	voteOnComment: vi.fn(),
 }));
 
+// Without this mock the vote handler awaits real Redis; the test can then
+// finish on the optimistic update and tear down the environment while the
+// call is still in flight, crashing in the handler's finally block.
+vi.mock("@/lib/site-settings.server", () => ({
+	isSiteReadOnly: vi.fn().mockResolvedValue(false),
+	READ_ONLY_MESSAGE:
+		"The site is currently in read-only mode. Try again later.",
+}));
+
+vi.mock("@/lib/rate-limit.server", () => ({
+	enforceRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
 describe("VoteButtons", () => {
 	const mockUser: SafeUser = {
 		id: 7,
@@ -63,9 +76,11 @@ describe("VoteButtons", () => {
 
 	it("applies server response after upvoting", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		// Distinct from the optimistic score (6) so the assertion only passes
+		// once the server round trip has fully settled.
 		vi.mocked(voteOnSubmission).mockResolvedValue({
 			success: true,
-			newScore: 6,
+			newScore: 9,
 			userVote: 1,
 		});
 
@@ -73,7 +88,7 @@ describe("VoteButtons", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Upvote" }));
 
 		await waitFor(() => {
-			expect(screen.queryByText("6")).not.toBeNull();
+			expect(screen.queryByText("9")).not.toBeNull();
 		});
 		expect(screen.getByRole("button", { name: "Upvote" }).className).toContain(
 			"bg-orange-500/10",
@@ -91,7 +106,3 @@ describe("VoteButtons", () => {
 		});
 	});
 });
-
-vi.mock("@/lib/rate-limit.server", () => ({
-	enforceRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
-}));
