@@ -16,6 +16,7 @@ import {
 	getUserRecentActivity,
 	getUserReportHistory,
 	MOD_LOG_PER_PAGE,
+	REPORTED_PER_PAGE,
 	searchUsers,
 } from "@/lib/admin.server";
 import { createQueryChain } from "@/test/mocks";
@@ -28,7 +29,11 @@ describe("getReportedSubmissions", () => {
 	it("returns an empty list without querying flags when nothing is reported", async () => {
 		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
-		await expect(getReportedSubmissions()).resolves.toEqual([]);
+		await expect(getReportedSubmissions()).resolves.toEqual({
+			entries: [],
+			page: 1,
+			hasMore: false,
+		});
 		expect(db.select).toHaveBeenCalledTimes(1);
 	});
 
@@ -67,12 +72,41 @@ describe("getReportedSubmissions", () => {
 
 		const result = await getReportedSubmissions();
 
-		expect(result).toHaveLength(2);
-		expect(result[0].flags).toEqual([
+		expect(result.entries).toHaveLength(2);
+		expect(result.entries[0].flags).toEqual([
 			{ userId: 20, reporterName: "carol", reason: "spam" },
 			{ userId: 21, reporterName: "dave", reason: null },
 		]);
-		expect(result[1].flags).toEqual([]);
+		expect(result.entries[1].flags).toEqual([]);
+		expect(result.hasMore).toBe(false);
+	});
+
+	it("bounds the query via limit+1 and reports hasMore past a full page", async () => {
+		const makeRow = (id: number) => ({
+			id,
+			title: `Post ${id}`,
+			titleHtml: `Post ${id}`,
+			authorId: 7,
+			authorName: "alice",
+			createdUtc: id,
+			stateReport: "REPORTED",
+			stateMod: "VISIBLE",
+		});
+		const rows = Array.from({ length: REPORTED_PER_PAGE + 1 }, (_, i) =>
+			makeRow(i + 1),
+		);
+		const listChain = createQueryChain(rows);
+		vi.mocked(db.select)
+			.mockReturnValueOnce(listChain as never)
+			.mockReturnValueOnce(createQueryChain([]) as never);
+
+		const result = await getReportedSubmissions(2);
+
+		expect(listChain.limit).toHaveBeenCalledWith(REPORTED_PER_PAGE + 1);
+		expect(listChain.offset).toHaveBeenCalledWith(REPORTED_PER_PAGE);
+		expect(result.entries).toHaveLength(REPORTED_PER_PAGE);
+		expect(result.page).toBe(2);
+		expect(result.hasMore).toBe(true);
 	});
 });
 
@@ -84,7 +118,11 @@ describe("getReportedComments", () => {
 	it("returns an empty list without querying flags when nothing is reported", async () => {
 		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
-		await expect(getReportedComments()).resolves.toEqual([]);
+		await expect(getReportedComments()).resolves.toEqual({
+			entries: [],
+			page: 1,
+			hasMore: false,
+		});
 		expect(db.select).toHaveBeenCalledTimes(1);
 	});
 
@@ -113,8 +151,8 @@ describe("getReportedComments", () => {
 
 		const result = await getReportedComments();
 
-		expect(result).toHaveLength(1);
-		expect(result[0].flags).toEqual([
+		expect(result.entries).toHaveLength(1);
+		expect(result.entries[0].flags).toEqual([
 			{ userId: 20, reporterName: "carol", reason: "rude" },
 		]);
 	});

@@ -1,31 +1,40 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getReportedComments, type ReportedComment } from "@/lib/admin.server";
 import { updateCommentFilterStatusFn } from "@/lib/admin-actions.server";
 import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { pageInputSchema } from "@/lib/validation";
 
-export const getReportedCommentsFn = createServerFn({ method: "GET" }).handler(
-	async () => {
+export const getReportedCommentsFn = createServerFn({ method: "GET" })
+	.inputValidator((data: { page: number }) => pageInputSchema.parse(data))
+	.handler(async ({ data }) => {
 		await assertAdmin();
-		return getReportedComments();
-	},
-);
+		return getReportedComments(data.page);
+	});
 
 export const Route = createFileRoute("/admin/reported-comments")({
 	component: ReportedCommentsPage,
-	loader: async () => {
-		return getReportedCommentsFn();
+	validateSearch: (search: Record<string, unknown>) => ({
+		page: Math.max(1, Math.floor(Number(search.page) || 1)),
+	}),
+	loaderDeps: ({ search }) => ({ page: search.page }),
+	loader: async ({ deps }) => {
+		return getReportedCommentsFn({ data: { page: deps.page } });
 	},
 });
 
 function ReportedCommentsPage() {
-	const initialComments = Route.useLoaderData();
+	const { entries: initialComments, page, hasMore } = Route.useLoaderData();
 	const [commentsList, setCommentsList] =
 		useState<ReportedComment[]>(initialComments);
+
+	useEffect(() => {
+		setCommentsList(initialComments);
+	}, [initialComments]);
 
 	const handleAction = async (
 		id: number,
@@ -39,23 +48,53 @@ function ReportedCommentsPage() {
 		}
 	};
 
-	if (commentsList.length === 0) {
-		return (
-			<div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/80 p-12 text-center shadow-xl">
-				<p className="text-slate-400">No reported comments.</p>
-			</div>
-		);
-	}
-
 	return (
 		<div className="space-y-4">
-			{commentsList.map((comment) => (
-				<ReportedCommentCard
-					key={comment.id}
-					comment={comment}
-					onAction={handleAction}
-				/>
-			))}
+			{commentsList.length === 0 ? (
+				<div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/80 p-12 text-center shadow-xl">
+					<p className="text-slate-400">No reported comments.</p>
+				</div>
+			) : (
+				commentsList.map((comment) => (
+					<ReportedCommentCard
+						key={comment.id}
+						comment={comment}
+						onAction={handleAction}
+					/>
+				))
+			)}
+
+			{(page > 1 || hasMore) && (
+				<div className="flex items-center justify-between">
+					{page > 1 ? (
+						<Link to="/admin/reported-comments" search={{ page: page - 1 }}>
+							<Button
+								variant="outline"
+								size="sm"
+								className="border-slate-700 text-slate-300 hover:bg-slate-800"
+							>
+								Previous
+							</Button>
+						</Link>
+					) : (
+						<span />
+					)}
+					<span className="text-xs text-slate-500">Page {page}</span>
+					{hasMore ? (
+						<Link to="/admin/reported-comments" search={{ page: page + 1 }}>
+							<Button
+								variant="outline"
+								size="sm"
+								className="border-slate-700 text-slate-300 hover:bg-slate-800"
+							>
+								Next
+							</Button>
+						</Link>
+					) : (
+						<span />
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

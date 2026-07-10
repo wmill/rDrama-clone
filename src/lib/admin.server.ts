@@ -70,8 +70,25 @@ export type UserAdminDetails = {
 	}>;
 };
 
-export async function getReportedSubmissions(): Promise<ReportedSubmission[]> {
-	const reportedPosts = await db
+export const REPORTED_PER_PAGE = 50;
+
+export type ReportedSubmissionsPage = {
+	entries: ReportedSubmission[];
+	page: number;
+	hasMore: boolean;
+};
+
+export type ReportedCommentsPage = {
+	entries: ReportedComment[];
+	page: number;
+	hasMore: boolean;
+};
+
+export async function getReportedSubmissions(
+	page = 1,
+): Promise<ReportedSubmissionsPage> {
+	const safePage = Math.max(1, Math.floor(page));
+	const rows = await db
 		.select({
 			id: submissions.id,
 			title: submissions.title,
@@ -90,9 +107,16 @@ export async function getReportedSubmissions(): Promise<ReportedSubmission[]> {
 				isNull(submissions.stateUserDeletedUtc),
 			),
 		)
-		.orderBy(submissions.createdUtc);
+		.orderBy(submissions.createdUtc)
+		.limit(REPORTED_PER_PAGE + 1)
+		.offset((safePage - 1) * REPORTED_PER_PAGE);
 
-	if (reportedPosts.length === 0) return [];
+	const hasMore = rows.length > REPORTED_PER_PAGE;
+	const reportedPosts = rows.slice(0, REPORTED_PER_PAGE);
+
+	if (reportedPosts.length === 0) {
+		return { entries: [], page: safePage, hasMore: false };
+	}
 
 	const postIds = reportedPosts.map((p) => p.id);
 	const reporter = alias(users, "reporter");
@@ -113,19 +137,26 @@ export async function getReportedSubmissions(): Promise<ReportedSubmission[]> {
 		flagsByPostId[f.postId].push(f);
 	}
 
-	return reportedPosts.map((post) => ({
-		...post,
-		flags: (flagsByPostId[post.id] ?? []).map((f) => ({
-			userId: f.userId,
-			reporterName: f.reporterName,
-			reason: f.reason,
+	return {
+		entries: reportedPosts.map((post) => ({
+			...post,
+			flags: (flagsByPostId[post.id] ?? []).map((f) => ({
+				userId: f.userId,
+				reporterName: f.reporterName,
+				reason: f.reason,
+			})),
 		})),
-	}));
+		page: safePage,
+		hasMore,
+	};
 }
 
-export async function getReportedComments(): Promise<ReportedComment[]> {
+export async function getReportedComments(
+	page = 1,
+): Promise<ReportedCommentsPage> {
+	const safePage = Math.max(1, Math.floor(page));
 	const author = alias(users, "author");
-	const reportedComments = await db
+	const rows = await db
 		.select({
 			id: comments.id,
 			bodyHtml: comments.bodyHtml,
@@ -141,9 +172,16 @@ export async function getReportedComments(): Promise<ReportedComment[]> {
 		.innerJoin(author, eq(comments.authorId, author.id))
 		.leftJoin(submissions, eq(comments.parentSubmission, submissions.id))
 		.where(eq(comments.stateReport, "REPORTED"))
-		.orderBy(comments.createdUtc);
+		.orderBy(comments.createdUtc)
+		.limit(REPORTED_PER_PAGE + 1)
+		.offset((safePage - 1) * REPORTED_PER_PAGE);
 
-	if (reportedComments.length === 0) return [];
+	const hasMore = rows.length > REPORTED_PER_PAGE;
+	const reportedComments = rows.slice(0, REPORTED_PER_PAGE);
+
+	if (reportedComments.length === 0) {
+		return { entries: [], page: safePage, hasMore: false };
+	}
 
 	const commentIds = reportedComments.map((c) => c.id);
 	const reporter = alias(users, "reporter");
@@ -164,14 +202,18 @@ export async function getReportedComments(): Promise<ReportedComment[]> {
 		flagsByCommentId[f.commentId].push(f);
 	}
 
-	return reportedComments.map((comment) => ({
-		...comment,
-		flags: (flagsByCommentId[comment.id] ?? []).map((f) => ({
-			userId: f.userId,
-			reporterName: f.reporterName,
-			reason: f.reason,
+	return {
+		entries: reportedComments.map((comment) => ({
+			...comment,
+			flags: (flagsByCommentId[comment.id] ?? []).map((f) => ({
+				userId: f.userId,
+				reporterName: f.reporterName,
+				reason: f.reason,
+			})),
 		})),
-	}));
+		page: safePage,
+		hasMore,
+	};
 }
 
 export type ModQueueKind = "FILTERED" | "REMOVED" | "SHADOWBANNED";

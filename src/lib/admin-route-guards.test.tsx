@@ -96,8 +96,11 @@ const mockUser: SafeUser = {
 };
 
 const getFns: [string, () => Promise<unknown>][] = [
-	["getReportedSubmissionsFn", () => getReportedSubmissionsFn()],
-	["getReportedCommentsFn", () => getReportedCommentsFn()],
+	[
+		"getReportedSubmissionsFn",
+		() => getReportedSubmissionsFn({ data: { page: 1 } }),
+	],
+	["getReportedCommentsFn", () => getReportedCommentsFn({ data: { page: 1 } })],
 	["getModQueuesFn", () => getModQueuesFn()],
 	["getModLogFn", () => getModLogFn({ data: { page: 1 } })],
 	["searchUsersFn", () => searchUsersFn({ data: { query: "alice" } })],

@@ -203,7 +203,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Files*: new `src/test/mocks.ts` exporting the chainable-db builder, the `createServerFn` stub, and the sessions mock; migrate the 2–3 biggest test files (`src/lib/admin-actions.server.test.ts`, `src/lib/admin.server.test.ts`, `src/lib/users.server.test.ts`) as the pattern; remaining files migrate opportunistically as they're touched. Update the testing notes in `CLAUDE.md`/this file's orientation section to point at the helpers.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T30: Bound the unbounded admin queries**
+- [x] **T30: Bound the unbounded admin queries** *(done 2026-07-10: getReportedSubmissions/getReportedComments now take a page and return {entries, page, hasMore} (REPORTED_PER_PAGE=50, limit+1 per getModLog); flags are fetched only for the page's ids; both reported routes gained a page search param + Previous/Next controls (shown only when there's more than one page); /admin index redirect updated. 1 new bounding test + shape updates.)*
   - *Why*: `getReportedSubmissions` / `getReportedComments` in `src/lib/admin.server.ts` have no `.limit()` — they load the entire reported set.
   - *Files*: add limit + pagination (copy `getModLog`'s limit+1/`hasMore` pattern in the same file); wire page controls into `src/routes/admin.reported-posts.tsx` and `admin.reported-comments.tsx`.
   - *Verify*: `pnpm test --run && pnpm check`

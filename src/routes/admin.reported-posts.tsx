@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,24 +10,33 @@ import {
 import { updateSubmissionFilterStatusFn } from "@/lib/admin-actions.server";
 import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { pageInputSchema } from "@/lib/validation";
 
-export const getReportedSubmissionsFn = createServerFn({
-	method: "GET",
-}).handler(async () => {
-	await assertAdmin();
-	return getReportedSubmissions();
-});
+export const getReportedSubmissionsFn = createServerFn({ method: "GET" })
+	.inputValidator((data: { page: number }) => pageInputSchema.parse(data))
+	.handler(async ({ data }) => {
+		await assertAdmin();
+		return getReportedSubmissions(data.page);
+	});
 
 export const Route = createFileRoute("/admin/reported-posts")({
 	component: ReportedPostsPage,
-	loader: async () => {
-		return getReportedSubmissionsFn();
+	validateSearch: (search: Record<string, unknown>) => ({
+		page: Math.max(1, Math.floor(Number(search.page) || 1)),
+	}),
+	loaderDeps: ({ search }) => ({ page: search.page }),
+	loader: async ({ deps }) => {
+		return getReportedSubmissionsFn({ data: { page: deps.page } });
 	},
 });
 
 function ReportedPostsPage() {
-	const initialPosts = Route.useLoaderData();
+	const { entries: initialPosts, page, hasMore } = Route.useLoaderData();
 	const [posts, setPosts] = useState<ReportedSubmission[]>(initialPosts);
+
+	useEffect(() => {
+		setPosts(initialPosts);
+	}, [initialPosts]);
 
 	const handleAction = async (
 		id: number,
@@ -41,19 +50,49 @@ function ReportedPostsPage() {
 		}
 	};
 
-	if (posts.length === 0) {
-		return (
-			<div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/80 p-12 text-center shadow-xl">
-				<p className="text-slate-400">No reported posts.</p>
-			</div>
-		);
-	}
-
 	return (
 		<div className="space-y-4">
-			{posts.map((post) => (
-				<ReportedPostCard key={post.id} post={post} onAction={handleAction} />
-			))}
+			{posts.length === 0 ? (
+				<div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/80 p-12 text-center shadow-xl">
+					<p className="text-slate-400">No reported posts.</p>
+				</div>
+			) : (
+				posts.map((post) => (
+					<ReportedPostCard key={post.id} post={post} onAction={handleAction} />
+				))
+			)}
+
+			{(page > 1 || hasMore) && (
+				<div className="flex items-center justify-between">
+					{page > 1 ? (
+						<Link to="/admin/reported-posts" search={{ page: page - 1 }}>
+							<Button
+								variant="outline"
+								size="sm"
+								className="border-slate-700 text-slate-300 hover:bg-slate-800"
+							>
+								Previous
+							</Button>
+						</Link>
+					) : (
+						<span />
+					)}
+					<span className="text-xs text-slate-500">Page {page}</span>
+					{hasMore ? (
+						<Link to="/admin/reported-posts" search={{ page: page + 1 }}>
+							<Button
+								variant="outline"
+								size="sm"
+								className="border-slate-700 text-slate-300 hover:bg-slate-800"
+							>
+								Next
+							</Button>
+						</Link>
+					) : (
+						<span />
+					)}
+				</div>
+			)}
 		</div>
 	);
 }
