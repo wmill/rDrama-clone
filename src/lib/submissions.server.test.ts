@@ -25,7 +25,12 @@ vi.mock("@/lib/search.server", () => ({
 	indexSubmissionBestEffort: vi.fn(),
 }));
 
+vi.mock("@/lib/awards.server", () => ({
+	getSubmissionAwardCounts: vi.fn(async () => new Map()),
+}));
+
 import { db } from "@/db";
+import { getSubmissionAwardCounts } from "@/lib/awards.server";
 import { authorDeleteSubmission } from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { indexSubmissionBestEffort } from "@/lib/search.server";
@@ -131,6 +136,46 @@ describe("submissions.server", () => {
 
 		expect(results).toHaveLength(1);
 		expect(results[0]?.authorName).toBe("visible");
+		expect(getSubmissionAwardCounts).toHaveBeenCalledWith([1]);
+	});
+
+	it("attaches batched award counts to feed submissions", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectOrderChain([
+				{
+					id: 4,
+					title: "Awarded",
+					titleHtml: "Awarded",
+					createdUtc: 1,
+					authorId: 2,
+					authorName: "author",
+					url: null,
+					body: "body",
+					bodyHtml: "<p>body</p>",
+					upvotes: 5,
+					downvotes: 1,
+					commentCount: 3,
+					thumbUrl: null,
+					flair: null,
+					isPinned: false,
+					isNsfw: false,
+					stickied: null,
+					userVoteType: null,
+					stateUserDeletedUtc: null,
+					stateMod: "VISIBLE",
+					stateModSetBy: null,
+					savedSubmissionId: null,
+					blockedTargetId: null,
+				},
+			]) as never,
+		);
+		vi.mocked(getSubmissionAwardCounts).mockResolvedValueOnce(
+			new Map([[4, [{ kind: "gold", count: 2 }]]]),
+		);
+
+		const results = await getSubmissions({});
+
+		expect(results[0]?.awards).toEqual([{ kind: "gold", count: 2 }]);
 	});
 
 	it("returns a blocked placeholder for direct post views", async () => {

@@ -43,6 +43,7 @@ function createProfileData(
 			storedSubscriberCount: 4,
 			postCount: 2,
 			commentCount: 3,
+			receivedAwardCount: 5,
 			highRes: null,
 			profileUrl: null,
 			bannerUrl: null,

@@ -277,6 +277,12 @@ export function UserPage({
 										</strong>{" "}
 										following
 									</Link>
+									<span>
+										<strong className="text-white">
+											{user.receivedAwardCount.toLocaleString()}
+										</strong>{" "}
+										awards
+									</span>
 								</div>
 								{data.viewer && !data.isOwner && (
 									<div className="mt-3 flex flex-wrap gap-2">

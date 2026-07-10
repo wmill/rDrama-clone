@@ -75,6 +75,20 @@ function makeComment(): CommentWithReplies {
 	};
 }
 
+describe("Comment awards", () => {
+	it("renders award chips in the comment header", () => {
+		const comment = {
+			...makeComment(),
+			awards: [{ kind: "silver", count: 3 }],
+		};
+
+		render(<Comment comment={comment} submissionId={42} />);
+
+		expect(screen.getByTitle("Silver x3")).toBeDefined();
+		expect(screen.getByTitle("Silver x3").textContent).toContain("3");
+	});
+});
+
 describe("Comment editing", () => {
 	it("shows rendered markdown, not raw markdown, after a successful edit", async () => {
 		const comment = makeComment();

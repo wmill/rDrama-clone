@@ -7,6 +7,7 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { AwardChips } from "@/components/awards";
 import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -530,6 +531,7 @@ function PostContent({
 							Stickied
 						</span>
 					)}
+					<AwardChips awards={post.awards} />
 				</div>
 			</div>
 

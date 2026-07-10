@@ -32,6 +32,10 @@ vi.mock("@/lib/search.server", () => ({
 	indexCommentBestEffort: vi.fn(),
 }));
 
+vi.mock("@/lib/awards.server", () => ({
+	getCommentAwardCounts: vi.fn(async () => new Map()),
+}));
+
 import { db } from "@/db";
 import {
 	type CommentViewerContext,

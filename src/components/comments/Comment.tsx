@@ -7,6 +7,7 @@ import pencilUrl from "lucide-static/icons/pencil.svg?url";
 import replyUrl from "lucide-static/icons/reply.svg?url";
 import trash2Url from "lucide-static/icons/trash-2.svg?url";
 import { memo, useMemo, useState } from "react";
+import { AwardChips } from "@/components/awards";
 import { IconMask } from "@/components/ui/icon-mask";
 import {
 	distinguishCommentFn,
@@ -256,6 +257,7 @@ export const Comment = memo(function Comment({
 							Removed
 						</span>
 					)}
+					{!isContentHidden && <AwardChips awards={comment.awards} />}
 
 					<span className="flex items-center gap-1">
 						<IconMask

@@ -19,6 +19,7 @@ import {
 	userBlocks,
 	users,
 } from "@/db/schema";
+import { type AwardCount, getCommentAwardCounts } from "@/lib/awards.server";
 import {
 	type CommentViewerContext,
 	getCommentViewerContext,
@@ -85,6 +86,7 @@ export type CommentSummary = {
 	userVote: VoteType;
 	stateMod: ModerationState;
 	stateModSetBy: string | null;
+	awards?: AwardCount[];
 };
 
 export type CommentWithReplies = CommentSummary & {
@@ -542,13 +544,25 @@ async function getRawCommentSubtreeRows(
 	}));
 }
 
+async function attachCommentAwards(
+	rows: CommentFlat[],
+): Promise<CommentFlat[]> {
+	const awardsById = await getCommentAwardCounts(
+		rows.filter((row) => !row.isModHidden).map((row) => row.id),
+	);
+	return rows.map((row) => ({
+		...row,
+		awards: awardsById.get(row.id) ?? [],
+	}));
+}
+
 export async function getCommentsBySubmissionFlat(
 	submissionId: number,
 	userId?: number,
 ): Promise<CommentFlat[]> {
 	const viewer = await getCommentViewerContext(userId);
 	const rows = await getSubmissionCommentRows(submissionId, userId);
-	return filterThreadComments(rows, viewer);
+	return attachCommentAwards(filterThreadComments(rows, viewer));
 }
 
 export async function getCommentsBySubmissionSince(
@@ -556,7 +570,9 @@ export async function getCommentsBySubmissionSince(
 	since: number,
 	userId?: number,
 ): Promise<CommentFlat[]> {
-	return getThreadRowsSince(submissionId, since, userId);
+	return attachCommentAwards(
+		await getThreadRowsSince(submissionId, since, userId),
+	);
 }
 
 export async function getCommentThreadFlat(
@@ -569,7 +585,7 @@ export async function getCommentThreadFlat(
 
 	const filtered = filterThreadComments(rows, viewer);
 	if (filtered.some((row) => row.id === id)) {
-		return filtered;
+		return attachCommentAwards(filtered);
 	}
 
 	const target = rows.find((row) => row.id === id);
@@ -582,7 +598,7 @@ export async function getCommentThreadFlat(
 		return null;
 	}
 
-	return [placeholder, ...filtered];
+	return attachCommentAwards([placeholder, ...filtered]);
 }
 
 export async function getCommentById(
@@ -594,7 +610,10 @@ export async function getCommentById(
 	if (!row) return null;
 
 	const mapped = mapThreadCommentRow(row, viewer, true);
-	return mapped;
+	if (!mapped) return null;
+
+	const [withAwards] = await attachCommentAwards([mapped]);
+	return withAwards;
 }
 
 export async function getRecentComments(

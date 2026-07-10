@@ -147,7 +147,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
 
 ## Feature completion (finish half-built)
 
-- [ ] **T21: Render awards on posts, comments, and profiles**
+- [x] **T21: Render awards on posts, comments, and profiles** *(done 2026-07-10: awards.server.ts with batched getSubmissionAwardCounts/getCommentAwardCounts (one grouped query per list, AWARD_OPTIONS display order); optional `awards` field on SubmissionSummary/CommentSummary attached in getSubmissions/getSubmissionById and the comment thread/permalink/single-comment paths (not on mod-hidden placeholders); AWARD_OPTIONS gained emoji icons; shared AwardChips component rendered in feed items, post header, and comment header; profile header shows receivedAwardCount. 4 grouping tests + attach assertions + 2 chip render tests. Manual grant-and-see check in dev still worthwhile when the stack is up.)*
   - *Why*: `awardContentFn` inserts `awardRelationships` and bumps `receivedAwardCount`, but nothing ever displays them — award-in, no award-out.
   - *Files*: batched queries joining `awardRelationships` in `src/lib/submissions.server.ts` / `src/lib/comments.server.ts` (one query per list, not per row); display icons + counts on `src/routes/post.$id.tsx`, `src/components/comments/Comment.tsx`, `src/components/recent-submissions.tsx`; show `receivedAwardCount` on `src/components/profile/user-page.tsx`. Award kinds/icons come from `AWARD_OPTIONS` in `src/lib/constants.ts`.
   - *Done when*: an awarded post/comment shows its awards in feed, post page, and comment tree; profile shows the received-award count.

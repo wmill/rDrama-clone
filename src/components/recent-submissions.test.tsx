@@ -89,4 +89,25 @@ describe("RecentSubmissions", () => {
 			"true",
 		);
 	});
+
+	it("renders award chips with counts on awarded submissions", () => {
+		render(
+			<RecentSubmissions
+				submissions={[
+					{
+						...baseSubmission,
+						awards: [
+							{ kind: "gold", count: 2 },
+							{ kind: "trophy", count: 1 },
+						],
+					},
+				]}
+				showSortControls={false}
+			/>,
+		);
+
+		expect(screen.getByTitle("Gold x2")).toBeDefined();
+		expect(screen.getByTitle("Gold x2").textContent).toContain("2");
+		expect(screen.getByTitle("Trophy")).toBeDefined();
+	});
 });

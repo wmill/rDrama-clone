@@ -42,16 +42,19 @@ export const AWARD_OPTIONS = [
 		kind: "gold",
 		title: "Gold",
 		description: "A shiny token of appreciation.",
+		icon: "🥇",
 	},
 	{
 		kind: "silver",
 		title: "Silver",
 		description: "A classic nod of approval.",
+		icon: "🥈",
 	},
 	{
 		kind: "trophy",
 		title: "Trophy",
 		description: "For an outstanding contribution.",
+		icon: "🏆",
 	},
 ] as const;
 export type AwardKind = (typeof AWARD_OPTIONS)[number]["kind"];

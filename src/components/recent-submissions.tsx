@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ExternalLink, FileText, MessageSquare } from "lucide-react";
 import { useState } from "react";
 
+import { AwardChips } from "@/components/awards";
 import { VoteButtons } from "@/components/comments/VoteButtons";
 import type { SortType, TimeFilter } from "@/lib/constants";
 import { saveSubmissionFn } from "@/lib/post-actions.server";
@@ -240,6 +241,7 @@ export function SubmissionListItem({
 										{submission.flair}
 									</span>
 								)}
+								<AwardChips awards={submission.awards} />
 								<Link
 									to="/post/$id"
 									params={{ id: String(submission.id) }}

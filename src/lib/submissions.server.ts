@@ -10,6 +10,7 @@ import {
 	users,
 	votes,
 } from "@/db/schema";
+import { type AwardCount, getSubmissionAwardCounts } from "@/lib/awards.server";
 import {
 	authorDeleteSubmission,
 	DELETED_BY_AUTHOR_MESSAGE,
@@ -52,6 +53,7 @@ export type SubmissionSummary = {
 	userVote: VoteType;
 	stateMod: ModerationState;
 	stateModSetBy?: string | null;
+	awards?: AwardCount[];
 };
 
 export type SubmissionDetail = SubmissionSummary & {
@@ -369,9 +371,15 @@ export async function getSubmissions(options: {
 		.limit(limit)
 		.offset(offset);
 
-	return results
-		.filter((row) => row.blockedTargetId === null)
-		.map((row) => mapSubmissionRow(row));
+	const visibleRows = results.filter((row) => row.blockedTargetId === null);
+	const awardsById = await getSubmissionAwardCounts(
+		visibleRows.map((row) => row.id),
+	);
+
+	return visibleRows.map((row) => ({
+		...mapSubmissionRow(row),
+		awards: awardsById.get(row.id) ?? [],
+	}));
 }
 
 export async function getSubmissionById(
@@ -450,11 +458,12 @@ export async function getSubmissionById(
 
 	if (!result) return null;
 
+	const awardsById = await getSubmissionAwardCounts([result.id]);
 	const mapped = mapSubmissionRow(result, {
 		includeBlockedPlaceholder: true,
 		viewerCanModerate,
 	});
-	return mapped;
+	return { ...mapped, awards: awardsById.get(result.id) ?? [] };
 }
 
 export async function incrementViews(id: number): Promise<void> {
