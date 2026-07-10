@@ -7,13 +7,19 @@ import { IconMask } from "@/components/ui/icon-mask";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 import {
+	commentVoteInputSchema,
+	submissionVoteInputSchema,
+} from "@/lib/validation";
+import {
 	type VoteType,
 	voteOnComment,
 	voteOnSubmission,
 } from "@/lib/votes.server";
 
 const voteSubmissionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { submissionId: number; voteType: VoteType }) => data)
+	.inputValidator((data: { submissionId: number; voteType: VoteType }) =>
+		submissionVoteInputSchema.parse(data),
+	)
 	.handler(
 		async ({
 			data,
@@ -42,7 +48,9 @@ const voteSubmissionFn = createServerFn({ method: "POST" })
 	);
 
 const voteCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { commentId: number; voteType: VoteType }) => data)
+	.inputValidator((data: { commentId: number; voteType: VoteType }) =>
+		commentVoteInputSchema.parse(data),
+	)
 	.handler(
 		async ({ data }: { data: { commentId: number; voteType: VoteType } }) => {
 			const user = await getCurrentUser();

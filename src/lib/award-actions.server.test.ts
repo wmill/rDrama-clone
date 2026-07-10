@@ -318,3 +318,30 @@ describe("award-actions.server", () => {
 		});
 	});
 });
+
+import {
+	awardContentInputSchema,
+	grantBadgeInputSchema,
+} from "@/lib/award-actions.server";
+
+describe("award-actions input schemas", () => {
+	it("rejects invalid award/badge inputs", () => {
+		expect(
+			grantBadgeInputSchema.safeParse({ username: "", badgeId: 1 }).success,
+		).toBe(false);
+		expect(
+			grantBadgeInputSchema.safeParse({ username: "alice", badgeId: 0 })
+				.success,
+		).toBe(false);
+		expect(
+			awardContentInputSchema.safeParse({ submissionId: 1, kind: "" }).success,
+		).toBe(false);
+	});
+
+	it("accepts valid award/badge inputs", () => {
+		expect(
+			grantBadgeInputSchema.safeParse({ username: "alice", badgeId: 2 })
+				.success,
+		).toBe(true);
+	});
+});

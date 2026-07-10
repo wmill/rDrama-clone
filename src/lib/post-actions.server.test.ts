@@ -193,3 +193,26 @@ describe("post-actions.server", () => {
 		});
 	});
 });
+
+import {
+	saveSubmissionInputSchema,
+	submissionSubscriptionInputSchema,
+} from "@/lib/post-actions.server";
+
+describe("post-actions input schemas", () => {
+	it("rejects non-boolean flags and bad ids", () => {
+		expect(
+			saveSubmissionInputSchema.safeParse({ id: 1, saved: "yes" }).success,
+		).toBe(false);
+		expect(
+			submissionSubscriptionInputSchema.safeParse({ id: -1, subscribed: true })
+				.success,
+		).toBe(false);
+	});
+
+	it("accepts valid input", () => {
+		expect(
+			saveSubmissionInputSchema.safeParse({ id: 1, saved: true }).success,
+		).toBe(true);
+	});
+});

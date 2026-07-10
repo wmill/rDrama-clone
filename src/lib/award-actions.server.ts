@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "@/db";
 import {
@@ -14,9 +15,32 @@ import {
 import { fail, requireAdmin, requireUser } from "@/lib/auth-guards.server";
 import { AWARD_OPTIONS } from "@/lib/constants";
 import { getUserByUsernameCanonical } from "@/lib/users.server";
+import { idSchema } from "@/lib/validation";
+
+const usernameSchema = z.string().min(1).max(50);
+export const createBadgeDefInputSchema = z.object({
+	name: z.string().min(1).max(100),
+	description: z.string().max(500).nullish(),
+});
+export const grantBadgeInputSchema = z.object({
+	username: usernameSchema,
+	badgeId: idSchema,
+	description: z.string().max(500).nullish(),
+});
+export const revokeBadgeInputSchema = z.object({
+	username: usernameSchema,
+	badgeId: idSchema,
+});
+export const awardContentInputSchema = z.object({
+	submissionId: idSchema.optional(),
+	commentId: idSchema.optional(),
+	kind: z.string().min(1).max(50),
+});
 
 export const createBadgeDefFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { name: string; description?: string | null }) => data)
+	.inputValidator((data: { name: string; description?: string | null }) =>
+		createBadgeDefInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -50,7 +74,7 @@ export const grantBadgeFn = createServerFn({ method: "POST" })
 			username: string;
 			badgeId: number;
 			description?: string | null;
-		}) => data,
+		}) => grantBadgeInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
@@ -93,7 +117,9 @@ export const grantBadgeFn = createServerFn({ method: "POST" })
 	});
 
 export const revokeBadgeFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { username: string; badgeId: number }) => data)
+	.inputValidator((data: { username: string; badgeId: number }) =>
+		revokeBadgeInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -124,7 +150,8 @@ export const revokeBadgeFn = createServerFn({ method: "POST" })
 
 export const awardContentFn = createServerFn({ method: "POST" })
 	.inputValidator(
-		(data: { submissionId?: number; commentId?: number; kind: string }) => data,
+		(data: { submissionId?: number; commentId?: number; kind: string }) =>
+			awardContentInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const guard = await requireUser();

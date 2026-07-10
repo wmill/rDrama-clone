@@ -1,10 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 import { db } from "@/db";
 import { modActions } from "@/db/schema";
 import { assertAdmin, fail, requireAdmin } from "@/lib/auth-guards.server";
 import { SITE_SETTINGS, type SiteSettingKey } from "@/lib/constants";
 import { getAllSiteSettings, setSiteSetting } from "@/lib/site-settings.server";
+
+export const updateSiteSettingInputSchema = z.object({
+	key: z.enum(
+		SITE_SETTINGS.map((setting) => setting.key) as [
+			SiteSettingKey,
+			...SiteSettingKey[],
+		],
+	),
+	value: z.boolean(),
+});
 
 export const getSiteSettingsFn = createServerFn({ method: "GET" }).handler(
 	async () => {
@@ -14,7 +25,9 @@ export const getSiteSettingsFn = createServerFn({ method: "GET" }).handler(
 );
 
 export const updateSiteSettingFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { key: SiteSettingKey; value: boolean }) => data)
+	.inputValidator((data: { key: SiteSettingKey; value: boolean }) =>
+		updateSiteSettingInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {

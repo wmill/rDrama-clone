@@ -7,7 +7,6 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, ExternalLink, Eye, MessageSquare, Share2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
-
 import { CommentThread, VoteButtons } from "@/components/comments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,11 +39,12 @@ import {
 	type SubmissionDetail,
 } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { idInputSchema } from "@/lib/validation";
 import type { VoteType } from "@/lib/votes.server";
 import { useModalsStore } from "@/stores/modals";
 
 const getPostFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { id: number }) => data)
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
 	.handler(async ({ data }: { data: { id: number } }) => {
 		const user = await getCurrentUser();
 		const userId = user?.id;

@@ -2,7 +2,6 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { z } from "zod";
-
 import { RecentSubmissions } from "@/components/recent-submissions";
 import {
 	type SortType,
@@ -10,9 +9,9 @@ import {
 	type TimeFilter,
 	TimeFilters,
 } from "@/lib/constants";
-
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissions } from "@/lib/submissions.server";
+import { feedInputSchema } from "@/lib/validation";
 
 const searchSchema = z.object({
 	sort: z.enum(SortTypes).default("hot"),
@@ -21,7 +20,8 @@ const searchSchema = z.object({
 
 const loadSubmissions = createServerFn({ method: "GET" })
 	.inputValidator(
-		(data: { sort?: SortType; time?: TimeFilter; limit?: number }) => data,
+		(data: { sort?: SortType; time?: TimeFilter; limit?: number }) =>
+			feedInputSchema.parse(data),
 	)
 	.handler(
 		async ({

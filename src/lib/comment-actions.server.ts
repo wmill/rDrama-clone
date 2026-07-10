@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { fail, requireUser } from "@/lib/auth-guards.server";
 import {
 	createComment,
@@ -10,6 +11,26 @@ import {
 import { setCommentSavedState } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
+import { idInputSchema, idSchema } from "@/lib/validation";
+
+const commentBodySchema = z.string().min(1).max(20000);
+export const createCommentInputSchema = z.object({
+	body: commentBodySchema,
+	parentSubmissionId: idSchema,
+	parentCommentId: idSchema.optional(),
+});
+export const updateCommentInputSchema = z.object({
+	id: idSchema,
+	body: commentBodySchema,
+});
+export const saveCommentInputSchema = z.object({
+	id: idSchema,
+	saved: z.boolean(),
+});
+export const commentsSinceInputSchema = z.object({
+	submissionId: idSchema,
+	since: z.number().int().min(0),
+});
 
 export const createCommentFn = createServerFn({ method: "POST" })
 	.inputValidator(
@@ -17,7 +38,7 @@ export const createCommentFn = createServerFn({ method: "POST" })
 			body: string;
 			parentSubmissionId: number;
 			parentCommentId?: number;
-		}) => data,
+		}) => createCommentInputSchema.parse(data),
 	)
 	.handler(
 		async ({
@@ -55,7 +76,9 @@ export const createCommentFn = createServerFn({ method: "POST" })
 	);
 
 export const updateCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; body: string }) => data)
+	.inputValidator((data: { id: number; body: string }) =>
+		updateCommentInputSchema.parse(data),
+	)
 	.handler(async ({ data }: { data: { id: number; body: string } }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {
@@ -71,7 +94,7 @@ export const updateCommentFn = createServerFn({ method: "POST" })
 	});
 
 export const deleteCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number }) => data)
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
 	.handler(async ({ data }: { data: { id: number } }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {
@@ -83,7 +106,9 @@ export const deleteCommentFn = createServerFn({ method: "POST" })
 	});
 
 export const saveCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; saved: boolean }) => data)
+	.inputValidator((data: { id: number; saved: boolean }) =>
+		saveCommentInputSchema.parse(data),
+	)
 	.handler(async ({ data }: { data: { id: number; saved: boolean } }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {
@@ -101,7 +126,9 @@ export const saveCommentFn = createServerFn({ method: "POST" })
 	});
 
 export const getCommentsSinceFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { submissionId: number; since: number }) => data)
+	.inputValidator((data: { submissionId: number; since: number }) =>
+		commentsSinceInputSchema.parse(data),
+	)
 	.handler(
 		async ({ data }: { data: { submissionId: number; since: number } }) => {
 			const user = await getCurrentUser();

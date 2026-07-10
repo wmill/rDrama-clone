@@ -5,7 +5,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-
 import { UserRelationshipPage } from "@/components/profile/user-relationship-page";
 import {
 	buildProfileFollowingHref,
@@ -13,9 +12,12 @@ import {
 } from "@/lib/profile-route";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getFollowingPage } from "@/lib/social.server";
+import { usernamePageInputSchema } from "@/lib/validation";
 
 const getFollowingPageFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { username: string; page: number }) => data)
+	.inputValidator((data: { username: string; page: number }) =>
+		usernamePageInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const viewer = await getCurrentUser();
 		return getFollowingPage({

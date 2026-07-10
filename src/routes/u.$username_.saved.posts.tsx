@@ -5,7 +5,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-
 import { UserPage } from "@/components/profile/user-page";
 import { getUserAdminDetails, type UserAdminDetails } from "@/lib/admin.server";
 import type { SortType, TimeFilter } from "@/lib/constants";
@@ -16,11 +15,12 @@ import {
 } from "@/lib/profile-route";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getProfilePageData } from "@/lib/users.server";
+import { profilePostsInputSchema } from "@/lib/validation";
 
 const getSavedPostsPageFn = createServerFn({ method: "GET" })
 	.inputValidator(
 		(data: { username: string; sort: SortType; t: TimeFilter; page: number }) =>
-			data,
+			profilePostsInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const viewer = await getCurrentUser();

@@ -734,3 +734,39 @@ describe("admin-actions.server", () => {
 		});
 	});
 });
+
+import {
+	banUserInputSchema,
+	moderationStateInputSchema,
+	queueActionInputSchema,
+} from "@/lib/admin-actions.server";
+
+describe("admin-actions input schemas", () => {
+	it("rejects invalid moderation inputs", () => {
+		expect(
+			queueActionInputSchema.safeParse({ id: 1, action: "nuke" }).success,
+		).toBe(false);
+		expect(
+			moderationStateInputSchema.safeParse({ id: 1, state: "HIDDEN" }).success,
+		).toBe(false);
+		expect(
+			banUserInputSchema.safeParse({ userId: 0, reason: "spam" }).success,
+		).toBe(false);
+		expect(
+			banUserInputSchema.safeParse({
+				userId: 1,
+				reason: "spam",
+				durationDays: -3,
+			}).success,
+		).toBe(false);
+	});
+
+	it("accepts valid moderation inputs", () => {
+		expect(
+			queueActionInputSchema.safeParse({ id: 1, action: "approve" }).success,
+		).toBe(true);
+		expect(
+			banUserInputSchema.safeParse({ userId: 1, reason: "spam" }).success,
+		).toBe(true);
+	});
+});

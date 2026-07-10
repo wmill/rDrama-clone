@@ -1,13 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireUser } from "@/lib/auth-guards.server";
 import {
 	clearReadNotifications,
 	markAllNotificationsRead,
 	markNotificationRead,
 } from "@/lib/notifications.server";
+import { idSchema } from "@/lib/validation";
+
+export const markNotificationReadInputSchema = z.object({
+	commentId: idSchema,
+});
 
 export const markNotificationReadFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { commentId: number }) => data)
+	.inputValidator((data: { commentId: number }) =>
+		markNotificationReadInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {

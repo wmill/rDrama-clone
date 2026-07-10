@@ -5,7 +5,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-
 import { UserPage } from "@/components/profile/user-page";
 import { getUserAdminDetails, type UserAdminDetails } from "@/lib/admin.server";
 import type { CommentFeedSortType, TimeFilter } from "@/lib/constants";
@@ -17,6 +16,7 @@ import {
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getProfilePageData, type ProfilePageData } from "@/lib/users.server";
 import { stripHtmlToText } from "@/lib/utils";
+import { profileCommentsInputSchema } from "@/lib/validation";
 
 function buildDescription(data: ProfilePageData): string {
 	const joined = new Date(
@@ -38,7 +38,7 @@ const getUserCommentsPageFn = createServerFn({ method: "GET" })
 			sort: CommentFeedSortType;
 			t: TimeFilter;
 			page: number;
-		}) => data,
+		}) => profileCommentsInputSchema.parse(data),
 	)
 	.handler(
 		async ({

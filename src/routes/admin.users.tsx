@@ -12,9 +12,12 @@ import {
 	unshadowbanUserFn,
 } from "@/lib/admin-actions.server";
 import { assertAdmin } from "@/lib/auth-guards.server";
+import { userSearchInputSchema } from "@/lib/validation";
 
 export const searchUsersFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { query: string }) => data)
+	.inputValidator((data: { query: string }) =>
+		userSearchInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		await assertAdmin();
 		return searchUsers(data.query);

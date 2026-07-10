@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "@/db";
 import {
@@ -21,8 +22,60 @@ import {
 	setSubmissionStickyState,
 } from "@/lib/lifecycle.server";
 import { renderPostTitleHtml } from "@/lib/markdown";
+import { idInputSchema, idSchema, userIdInputSchema } from "@/lib/validation";
 
 type QueueModerationAction = "approve" | "filtered" | "removed" | "ignored";
+
+export const queueActionInputSchema = z.object({
+	id: idSchema,
+	action: z.enum(["approve", "filtered", "removed", "ignored"]),
+});
+export const moderationStateInputSchema = z.object({
+	id: idSchema,
+	state: z.enum(["VISIBLE", "FILTERED", "REMOVED"]),
+});
+export const removedInputSchema = z.object({
+	id: idSchema,
+	removed: z.boolean(),
+});
+export const stickiedInputSchema = z.object({
+	id: idSchema,
+	stickied: z.boolean(),
+});
+export const pinnedInputSchema = z.object({
+	id: idSchema,
+	pinned: z.boolean(),
+});
+export const moderationDetailsInputSchema = z.object({
+	id: idSchema,
+	title: z.string().max(500),
+	flair: z.string().max(100).nullish(),
+});
+export const banUserInputSchema = z.object({
+	userId: idSchema,
+	reason: z.string().max(1000),
+	durationDays: z.number().int().positive().optional(),
+});
+export const moderationProfileInputSchema = z.object({
+	userId: idSchema,
+	verified: z.string().max(100).nullish(),
+	verifiedColor: z.string().max(10).nullish(),
+	customTitlePlain: z.string().max(200).nullish(),
+});
+export const userNoteInputSchema = z.object({
+	userId: idSchema,
+	note: z.string().max(5000),
+	tag: z.string().max(20),
+	referencePost: idSchema.optional(),
+	referenceComment: idSchema.optional(),
+});
+export const addBannedDomainInputSchema = z.object({
+	domain: z.string().min(1).max(253),
+	reason: z.string().max(1000),
+});
+export const removeBannedDomainInputSchema = z.object({
+	domain: z.string().min(1).max(253),
+});
 
 function normalizeOptionalModerationText(value?: string | null): string | null {
 	if (value === undefined || value === null) {
@@ -45,7 +98,9 @@ function normalizeVerifiedColor(value?: string | null): string | null {
 export const updateSubmissionFilterStatusFn = createServerFn({
 	method: "POST",
 })
-	.inputValidator((data: { id: number; action: QueueModerationAction }) => data)
+	.inputValidator((data: { id: number; action: QueueModerationAction }) =>
+		queueActionInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -95,7 +150,9 @@ export const updateSubmissionFilterStatusFn = createServerFn({
 	});
 
 export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; action: QueueModerationAction }) => data)
+	.inputValidator((data: { id: number; action: QueueModerationAction }) =>
+		queueActionInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -145,7 +202,9 @@ export const updateCommentFilterStatusFn = createServerFn({ method: "POST" })
 	});
 
 export const setSubmissionModerationStateFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; state: ModerationState }) => data)
+	.inputValidator((data: { id: number; state: ModerationState }) =>
+		moderationStateInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -166,7 +225,9 @@ export const setSubmissionModerationStateFn = createServerFn({ method: "POST" })
 	});
 
 export const removeSubmissionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; removed: boolean }) => data)
+	.inputValidator((data: { id: number; removed: boolean }) =>
+		removedInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -188,7 +249,8 @@ export const updateSubmissionModerationDetailsFn = createServerFn({
 	method: "POST",
 })
 	.inputValidator(
-		(data: { id: number; title: string; flair?: string | null }) => data,
+		(data: { id: number; title: string; flair?: string | null }) =>
+			moderationDetailsInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
@@ -246,7 +308,9 @@ export const updateSubmissionModerationDetailsFn = createServerFn({
 	});
 
 export const stickySubmissionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; stickied: boolean }) => data)
+	.inputValidator((data: { id: number; stickied: boolean }) =>
+		stickiedInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -265,7 +329,9 @@ export const stickySubmissionFn = createServerFn({ method: "POST" })
 	});
 
 export const setCommentModerationStateFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; state: ModerationState }) => data)
+	.inputValidator((data: { id: number; state: ModerationState }) =>
+		moderationStateInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -286,7 +352,9 @@ export const setCommentModerationStateFn = createServerFn({ method: "POST" })
 	});
 
 export const removeCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; removed: boolean }) => data)
+	.inputValidator((data: { id: number; removed: boolean }) =>
+		removedInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -305,7 +373,9 @@ export const removeCommentFn = createServerFn({ method: "POST" })
 	});
 
 export const pinCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; pinned: boolean }) => data)
+	.inputValidator((data: { id: number; pinned: boolean }) =>
+		pinnedInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -325,7 +395,8 @@ export const pinCommentFn = createServerFn({ method: "POST" })
 
 export const banUserFn = createServerFn({ method: "POST" })
 	.inputValidator(
-		(data: { userId: number; reason: string; durationDays?: number }) => data,
+		(data: { userId: number; reason: string; durationDays?: number }) =>
+			banUserInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
@@ -354,7 +425,7 @@ export const banUserFn = createServerFn({ method: "POST" })
 	});
 
 export const unbanUserFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { userId: number }) => data)
+	.inputValidator((data: { userId: number }) => userIdInputSchema.parse(data))
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -377,7 +448,7 @@ export const unbanUserFn = createServerFn({ method: "POST" })
 	});
 
 export const shadowbanUserFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { userId: number }) => data)
+	.inputValidator((data: { userId: number }) => userIdInputSchema.parse(data))
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -400,7 +471,7 @@ export const shadowbanUserFn = createServerFn({ method: "POST" })
 	});
 
 export const unshadowbanUserFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { userId: number }) => data)
+	.inputValidator((data: { userId: number }) => userIdInputSchema.parse(data))
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -431,7 +502,7 @@ export const updateUserModerationProfileFn = createServerFn({
 			verified?: string | null;
 			verifiedColor?: string | null;
 			customTitlePlain?: string | null;
-		}) => data,
+		}) => moderationProfileInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
@@ -503,7 +574,7 @@ export const createUserNoteFn = createServerFn({ method: "POST" })
 			tag: string;
 			referencePost?: number;
 			referenceComment?: number;
-		}) => data,
+		}) => userNoteInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
@@ -560,7 +631,9 @@ export function normalizeBannedDomainInput(value: string): string | null {
 }
 
 export const addBannedDomainFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { domain: string; reason: string }) => data)
+	.inputValidator((data: { domain: string; reason: string }) =>
+		addBannedDomainInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -596,7 +669,9 @@ export const addBannedDomainFn = createServerFn({ method: "POST" })
 	});
 
 export const removeBannedDomainFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { domain: string }) => data)
+	.inputValidator((data: { domain: string }) =>
+		removeBannedDomainInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
 		if (!guard.ok) {
@@ -616,7 +691,7 @@ export const removeBannedDomainFn = createServerFn({ method: "POST" })
 	});
 
 export const distinguishSubmissionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number }) => data)
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin(1);
 		if (!guard.ok) {
@@ -659,7 +734,7 @@ export const distinguishSubmissionFn = createServerFn({ method: "POST" })
 	});
 
 export const distinguishCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number }) => data)
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin(1);
 		if (!guard.ok) {

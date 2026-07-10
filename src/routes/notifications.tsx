@@ -7,7 +7,6 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { Bell } from "lucide-react";
 import { useState } from "react";
-
 import {
 	clearReadNotificationsFn,
 	markAllNotificationsReadFn,
@@ -19,11 +18,12 @@ import {
 } from "@/lib/notifications.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { pageInputSchema } from "@/lib/validation";
 
 const PAGE_SIZE = 25;
 
 const getNotificationsPageFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { page: number }) => data)
+	.inputValidator((data: { page: number }) => pageInputSchema.parse(data))
 	.handler(async ({ data }) => {
 		const user = await getCurrentUser();
 		if (!user) {

@@ -8,6 +8,7 @@ import {
 	deleteSubmission,
 	updateSubmission,
 } from "@/lib/submissions.server";
+import { idInputSchema, idSchema } from "@/lib/validation";
 
 const updateSubmissionSchema = z
 	.object({
@@ -67,8 +68,17 @@ export const updateSubmissionFn = createServerFn({ method: "POST" })
 		return { success: true as const };
 	});
 
+export const saveSubmissionInputSchema = z.object({
+	id: idSchema,
+	saved: z.boolean(),
+});
+export const submissionSubscriptionInputSchema = z.object({
+	id: idSchema,
+	subscribed: z.boolean(),
+});
+
 export const deleteSubmissionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number }) => data)
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
 	.handler(async ({ data }: { data: { id: number } }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {
@@ -85,7 +95,9 @@ export const deleteSubmissionFn = createServerFn({ method: "POST" })
 	});
 
 export const saveSubmissionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; saved: boolean }) => data)
+	.inputValidator((data: { id: number; saved: boolean }) =>
+		saveSubmissionInputSchema.parse(data),
+	)
 	.handler(async ({ data }: { data: { id: number; saved: boolean } }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {
@@ -103,7 +115,9 @@ export const saveSubmissionFn = createServerFn({ method: "POST" })
 	});
 
 export const setSubmissionSubscriptionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { id: number; subscribed: boolean }) => data)
+	.inputValidator((data: { id: number; subscribed: boolean }) =>
+		submissionSubscriptionInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {

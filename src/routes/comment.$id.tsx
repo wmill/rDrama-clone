@@ -2,7 +2,6 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Clock, ExternalLink, MessageSquare } from "lucide-react";
 import { useMemo } from "react";
-
 import { Comment } from "@/components/comments";
 import { Button } from "@/components/ui/button";
 import { buildCommentForest } from "@/lib/comment-tree";
@@ -14,9 +13,10 @@ import {
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissionById } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { idInputSchema } from "@/lib/validation";
 
 const getCommentFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { id: number }) => data)
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
 	.handler(async ({ data }: { data: { id: number } }) => {
 		const user = await getCurrentUser();
 		const userId = user?.id;

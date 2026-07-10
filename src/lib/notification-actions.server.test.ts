@@ -99,3 +99,20 @@ describe("notification-actions.server", () => {
 		expect(clearReadNotifications).toHaveBeenCalledWith(11);
 	});
 });
+
+import { markNotificationReadInputSchema } from "@/lib/notification-actions.server";
+
+describe("notification-actions input schemas", () => {
+	it("rejects invalid comment ids", () => {
+		expect(
+			markNotificationReadInputSchema.safeParse({ commentId: -5 }).success,
+		).toBe(false);
+		expect(markNotificationReadInputSchema.safeParse({}).success).toBe(false);
+	});
+
+	it("accepts a valid comment id", () => {
+		expect(
+			markNotificationReadInputSchema.safeParse({ commentId: 5 }).success,
+		).toBe(true);
+	});
+});

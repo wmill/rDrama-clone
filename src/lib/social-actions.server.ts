@@ -1,10 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 import { fail, requireUser } from "@/lib/auth-guards.server";
 import { setBlockState, setFollowState } from "@/lib/social.server";
+import { idSchema } from "@/lib/validation";
+
+export const followInputSchema = z.object({
+	targetUserId: idSchema,
+	following: z.boolean(),
+});
+export const blockInputSchema = z.object({
+	targetUserId: idSchema,
+	blocked: z.boolean(),
+});
 
 export const setFollowStateFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { targetUserId: number; following: boolean }) => data)
+	.inputValidator((data: { targetUserId: number; following: boolean }) =>
+		followInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {
@@ -30,7 +43,9 @@ export const setFollowStateFn = createServerFn({ method: "POST" })
 	});
 
 export const setBlockStateFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { targetUserId: number; blocked: boolean }) => data)
+	.inputValidator((data: { targetUserId: number; blocked: boolean }) =>
+		blockInputSchema.parse(data),
+	)
 	.handler(async ({ data }) => {
 		const guard = await requireUser();
 		if (!guard.ok) {

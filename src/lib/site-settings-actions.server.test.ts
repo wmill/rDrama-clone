@@ -130,3 +130,27 @@ describe("site-settings-actions.server", () => {
 		});
 	});
 });
+
+import { updateSiteSettingInputSchema } from "@/lib/site-settings-actions.server";
+
+describe("site-settings input schema", () => {
+	it("rejects unknown keys and non-boolean values", () => {
+		expect(
+			updateSiteSettingInputSchema.safeParse({
+				key: "self_destruct",
+				value: true,
+			}).success,
+		).toBe(false);
+		expect(
+			updateSiteSettingInputSchema.safeParse({ key: "read_only", value: "on" })
+				.success,
+		).toBe(false);
+	});
+
+	it("accepts known keys with boolean values", () => {
+		expect(
+			updateSiteSettingInputSchema.safeParse({ key: "read_only", value: true })
+				.success,
+		).toBe(true);
+	});
+});

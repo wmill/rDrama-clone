@@ -133,7 +133,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Files*: all `src/lib/*-actions.server.ts`; put `ActionResult<T>` next to the T17 helpers. Pure refactor — no behavior change; existing tests must stay green.
   - *Verify*: `pnpm test --run && pnpm check`
 
-- [ ] **T19: Real input validation (zod) on all server fns**
+- [x] **T19: Real input validation (zod) on all server fns** *(done 2026-07-10: every identity inputValidator replaced with a zod parse — all 9 actions files, all route-local server fns (feeds, profiles, search, admin, notifications, followers/following) and VoteButtons; shared primitives + route schemas in src/lib/validation.ts (idSchema, pageSchema, voteTypeSchema, sort/time/comment-sort enums from constants); action schemas exported per file; 20 new invalid-input tests incl. validation.test.ts)*
   - *Why*: most `.inputValidator((data) => data)` calls are identity passthroughs that only type-assert — untrusted client input reaches DB writes unvalidated. Only `reporting-actions.server.ts` and `post-actions.server.ts` use zod today.
   - *Files*: every `src/lib/*-actions.server.ts` (and route-local server fns) with a passthrough validator; copy the zod pattern from `src/lib/reporting-actions.server.ts`.
   - *Done when*: `grep -rn "inputValidator((data" src/lib src/routes` finds only zod-parsing validators; at least one invalid-input test added per migrated file.

@@ -110,3 +110,27 @@ describe("social-actions.server", () => {
 		});
 	});
 });
+
+import {
+	blockInputSchema,
+	followInputSchema,
+} from "@/lib/social-actions.server";
+
+describe("social-actions input schemas", () => {
+	it("rejects invalid target ids and flags", () => {
+		expect(
+			followInputSchema.safeParse({ targetUserId: 1.5, following: true })
+				.success,
+		).toBe(false);
+		expect(
+			blockInputSchema.safeParse({ targetUserId: 2, blocked: "yes" }).success,
+		).toBe(false);
+	});
+
+	it("accepts valid input", () => {
+		expect(
+			followInputSchema.safeParse({ targetUserId: 2, following: false })
+				.success,
+		).toBe(true);
+	});
+});

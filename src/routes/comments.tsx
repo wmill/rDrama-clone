@@ -1,17 +1,17 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { Clock, MessageSquare } from "lucide-react";
-
 import { VoteButtons } from "@/components/comments";
 import { type CommentFeedItem, getCommentsFeed } from "@/lib/comments.server";
 import type { CommentFeedSortType, TimeFilter } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { commentFeedInputSchema } from "@/lib/validation";
 
 const getCommentsFeedFn = createServerFn({ method: "GET" })
 	.inputValidator(
 		(data: { sort?: CommentFeedSortType; t?: TimeFilter; page?: number }) =>
-			data,
+			commentFeedInputSchema.parse(data),
 	)
 	.handler(
 		async ({

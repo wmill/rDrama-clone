@@ -15,6 +15,7 @@ import {
 import { createUserNoteFn } from "@/lib/admin-actions.server";
 import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { userIdInputSchema } from "@/lib/validation";
 
 const NOTE_TAGS = [
 	"Quality",
@@ -46,7 +47,7 @@ type UserInvestigation = {
 };
 
 export const getUserInvestigationFn = createServerFn({ method: "GET" })
-	.inputValidator((data: { userId: number }) => data)
+	.inputValidator((data: { userId: number }) => userIdInputSchema.parse(data))
 	.handler(async ({ data }): Promise<UserInvestigation | null> => {
 		await assertAdmin();
 		const details = await getUserAdminDetails(data.userId);

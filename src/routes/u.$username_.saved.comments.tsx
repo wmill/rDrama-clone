@@ -5,7 +5,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-
 import { UserPage } from "@/components/profile/user-page";
 import { getUserAdminDetails, type UserAdminDetails } from "@/lib/admin.server";
 import type { CommentFeedSortType, TimeFilter } from "@/lib/constants";
@@ -16,6 +15,7 @@ import {
 } from "@/lib/profile-route";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getProfilePageData } from "@/lib/users.server";
+import { profileCommentsInputSchema } from "@/lib/validation";
 
 const getSavedCommentsPageFn = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -24,7 +24,7 @@ const getSavedCommentsPageFn = createServerFn({ method: "GET" })
 			sort: CommentFeedSortType;
 			t: TimeFilter;
 			page: number;
-		}) => data,
+		}) => profileCommentsInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const viewer = await getCurrentUser();

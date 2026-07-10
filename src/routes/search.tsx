@@ -12,10 +12,11 @@ import {
 import { getCurrentUser } from "@/lib/sessions.server";
 import type { SubmissionSummary } from "@/lib/submissions.server";
 import { formatRelativeTime } from "@/lib/utils";
+import { searchInputSchema } from "@/lib/validation";
 
 const loadSearchResults = createServerFn({ method: "GET" })
-	.inputValidator(
-		(data: { q: string; type: SearchResultType; page: number }) => data,
+	.inputValidator((data: { q: string; type: SearchResultType; page: number }) =>
+		searchInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const { searchPublicContent } = await import("@/lib/search.server");

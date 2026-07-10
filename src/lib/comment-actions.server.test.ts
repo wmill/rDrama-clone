@@ -262,3 +262,32 @@ describe("comment-actions.server", () => {
 		expect(getCommentsBySubmissionSince).toHaveBeenCalledWith(4, 10, undefined);
 	});
 });
+
+import {
+	createCommentInputSchema,
+	updateCommentInputSchema,
+} from "@/lib/comment-actions.server";
+
+describe("comment-actions input schemas", () => {
+	it("rejects empty bodies and bad parent ids", () => {
+		expect(
+			createCommentInputSchema.safeParse({ body: "", parentSubmissionId: 1 })
+				.success,
+		).toBe(false);
+		expect(
+			createCommentInputSchema.safeParse({ body: "hi", parentSubmissionId: 0 })
+				.success,
+		).toBe(false);
+		expect(
+			updateCommentInputSchema.safeParse({ id: 1, body: "x".repeat(20001) })
+				.success,
+		).toBe(false);
+	});
+
+	it("accepts a valid comment", () => {
+		expect(
+			createCommentInputSchema.safeParse({ body: "hi", parentSubmissionId: 3 })
+				.success,
+		).toBe(true);
+	});
+});
