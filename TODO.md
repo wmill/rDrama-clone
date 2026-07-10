@@ -193,7 +193,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
 
 ## Codebase quality
 
-- [ ] **T28: Unify submission/comment visibility derivation**
+- [x] **T28: Unify submission/comment visibility derivation** *(done 2026-07-10: shared deriveModerationVisibility in comment-visibility.server.ts — REMOVED/FILTERED/deleted classification + hidden/message derivation, with per-caller messages and hideRemovedFromModerators/hideDeletedFromModerators knobs (submissions placeholder those even for mods; comments don't); mapSubmissionRow and getCommentVisibility both delegate to it. All 326 existing tests green. One combined-state edge converged: a post that is both author-deleted and mod-removed now reads "removed by moderator" (moderation trumps self-delete, matching the comment path) instead of "deleted by author".)*
   - *Why*: the same REMOVED/FILTERED/user-deleted state machine is implemented twice — inline in `src/lib/submissions.server.ts` (~lines 104–160) and in `src/lib/comment-visibility.server.ts` (~lines 82–147) — with separately maintained message constants.
   - *Files*: extract a shared `deriveVisibility(state, viewer)` (natural home: generalize `comment-visibility.server.ts`); migrate both callers. Pure refactor; existing tests stay green.
   - *Verify*: `pnpm test --run && pnpm check`

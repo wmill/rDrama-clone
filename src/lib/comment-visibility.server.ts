@@ -74,6 +74,62 @@ export async function getCommentViewerContext(
 	};
 }
 
+export type ModerationStateInput = {
+	stateMod: string | null;
+	stateUserDeletedUtc: Date | null;
+};
+
+export type ModerationVisibility = {
+	isDeleted: boolean;
+	isRemoved: boolean;
+	isFiltered: boolean;
+	/** Hidden from this viewer by the removed/filtered/deleted state machine. */
+	isHidden: boolean;
+	message: string | null;
+};
+
+// Shared REMOVED/FILTERED/user-deleted state machine used by both the
+// submission and comment visibility paths. Message text and moderator
+// treatment differ per content type, so callers pass them in: submissions
+// render placeholders for removed and author-deleted posts even to
+// moderators (who act via Unremove), while comments show moderators the
+// content.
+export function deriveModerationVisibility(
+	state: ModerationStateInput,
+	viewer: { canModerate: boolean },
+	options: {
+		messages: { deleted: string; removed: string; filtered: string };
+		hideRemovedFromModerators?: boolean;
+		hideDeletedFromModerators?: boolean;
+	},
+): ModerationVisibility {
+	const isDeleted = state.stateUserDeletedUtc !== null;
+	const isRemoved = state.stateMod === "REMOVED";
+	const isFiltered = state.stateMod === "FILTERED";
+
+	const removedHidden =
+		isRemoved && (options.hideRemovedFromModerators || !viewer.canModerate);
+	const filteredHidden = isFiltered && !viewer.canModerate;
+	const deletedHidden =
+		isDeleted && (options.hideDeletedFromModerators || !viewer.canModerate);
+
+	const message = removedHidden
+		? options.messages.removed
+		: filteredHidden
+			? options.messages.filtered
+			: deletedHidden
+				? options.messages.deleted
+				: null;
+
+	return {
+		isDeleted,
+		isRemoved,
+		isFiltered,
+		isHidden: removedHidden || filteredHidden || deletedHidden,
+		message,
+	};
+}
+
 export function getCommentVisibility(
 	input: CommentVisibilityInput,
 	viewer: CommentViewerContext,
@@ -82,24 +138,30 @@ export function getCommentVisibility(
 		return { isVisible: true, message: null };
 	}
 
-	if (
-		(input.stateMod === "REMOVED" && !viewer.canModerate) ||
-		(input.authorShadowBanned !== null && !viewer.canSeeShadowbanned)
-	) {
-		return {
-			isVisible: false,
-			message: input.stateModSetBy
-				? `Removed by @${input.stateModSetBy}`
-				: "Removed",
-		};
+	const removedMessage = input.stateModSetBy
+		? `Removed by @${input.stateModSetBy}`
+		: "Removed";
+
+	if (input.authorShadowBanned !== null && !viewer.canSeeShadowbanned) {
+		return { isVisible: false, message: removedMessage };
 	}
 
-	if (input.stateMod === "FILTERED" && !viewer.canModerate) {
-		return { isVisible: false, message: "Filtered" };
-	}
-
-	if (input.stateUserDeletedUtc !== null && !viewer.canModerate) {
-		return { isVisible: false, message: "Deleted by author" };
+	const moderation = deriveModerationVisibility(
+		{
+			stateMod: input.stateMod,
+			stateUserDeletedUtc: input.stateUserDeletedUtc,
+		},
+		viewer,
+		{
+			messages: {
+				deleted: "Deleted by author",
+				removed: removedMessage,
+				filtered: "Filtered",
+			},
+		},
+	);
+	if (moderation.isHidden) {
+		return { isVisible: false, message: moderation.message };
 	}
 
 	if (input.isBlocking) {

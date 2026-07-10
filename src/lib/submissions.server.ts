@@ -11,6 +11,7 @@ import {
 	votes,
 } from "@/db/schema";
 import { type AwardCount, getSubmissionAwardCounts } from "@/lib/awards.server";
+import { deriveModerationVisibility } from "@/lib/comment-visibility.server";
 import {
 	authorDeleteSubmission,
 	DELETED_BY_AUTHOR_MESSAGE,
@@ -104,54 +105,43 @@ function mapSubmissionRow<T extends SubmissionRow>(
 		viewerCanModerate?: boolean;
 	},
 ) {
-	const isDeleted = row.stateUserDeletedUtc !== null;
-	const isRemoved = row.stateMod === "REMOVED";
-	const isFiltered = row.stateMod === "FILTERED";
+	const moderation = deriveModerationVisibility(
+		{ stateMod: row.stateMod, stateUserDeletedUtc: row.stateUserDeletedUtc },
+		{ canModerate: options?.viewerCanModerate ?? false },
+		{
+			messages: {
+				deleted: DELETED_BY_AUTHOR_MESSAGE,
+				removed: REMOVED_BY_MODERATOR_MESSAGE,
+				filtered: FILTERED_BY_MODERATOR_MESSAGE,
+			},
+			hideRemovedFromModerators: true,
+			hideDeletedFromModerators: true,
+		},
+	);
 	const isBlockedAuthor = row.blockedTargetId !== null;
-	const isHiddenByModeration =
-		isRemoved || (isFiltered && !options?.viewerCanModerate);
-	const visibilityMessage = isDeleted
-		? DELETED_BY_AUTHOR_MESSAGE
-		: isRemoved
-			? REMOVED_BY_MODERATOR_MESSAGE
-			: isFiltered && !options?.viewerCanModerate
-				? FILTERED_BY_MODERATOR_MESSAGE
-				: options?.includeBlockedPlaceholder && isBlockedAuthor
-					? `You are blocking @${row.authorName}`
-					: null;
+	const showBlockedPlaceholder =
+		options?.includeBlockedPlaceholder && isBlockedAuthor;
+	const visibilityMessage =
+		moderation.message ??
+		(showBlockedPlaceholder ? `You are blocking @${row.authorName}` : null);
 	const blockedTitle = `[blocked post by @${row.authorName}]`;
 
 	return {
 		...row,
-		title:
-			options?.includeBlockedPlaceholder && isBlockedAuthor
-				? blockedTitle
-				: row.title,
-		titleHtml:
-			options?.includeBlockedPlaceholder && isBlockedAuthor
-				? blockedTitle
-				: row.titleHtml,
-		url: options?.includeBlockedPlaceholder && isBlockedAuthor ? null : row.url,
-		body: isHiddenByModeration
-			? `[${visibilityMessage?.toLowerCase() ?? "hidden"}]`
-			: visibilityMessage
-				? `[${visibilityMessage.toLowerCase()}]`
-				: row.body,
-		bodyHtml: isHiddenByModeration
-			? `<p>[${visibilityMessage?.toLowerCase() ?? "hidden"}]</p>`
-			: visibilityMessage
-				? `<p>[${visibilityMessage.toLowerCase()}]</p>`
-				: row.bodyHtml,
-		embedUrl:
-			options?.includeBlockedPlaceholder && isBlockedAuthor
-				? null
-				: row.embedUrl,
+		title: showBlockedPlaceholder ? blockedTitle : row.title,
+		titleHtml: showBlockedPlaceholder ? blockedTitle : row.titleHtml,
+		url: showBlockedPlaceholder ? null : row.url,
+		body: visibilityMessage ? `[${visibilityMessage.toLowerCase()}]` : row.body,
+		bodyHtml: visibilityMessage
+			? `<p>[${visibilityMessage.toLowerCase()}]</p>`
+			: row.bodyHtml,
+		embedUrl: showBlockedPlaceholder ? null : row.embedUrl,
 		score: row.upvotes - row.downvotes,
 		userVote: (row.userVoteType as VoteType) ?? 0,
 		isStickied: row.stickied !== null,
-		isDeleted,
-		isRemoved,
-		isFiltered,
+		isDeleted: moderation.isDeleted,
+		isRemoved: moderation.isRemoved,
+		isFiltered: moderation.isFiltered,
 		visibilityMessage,
 		isSaved: row.savedSubmissionId !== null,
 		isSubscribed: row.subscribedSubmissionId !== null,
