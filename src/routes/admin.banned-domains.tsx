@@ -9,9 +9,11 @@ import {
 	addBannedDomainFn,
 	removeBannedDomainFn,
 } from "@/lib/admin-actions.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 
-const listBannedDomainsFn = createServerFn({ method: "GET" }).handler(
+export const listBannedDomainsFn = createServerFn({ method: "GET" }).handler(
 	async () => {
+		await assertAdmin();
 		return listBannedDomains();
 	},
 );

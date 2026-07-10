@@ -59,7 +59,8 @@ describe("site-settings-actions.server", () => {
 		vi.clearAllMocks();
 	});
 
-	it("returns all settings from the loader fn", async () => {
+	it("returns all settings from the loader fn for admins", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(admin);
 		vi.mocked(getAllSiteSettings).mockResolvedValue({
 			signups_enabled: true,
 			read_only: false,
@@ -69,6 +70,19 @@ describe("site-settings-actions.server", () => {
 			signups_enabled: true,
 			read_only: false,
 		});
+	});
+
+	it("rejects the settings loader fn for non-admins and logged-out users", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValueOnce(null);
+		await expect(getSiteSettingsFn()).rejects.toThrow("Unauthorized");
+
+		vi.mocked(getCurrentUser).mockResolvedValueOnce({
+			...admin,
+			adminLevel: 0,
+		});
+		await expect(getSiteSettingsFn()).rejects.toThrow("Unauthorized");
+
+		expect(getAllSiteSettings).not.toHaveBeenCalled();
 	});
 
 	it("rejects setting updates from non-admins and logged-out users", async () => {

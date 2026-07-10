@@ -13,6 +13,7 @@ import {
 	type UserReportHistoryEntry,
 } from "@/lib/admin.server";
 import { createUserNoteFn } from "@/lib/admin-actions.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
 
 const NOTE_TAGS = [
@@ -44,9 +45,10 @@ type UserInvestigation = {
 	reports: UserReportHistoryEntry[];
 };
 
-const getUserInvestigationFn = createServerFn({ method: "GET" })
+export const getUserInvestigationFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { userId: number }) => data)
 	.handler(async ({ data }): Promise<UserInvestigation | null> => {
+		await assertAdmin();
 		const details = await getUserAdminDetails(data.userId);
 		if (!details) return null;
 

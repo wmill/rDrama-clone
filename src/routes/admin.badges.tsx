@@ -5,15 +5,19 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type BadgeDef, listBadgeDefs } from "@/lib/admin.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 import {
 	createBadgeDefFn,
 	grantBadgeFn,
 	revokeBadgeFn,
 } from "@/lib/award-actions.server";
 
-const listBadgeDefsFn = createServerFn({ method: "GET" }).handler(async () => {
-	return listBadgeDefs();
-});
+export const listBadgeDefsFn = createServerFn({ method: "GET" }).handler(
+	async () => {
+		await assertAdmin();
+		return listBadgeDefs();
+	},
+);
 
 export const Route = createFileRoute("/admin/badges")({
 	component: BadgesPage,

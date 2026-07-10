@@ -3,10 +3,12 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { Button } from "@/components/ui/button";
 import { getModLog, type ModLogEntry } from "@/lib/admin.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 
-const getModLogFn = createServerFn({ method: "GET" })
+export const getModLogFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { page: number }) => data)
 	.handler(async ({ data }) => {
+		await assertAdmin();
 		return getModLog(data.page);
 	});
 

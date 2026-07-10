@@ -8,13 +8,15 @@ import {
 	type ReportedSubmission,
 } from "@/lib/admin.server";
 import { updateSubmissionFilterStatusFn } from "@/lib/admin-actions.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
 
-const getReportedSubmissionsFn = createServerFn({ method: "GET" }).handler(
-	async () => {
-		return getReportedSubmissions();
-	},
-);
+export const getReportedSubmissionsFn = createServerFn({
+	method: "GET",
+}).handler(async () => {
+	await assertAdmin();
+	return getReportedSubmissions();
+});
 
 export const Route = createFileRoute("/admin/reported-posts")({
 	component: ReportedPostsPage,

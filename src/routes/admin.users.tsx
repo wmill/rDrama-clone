@@ -11,10 +11,12 @@ import {
 	unbanUserFn,
 	unshadowbanUserFn,
 } from "@/lib/admin-actions.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 
-const searchUsersFn = createServerFn({ method: "GET" })
+export const searchUsersFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { query: string }) => data)
 	.handler(async ({ data }) => {
+		await assertAdmin();
 		return searchUsers(data.query);
 	});
 

@@ -14,30 +14,37 @@ import {
 	setCommentModerationStateFn,
 	setSubmissionModerationStateFn,
 } from "@/lib/admin-actions.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
 
-const getModQueuesFn = createServerFn({ method: "GET" }).handler(async () => {
-	const [
-		filteredPosts,
-		filteredComments,
-		removedPosts,
-		removedComments,
-		shadowbannedPosts,
-		shadowbannedComments,
-	] = await Promise.all([
-		getModQueueSubmissions("FILTERED"),
-		getModQueueComments("FILTERED"),
-		getModQueueSubmissions("REMOVED"),
-		getModQueueComments("REMOVED"),
-		getModQueueSubmissions("SHADOWBANNED"),
-		getModQueueComments("SHADOWBANNED"),
-	]);
-	return {
-		FILTERED: { posts: filteredPosts, comments: filteredComments },
-		REMOVED: { posts: removedPosts, comments: removedComments },
-		SHADOWBANNED: { posts: shadowbannedPosts, comments: shadowbannedComments },
-	};
-});
+export const getModQueuesFn = createServerFn({ method: "GET" }).handler(
+	async () => {
+		await assertAdmin();
+		const [
+			filteredPosts,
+			filteredComments,
+			removedPosts,
+			removedComments,
+			shadowbannedPosts,
+			shadowbannedComments,
+		] = await Promise.all([
+			getModQueueSubmissions("FILTERED"),
+			getModQueueComments("FILTERED"),
+			getModQueueSubmissions("REMOVED"),
+			getModQueueComments("REMOVED"),
+			getModQueueSubmissions("SHADOWBANNED"),
+			getModQueueComments("SHADOWBANNED"),
+		]);
+		return {
+			FILTERED: { posts: filteredPosts, comments: filteredComments },
+			REMOVED: { posts: removedPosts, comments: removedComments },
+			SHADOWBANNED: {
+				posts: shadowbannedPosts,
+				comments: shadowbannedComments,
+			},
+		};
+	},
+);
 
 export const Route = createFileRoute("/admin/filtered")({
 	component: ContentQueuesPage,

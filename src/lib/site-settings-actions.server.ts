@@ -2,12 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { db } from "@/db";
 import { modActions } from "@/db/schema";
+import { assertAdmin } from "@/lib/auth-guards.server";
 import { SITE_SETTINGS, type SiteSettingKey } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getAllSiteSettings, setSiteSetting } from "@/lib/site-settings.server";
 
 export const getSiteSettingsFn = createServerFn({ method: "GET" }).handler(
 	async () => {
+		await assertAdmin();
 		return getAllSiteSettings();
 	},
 );

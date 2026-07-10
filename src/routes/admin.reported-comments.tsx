@@ -5,10 +5,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getReportedComments, type ReportedComment } from "@/lib/admin.server";
 import { updateCommentFilterStatusFn } from "@/lib/admin-actions.server";
+import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
 
-const getReportedCommentsFn = createServerFn({ method: "GET" }).handler(
+export const getReportedCommentsFn = createServerFn({ method: "GET" }).handler(
 	async () => {
+		await assertAdmin();
 		return getReportedComments();
 	},
 );

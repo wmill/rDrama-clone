@@ -122,7 +122,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
 
 ## Security hardening (priority)
 
-- [ ] **T17: Server-side auth for admin GET server-fns + `requireUser`/`requireAdmin` helpers**
+- [x] **T17: Server-side auth for admin GET server-fns + `requireUser`/`requireAdmin` helpers** *(done 2026-07-10: auth-guards.server.ts with requireUser/requireAdmin (typed GuardResult) + assertAdmin (throwing, for GET/loader fns); assertAdmin applied to all 8 admin route GET fns plus getSiteSettingsFn; shared parameterized test in admin-route-guards.test.tsx covers logged-out/non-admin rejection + admin success per fn, plus guard unit tests)*
   - *Why*: the admin GET server-fns (`admin.reported-posts.tsx`, `admin.reported-comments.tsx`, `admin.mod-log.tsx`, `admin.users.tsx`, `admin.badges.tsx`, `admin.banned-domains.tsx`, `admin.filtered.tsx`) do no server-side auth — only the layout-loader guard in `admin.tsx` protects them, but they are directly callable RPC endpoints. A non-admin can fetch mod logs, reported content, and user search by hitting the endpoint directly.
   - *Files*: new `src/lib/auth-guards.server.ts` with `requireUser()` and `requireAdmin()` (wrap `getCurrentUser` from `src/lib/sessions.server.ts`; throw or return a typed result); apply to every GET fn in `src/routes/admin.*.tsx`.
   - *Done when*: each admin GET fn rejects non-admin callers (server test per fn, or one shared parameterized test); helpers are exported for T18 to reuse.
