@@ -218,7 +218,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Files*: standardize on `router.invalidate()` + loader data (the majority pattern); convert the admin pages' local-state mirrors (`src/routes/admin.reported-posts.tsx` etc.); document the convention in CLAUDE.md's data-layer section.
   - *Verify*: `pnpm test --run && pnpm check`; click through the admin queues in dev.
 
-- [ ] **T33: Stop swallowing Elasticsearch index failures**
+- [x] **T33: Stop swallowing Elasticsearch index failures** *(done 2026-07-10: indexSubmissionBestEffort/indexCommentBestEffort now retry the upsert once; a persistent failure is reported via Sentry.captureException (tags: feature=search-index, documentType; no-op when Sentry isn't initialized) and the console.error message names `pnpm reindex-search` as the recovery path. 2 tests: retry-then-report and retry-succeeds-silently.)*
   - *Why*: `src/lib/search.server.ts` (~lines 772–786) catches index failures and only `console.error`s — silent divergence between Postgres and the search index.
   - *Files*: `src/lib/search.server.ts` — report to Sentry (`captureException`) at minimum, consider a single retry; mention `pnpm reindex-search` as the recovery path in the error log message.
   - *Verify*: `pnpm test --run && pnpm check`

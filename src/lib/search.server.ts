@@ -1,6 +1,7 @@
 import "@/lib/env.server";
 
 import { Client } from "@elastic/elasticsearch";
+import * as Sentry from "@sentry/tanstackstart-react";
 import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -761,6 +762,32 @@ async function upsertSearchDocument(
 	return true;
 }
 
+async function upsertSearchDocumentWithRetry(
+	document: SearchSubmissionDocument | SearchCommentDocument,
+): Promise<void> {
+	try {
+		await upsertSearchDocument(document);
+	} catch {
+		// One retry: transient Elasticsearch hiccups are the common case.
+		await upsertSearchDocument(document);
+	}
+}
+
+function reportSearchIndexFailure(
+	documentType: "submission" | "comment",
+	id: number,
+	error: unknown,
+): void {
+	console.error(
+		`[search] failed to index ${documentType} ${id} after retry — Postgres and the search index have diverged; run \`pnpm reindex-search\` to rebuild`,
+		error,
+	);
+	Sentry.captureException(error, {
+		tags: { feature: "search-index", documentType },
+		extra: { id },
+	});
+}
+
 export async function indexSubmissionBestEffort(id: number): Promise<void> {
 	try {
 		const document = await getSubmissionDocumentById(id);
@@ -768,9 +795,9 @@ export async function indexSubmissionBestEffort(id: number): Promise<void> {
 			return;
 		}
 
-		await upsertSearchDocument(document);
+		await upsertSearchDocumentWithRetry(document);
 	} catch (error) {
-		console.error("[search] failed to index submission", { id, error });
+		reportSearchIndexFailure("submission", id, error);
 	}
 }
 
@@ -781,9 +808,9 @@ export async function indexCommentBestEffort(id: number): Promise<void> {
 			return;
 		}
 
-		await upsertSearchDocument(document);
+		await upsertSearchDocumentWithRetry(document);
 	} catch (error) {
-		console.error("[search] failed to index comment", { id, error });
+		reportSearchIndexFailure("comment", id, error);
 	}
 }
 

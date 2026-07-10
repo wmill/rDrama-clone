@@ -21,6 +21,10 @@ vi.mock("@elastic/elasticsearch", () => ({
 	Client: vi.fn(() => mockClient),
 }));
 
+vi.mock("@sentry/tanstackstart-react", () => ({
+	captureException: vi.fn(),
+}));
+
 vi.mock("@/lib/comment-visibility.server", async () => {
 	const actual = await vi.importActual<
 		typeof import("@/lib/comment-visibility.server")
@@ -36,6 +40,8 @@ vi.mock("@/lib/comment-visibility.server", async () => {
 		}),
 	};
 });
+
+import * as Sentry from "@sentry/tanstackstart-react";
 
 import { db } from "@/db";
 import {
@@ -322,7 +328,7 @@ describe("search.server", () => {
 		expect(results[0]?.id).toBe(1);
 	});
 
-	it("swallows Elasticsearch indexing failures for submissions and comments", async () => {
+	it("retries once, then reports persistent indexing failures to Sentry without throwing", async () => {
 		process.env.ELASTICSEARCH_URL = "http://127.0.0.1:9200";
 		mockClient.indices.exists.mockResolvedValue({ body: true });
 		mockClient.index.mockRejectedValue(new Error("es down"));
@@ -373,6 +379,53 @@ describe("search.server", () => {
 		await expect(indexSubmissionBestEffort(1)).resolves.toBeUndefined();
 		await expect(indexCommentBestEffort(2)).resolves.toBeUndefined();
 
+		// One retry per document: 2 documents x 2 attempts.
+		expect(mockClient.index).toHaveBeenCalledTimes(4);
 		expect(consoleError).toHaveBeenCalledTimes(2);
+		expect(consoleError.mock.calls[0][0]).toContain("pnpm reindex-search");
+		expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+
+		consoleError.mockRestore();
+	});
+
+	it("does not report when the indexing retry succeeds", async () => {
+		process.env.ELASTICSEARCH_URL = "http://127.0.0.1:9200";
+		vi.mocked(Sentry.captureException).mockClear();
+		mockClient.index.mockReset();
+		mockClient.indices.exists.mockResolvedValue({ body: true });
+		mockClient.index
+			.mockRejectedValueOnce(new Error("transient hiccup"))
+			.mockResolvedValueOnce({ body: {} });
+		const consoleError = vi
+			.spyOn(console, "error")
+			.mockImplementation(() => undefined);
+		vi.mocked(db.select).mockReturnValueOnce({
+			from: vi.fn(() => ({
+				innerJoin: vi.fn(() => ({
+					where: vi.fn(() => ({
+						limit: vi.fn().mockResolvedValue([
+							{
+								id: 1,
+								authorId: 2,
+								authorUsername: "alice",
+								title: "Post",
+								url: null,
+								body: "body",
+								createdUtc: 1,
+								editedUtc: 0,
+							},
+						]),
+					})),
+				})),
+			})),
+		} as never);
+
+		await expect(indexSubmissionBestEffort(1)).resolves.toBeUndefined();
+
+		expect(mockClient.index).toHaveBeenCalledTimes(2);
+		expect(consoleError).not.toHaveBeenCalled();
+		expect(Sentry.captureException).not.toHaveBeenCalled();
+
+		consoleError.mockRestore();
 	});
 });
