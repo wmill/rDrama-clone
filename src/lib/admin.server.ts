@@ -1,8 +1,18 @@
-import { and, desc, eq, ilike, inArray, isNotNull, isNull } from "drizzle-orm";
+import {
+	and,
+	desc,
+	eq,
+	ilike,
+	inArray,
+	isNotNull,
+	isNull,
+	or,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
 import {
+	alts,
 	badgeDefs,
 	bannedDomains,
 	commentFlags,
@@ -507,4 +517,29 @@ export async function getUserAdminDetails(
 		.orderBy(userNotes.createdDatetimez);
 
 	return { user, notes };
+}
+
+export type UserAlt = {
+	id: number;
+	username: string;
+	isManual: boolean;
+};
+
+export async function getUserAlts(userId: number): Promise<UserAlt[]> {
+	return db
+		.select({
+			id: users.id,
+			username: users.username,
+			isManual: alts.isManual,
+		})
+		.from(alts)
+		.innerJoin(
+			users,
+			or(
+				and(eq(alts.user1, userId), eq(users.id, alts.user2)),
+				and(eq(alts.user2, userId), eq(users.id, alts.user1)),
+			),
+		)
+		.where(or(eq(alts.user1, userId), eq(alts.user2, userId)))
+		.orderBy(users.username);
 }

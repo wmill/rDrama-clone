@@ -7,11 +7,12 @@ import type { BanModalResult } from "@/stores/modals";
 import { ModalFrame } from "./ModalFrame";
 
 type BanModalProps = {
+	knownAlts?: string[];
 	onSubmit: (result: BanModalResult) => void;
 	onCancel: () => void;
 };
 
-export function BanModal({ onSubmit, onCancel }: BanModalProps) {
+export function BanModal({ knownAlts, onSubmit, onCancel }: BanModalProps) {
 	const [reason, setReason] = useState("");
 	const [durationDays, setDurationDays] = useState("");
 	const [banAlts, setBanAlts] = useState(false);
@@ -84,6 +85,18 @@ export function BanModal({ onSubmit, onCancel }: BanModalProps) {
 					/>
 					Ban known alts
 				</label>
+
+				{knownAlts && knownAlts.length > 0 && (
+					<p className="text-xs text-slate-400">
+						Known alts:{" "}
+						{knownAlts.map((alt, index) => (
+							<span key={alt}>
+								{index > 0 && ", "}
+								<span className="text-slate-200">{alt}</span>
+							</span>
+						))}
+					</p>
+				)}
 			</div>
 		</ModalFrame>
 	);

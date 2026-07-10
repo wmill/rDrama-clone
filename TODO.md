@@ -165,7 +165,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
   - *Done when*: following a user and awarding their content each produce a notification; existing reply/mention/subscription notifications unaffected.
   - *Verify*: `pnpm test --run && pnpm check`; follow + award in dev and see both notifications.
 
-- [ ] **T24: Manual alt-linking for admins**
+- [x] **T24: Manual alt-linking for admins** *(done 2026-07-10: linkUserAltFn/unlinkUserAltFn in admin-actions.server.ts — link by username, pair normalized user1<user2, isManual set (upserts over auto-detected rows), link_alt/unlink_alt mod-log entries, self-link and unknown-user rejected; getUserAlts query (order-agnostic) in admin.server.ts; "Linked Alts" section on /admin/users/$id with add-by-username form, manual/auto badges, cross-links to each alt's investigation page, and unlink buttons; BanModal now accepts knownAlts via openBanModal(options) and lists them next to the "Ban known alts" checkbox. 5 new tests. Note: openBanModal still has no caller (pre-existing — the ban flows use inline forms) and banUserFn still ignores banAlts; wiring the ban-alts flow is future work.)*
   - *Why*: the `alts` table renders in `src/components/modals/BanModal.tsx` but nothing can ever write rows; `isManual` is never set.
   - *Files*: link/unlink actions in `src/lib/admin-actions.server.ts` (set `isManual`, write a mod-log entry); UI on the user investigation page `src/routes/admin.users_.$id.tsx` (list alts there too).
   - *Done when*: an admin can link/unlink two accounts as alts; the link shows in both BanModal and the investigation page; actions are tested.

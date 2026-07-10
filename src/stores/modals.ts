@@ -22,6 +22,10 @@ export type BanModalResult = {
 	banAlts: boolean;
 };
 
+export type BanModalOptions = {
+	knownAlts?: string[];
+};
+
 export type DeleteModalOptions = {
 	title: string;
 	description: string;
@@ -60,7 +64,7 @@ type DeleteModalConfig = DeleteModalOptions & {
 	reject: () => void;
 };
 
-type BanModalConfig = {
+type BanModalConfig = BanModalOptions & {
 	type: "ban";
 	id: string;
 	resolve: (result: BanModalResult) => void;
@@ -101,7 +105,7 @@ type ModalsStore = {
 	openReportModal: () => Promise<string>;
 	openDeleteCommentModal: () => Promise<void>;
 	openDeletePostModal: () => Promise<void>;
-	openBanModal: () => Promise<BanModalResult>;
+	openBanModal: (options?: BanModalOptions) => Promise<BanModalResult>;
 	openShadowbanModal: (options: ShadowbanModalOptions) => Promise<void>;
 	openExpandedImageModal: (options: ExpandedImageModalOptions) => Promise<void>;
 	openAwardModal: (options: AwardModalOptions) => Promise<AwardModalResult>;
@@ -171,10 +175,11 @@ export const useModalsStore = create<ModalsStore>((set) => ({
 			resolve,
 			reject,
 		})),
-	openBanModal: () =>
+	openBanModal: (options) =>
 		createModalPromise(set, (id, resolve, reject) => ({
 			type: "ban",
 			id,
+			knownAlts: options?.knownAlts,
 			resolve,
 			reject,
 		})),

@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
 import {
+	alts,
 	bannedDomains,
 	comments,
 	modActions,
@@ -22,6 +23,7 @@ import {
 	setSubmissionStickyState,
 } from "@/lib/lifecycle.server";
 import { renderPostTitleHtml } from "@/lib/markdown";
+import { getUserByUsernameCanonical } from "@/lib/users.server";
 import { idInputSchema, idSchema, userIdInputSchema } from "@/lib/validation";
 
 type QueueModerationAction = "approve" | "filtered" | "removed" | "ignored";
@@ -75,6 +77,10 @@ export const addBannedDomainInputSchema = z.object({
 });
 export const removeBannedDomainInputSchema = z.object({
 	domain: z.string().min(1).max(253),
+});
+export const altLinkInputSchema = z.object({
+	userId: idSchema,
+	username: z.string().min(1).max(50),
 });
 
 function normalizeOptionalModerationText(value?: string | null): string | null {
@@ -488,6 +494,87 @@ export const unshadowbanUserFn = createServerFn({ method: "POST" })
 			userId: user.id,
 			targetUserId: data.userId,
 			kind: "unshadowban",
+		});
+
+		return { success: true as const };
+	});
+
+// Alt rows are stored with user1 < user2 so a pair can only exist once.
+function normalizeAltPair(a: number, b: number): [number, number] {
+	return a < b ? [a, b] : [b, a];
+}
+
+export const linkUserAltFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { userId: number; username: string }) =>
+		altLinkInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
+		}
+		const user = guard.user;
+
+		const target = await getUserByUsernameCanonical(data.username);
+		if (!target) {
+			return fail("User not found");
+		}
+		if (target.id === data.userId) {
+			return fail("Cannot link a user to themselves");
+		}
+
+		const [user1, user2] = normalizeAltPair(data.userId, target.id);
+		await db
+			.insert(alts)
+			.values({ user1, user2, isManual: true })
+			.onConflictDoUpdate({
+				target: [alts.user1, alts.user2],
+				set: { isManual: true },
+			});
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetUserId: data.userId,
+			kind: "link_alt",
+			note: `@${target.username}`,
+		});
+
+		return {
+			success: true as const,
+			alt: {
+				id: target.id,
+				username: target.username,
+				isManual: true,
+			},
+		};
+	});
+
+export const unlinkUserAltFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { userId: number; username: string }) =>
+		altLinkInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireAdmin();
+		if (!guard.ok) {
+			return guard.failure;
+		}
+		const user = guard.user;
+
+		const target = await getUserByUsernameCanonical(data.username);
+		if (!target) {
+			return fail("User not found");
+		}
+
+		const [user1, user2] = normalizeAltPair(data.userId, target.id);
+		await db
+			.delete(alts)
+			.where(and(eq(alts.user1, user1), eq(alts.user2, user2)));
+
+		await db.insert(modActions).values({
+			userId: user.id,
+			targetUserId: data.userId,
+			kind: "unlink_alt",
+			note: `@${target.username}`,
 		});
 
 		return { success: true as const };

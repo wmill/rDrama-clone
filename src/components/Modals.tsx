@@ -38,6 +38,7 @@ export function Modals() {
 						return (
 							<BanModal
 								key={modal.id}
+								knownAlts={modal.knownAlts}
 								onSubmit={modal.resolve}
 								onCancel={modal.reject}
 							/>

@@ -6,13 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
 	getUserAdminDetails,
+	getUserAlts,
 	getUserRecentActivity,
 	getUserReportHistory,
 	type UserAdminDetails,
+	type UserAlt,
 	type UserRecentActivity,
 	type UserReportHistoryEntry,
 } from "@/lib/admin.server";
-import { createUserNoteFn } from "@/lib/admin-actions.server";
+import {
+	createUserNoteFn,
+	linkUserAltFn,
+	unlinkUserAltFn,
+} from "@/lib/admin-actions.server";
 import { assertAdmin } from "@/lib/auth-guards.server";
 import { formatRelativeTime } from "@/lib/utils";
 import { userIdInputSchema } from "@/lib/validation";
@@ -44,6 +50,7 @@ type UserInvestigation = {
 	notes: UserAdminDetails["notes"];
 	activity: UserRecentActivity;
 	reports: UserReportHistoryEntry[];
+	alts: UserAlt[];
 };
 
 export const getUserInvestigationFn = createServerFn({ method: "GET" })
@@ -53,9 +60,10 @@ export const getUserInvestigationFn = createServerFn({ method: "GET" })
 		const details = await getUserAdminDetails(data.userId);
 		if (!details) return null;
 
-		const [activity, reports] = await Promise.all([
+		const [activity, reports, userAlts] = await Promise.all([
 			getUserRecentActivity(data.userId),
 			getUserReportHistory(data.userId),
+			getUserAlts(data.userId),
 		]);
 
 		const { user } = details;
@@ -75,6 +83,7 @@ export const getUserInvestigationFn = createServerFn({ method: "GET" })
 			notes: details.notes,
 			activity,
 			reports,
+			alts: userAlts,
 		};
 	});
 
@@ -95,8 +104,10 @@ function UserInvestigationPage() {
 		notes: initialNotes,
 		activity,
 		reports,
+		alts: initialAlts,
 	} = Route.useLoaderData();
 	const [notes, setNotes] = useState(initialNotes);
+	const [alts, setAlts] = useState(initialAlts);
 
 	return (
 		<div className="space-y-4">
@@ -139,6 +150,23 @@ function UserInvestigationPage() {
 				userId={user.id}
 				notes={notes}
 				onNoteAdded={(note) => setNotes((prev) => [...prev, note])}
+			/>
+
+			<AltsSection
+				userId={user.id}
+				alts={alts}
+				onAltLinked={(alt) =>
+					setAlts((prev) =>
+						prev.some((existing) => existing.id === alt.id)
+							? prev.map((existing) =>
+									existing.id === alt.id ? alt : existing,
+								)
+							: [...prev, alt],
+					)
+				}
+				onAltUnlinked={(username) =>
+					setAlts((prev) => prev.filter((alt) => alt.username !== username))
+				}
 			/>
 
 			<ReportsSection reports={reports} />
@@ -243,6 +271,121 @@ function NotesSection({
 					className="shrink-0 bg-cyan-500 hover:bg-cyan-600"
 				>
 					Add Note
+				</Button>
+			</form>
+			{error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+		</div>
+	);
+}
+
+function AltsSection({
+	userId,
+	alts,
+	onAltLinked,
+	onAltUnlinked,
+}: {
+	userId: number;
+	alts: UserAlt[];
+	onAltLinked: (alt: UserAlt) => void;
+	onAltUnlinked: (username: string) => void;
+}) {
+	const [username, setUsername] = useState("");
+	const [isPending, setIsPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const handleLink = async (e: React.FormEvent) => {
+		e.preventDefault();
+		const name = username.trim();
+		if (!name) return;
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await linkUserAltFn({ data: { userId, username: name } });
+			if (res.success) {
+				onAltLinked(res.alt);
+				setUsername("");
+			} else {
+				setError(res.error);
+			}
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	const handleUnlink = async (altUsername: string) => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await unlinkUserAltFn({
+				data: { userId, username: altUsername },
+			});
+			if (res.success) {
+				onAltUnlinked(altUsername);
+			} else {
+				setError(res.error);
+			}
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	return (
+		<div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
+			<h3 className="mb-3 text-base font-semibold text-white">
+				Linked Alts ({alts.length})
+			</h3>
+
+			{alts.length === 0 ? (
+				<p className="mb-4 text-sm text-slate-400">No linked alts.</p>
+			) : (
+				<div className="mb-4 space-y-2">
+					{alts.map((alt) => (
+						<div
+							key={alt.id}
+							className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-4 py-2 text-sm"
+						>
+							<Link
+								to="/admin/users/$id"
+								params={{ id: String(alt.id) }}
+								className="font-medium text-cyan-400 hover:underline"
+							>
+								{alt.username}
+							</Link>
+							<span
+								className={`rounded px-1.5 py-0.5 text-xs ${
+									alt.isManual
+										? "bg-violet-500/20 text-violet-300"
+										: "bg-slate-800 text-slate-400"
+								}`}
+							>
+								{alt.isManual ? "manual" : "auto"}
+							</span>
+							<button
+								type="button"
+								disabled={isPending}
+								onClick={() => handleUnlink(alt.username)}
+								className="ml-auto text-xs text-slate-400 underline hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+							>
+								Unlink
+							</button>
+						</div>
+					))}
+				</div>
+			)}
+
+			<form onSubmit={handleLink} className="flex gap-2">
+				<Input
+					value={username}
+					onChange={(e) => setUsername(e.target.value)}
+					placeholder="Link alt by username..."
+					className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+				/>
+				<Button
+					type="submit"
+					disabled={isPending || !username.trim()}
+					className="shrink-0 bg-cyan-500 hover:bg-cyan-600"
+				>
+					Link Alt
 				</Button>
 			</form>
 			{error && <p className="mt-2 text-xs text-red-400">{error}</p>}

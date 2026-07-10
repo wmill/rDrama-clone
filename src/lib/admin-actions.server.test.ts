@@ -37,12 +37,17 @@ vi.mock("@/lib/lifecycle.server", () => ({
 	setSubmissionStickyState: vi.fn(),
 }));
 
+vi.mock("@/lib/users.server", () => ({
+	getUserByUsernameCanonical: vi.fn(),
+}));
+
 import {
 	addBannedDomainFn,
 	banUserFn,
 	createUserNoteFn,
 	distinguishCommentFn,
 	distinguishSubmissionFn,
+	linkUserAltFn,
 	pinCommentFn,
 	removeBannedDomainFn,
 	removeCommentFn,
@@ -52,6 +57,7 @@ import {
 	shadowbanUserFn,
 	stickySubmissionFn,
 	unbanUserFn,
+	unlinkUserAltFn,
 	unshadowbanUserFn,
 	updateCommentFilterStatusFn,
 	updateSubmissionFilterStatusFn,
@@ -68,6 +74,7 @@ import {
 	setSubmissionStickyState,
 } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
+import { getUserByUsernameCanonical } from "@/lib/users.server";
 
 function createSelectChain<T>(result: T) {
 	return {
@@ -733,9 +740,103 @@ describe("admin-actions.server", () => {
 			kind: "undistinguish_comment",
 		});
 	});
+
+	it("rejects alt linking from non-admins with no DB writes", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(janitor);
+
+		await expect(
+			linkUserAltFn({ data: { userId: 9, username: "alice" } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		await expect(
+			unlinkUserAltFn({ data: { userId: 9, username: "alice" } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+
+		expect(dbMock.insert).not.toHaveBeenCalled();
+		expect(dbMock.delete).not.toHaveBeenCalled();
+	});
+
+	it("links alts with a normalized pair, isManual set, and a mod-log entry", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		vi.mocked(getUserByUsernameCanonical).mockResolvedValue({
+			id: 4,
+			username: "alice",
+		} as never);
+		const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+		const altInsert = {
+			values: vi.fn().mockReturnValue({ onConflictDoUpdate }),
+		};
+		const logInsert = createInsertChain();
+		dbMock.insert.mockReturnValueOnce(altInsert).mockReturnValueOnce(logInsert);
+
+		await expect(
+			linkUserAltFn({ data: { userId: 9, username: "alice" } }),
+		).resolves.toEqual({
+			success: true,
+			alt: { id: 4, username: "alice", isManual: true },
+		});
+
+		expect(altInsert.values).toHaveBeenCalledWith({
+			user1: 4,
+			user2: 9,
+			isManual: true,
+		});
+		expect(logInsert.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetUserId: 9,
+			kind: "link_alt",
+			note: "@alice",
+		});
+	});
+
+	it("rejects self-links and unknown usernames", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+
+		vi.mocked(getUserByUsernameCanonical).mockResolvedValueOnce(null);
+		await expect(
+			linkUserAltFn({ data: { userId: 9, username: "ghost" } }),
+		).resolves.toEqual({ success: false, error: "User not found" });
+
+		vi.mocked(getUserByUsernameCanonical).mockResolvedValueOnce({
+			id: 9,
+			username: "same",
+		} as never);
+		await expect(
+			linkUserAltFn({ data: { userId: 9, username: "same" } }),
+		).resolves.toEqual({
+			success: false,
+			error: "Cannot link a user to themselves",
+		});
+
+		expect(dbMock.insert).not.toHaveBeenCalled();
+	});
+
+	it("unlinks alts and logs the mod action", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		vi.mocked(getUserByUsernameCanonical).mockResolvedValue({
+			id: 12,
+			username: "bob",
+		} as never);
+		const deleteChain = { where: vi.fn().mockResolvedValue(undefined) };
+		dbMock.delete.mockReturnValueOnce(deleteChain);
+		const logInsert = createInsertChain();
+		dbMock.insert.mockReturnValueOnce(logInsert);
+
+		await expect(
+			unlinkUserAltFn({ data: { userId: 9, username: "bob" } }),
+		).resolves.toEqual({ success: true });
+
+		expect(deleteChain.where).toHaveBeenCalledTimes(1);
+		expect(logInsert.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetUserId: 9,
+			kind: "unlink_alt",
+			note: "@bob",
+		});
+	});
 });
 
 import {
+	altLinkInputSchema,
 	banUserInputSchema,
 	moderationStateInputSchema,
 	queueActionInputSchema,
@@ -767,6 +868,18 @@ describe("admin-actions input schemas", () => {
 		).toBe(true);
 		expect(
 			banUserInputSchema.safeParse({ userId: 1, reason: "spam" }).success,
+		).toBe(true);
+	});
+
+	it("validates alt-link inputs", () => {
+		expect(
+			altLinkInputSchema.safeParse({ userId: 0, username: "alice" }).success,
+		).toBe(false);
+		expect(
+			altLinkInputSchema.safeParse({ userId: 1, username: "" }).success,
+		).toBe(false);
+		expect(
+			altLinkInputSchema.safeParse({ userId: 1, username: "alice" }).success,
 		).toBe(true);
 	});
 });

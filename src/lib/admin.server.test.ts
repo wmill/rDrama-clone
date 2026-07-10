@@ -17,6 +17,7 @@ import {
 	getReportedComments,
 	getReportedSubmissions,
 	getUserAdminDetails,
+	getUserAlts,
 	getUserRecentActivity,
 	getUserReportHistory,
 	MOD_LOG_PER_PAGE,
@@ -422,5 +423,26 @@ describe("getUserAdminDetails", () => {
 			.mockReturnValueOnce(createChain("orderBy", notes) as never);
 
 		await expect(getUserAdminDetails(7)).resolves.toEqual({ user, notes });
+	});
+});
+
+describe("getUserAlts", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("returns linked alts regardless of pair order", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createChain("orderBy", [
+				{ id: 4, username: "alice", isManual: true },
+				{ id: 12, username: "bob", isManual: false },
+			]) as never,
+		);
+
+		await expect(getUserAlts(9)).resolves.toEqual([
+			{ id: 4, username: "alice", isManual: true },
+			{ id: 12, username: "bob", isManual: false },
+		]);
+		expect(db.select).toHaveBeenCalledTimes(1);
 	});
 });
