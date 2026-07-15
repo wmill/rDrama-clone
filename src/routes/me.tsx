@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
 import { useId, useState } from "react";
 import { z } from "zod";
 
@@ -14,175 +13,23 @@ import {
 	changeUsernameFn,
 	changeUsernameInputSchema,
 } from "@/lib/account-actions.server";
-import {
-	type CommentFeedSortType,
-	CommentSortTypes,
-	type SortType,
-	SortTypes,
-	type TimeFilter,
-	TimeFilters,
+import type {
+	CommentFeedSortType,
+	SortType,
+	TimeFilter,
 } from "@/lib/constants";
 import {
 	emailChangeInputSchema,
 	requestEmailChangeFn,
 	resendEmailVerificationFn,
 } from "@/lib/email-verification-actions.server";
-import {
-	type ClientSessionInfo,
-	listSessionsFn,
-	logoutOtherSessionsFn,
-} from "@/lib/session-actions.server";
-import { getCurrentUser } from "@/lib/sessions.server";
-import {
-	type BlockedUsersPage,
-	getBlockedUsersPage,
-} from "@/lib/social.server";
+import { getMePageFn, updateSettingsFn } from "@/lib/me-actions.server";
+import { type SettingsInput, settingsSchema } from "@/lib/me-settings";
+import type { ClientSessionInfo } from "@/lib/session-actions.server";
+import { logoutOtherSessionsFn } from "@/lib/session-actions.server";
+import type { BlockedUsersPage } from "@/lib/social.server";
 import { setBlockStateFn } from "@/lib/social-actions.server";
-import {
-	getUserSettingsById,
-	type UserSettings,
-	updateUserSettings,
-} from "@/lib/users.server";
-
-const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
-	return getCurrentUser();
-});
-
-const colorSchema = z
-	.string()
-	.trim()
-	.regex(/^[0-9a-fA-F]{3,6}$/, "Use a 3 or 6 character hex color");
-
-const optionalUrlSchema = z
-	.string()
-	.trim()
-	.max(65, "URL must be 65 characters or fewer")
-	.refine((value) => {
-		if (!value) return true;
-		try {
-			const url = new URL(value);
-			return url.protocol === "http:" || url.protocol === "https:";
-		} catch {
-			return false;
-		}
-	}, "Enter a valid http:// or https:// URL");
-
-const settingsSchema = z.object({
-	bio: z.string().trim().max(1500, "Bio must be 1500 characters or fewer"),
-	customTitlePlain: z
-		.string()
-		.trim()
-		.max(100, "Custom title must be 100 characters or fewer"),
-	profileUrl: optionalUrlSchema,
-	bannerUrl: optionalUrlSchema,
-	profileCss: z
-		.string()
-		.max(4000, "Profile CSS must be 4000 characters or fewer"),
-	defaultSorting: z.enum(SortTypes),
-	defaultSortingComments: z.enum(CommentSortTypes),
-	defaultTime: z.enum(TimeFilters),
-	isPrivate: z.boolean(),
-	hideVotedOn: z.boolean(),
-	cardView: z.boolean(),
-	highlightComments: z.boolean(),
-	newTabExternal: z.boolean(),
-	newTab: z.boolean(),
-	nameColor: colorSchema,
-	titleColor: colorSchema,
-	themeColor: colorSchema,
-	theme: z.enum(["dark", "light"]),
-	over18: z.boolean(),
-	slurReplacer: z.boolean(),
-});
-
-type SettingsInput = z.infer<typeof settingsSchema>;
-
-const getCurrentUserSettingsFn = createServerFn({ method: "GET" }).handler(
-	async () => {
-		const user = await getCurrentUser();
-		if (!user) return null;
-
-		return getUserSettingsById(user.id);
-	},
-);
-
-const updateSettingsFn = createServerFn({ method: "POST" })
-	.inputValidator((data: SettingsInput) => settingsSchema.parse(data))
-	.handler(async ({ data }) => {
-		const user = await getCurrentUser();
-		if (!user) {
-			throw new Error("You must be logged in");
-		}
-
-		const currentSettings = await getUserSettingsById(user.id);
-		if (!currentSettings) {
-			return { success: false as const, error: "User not found" };
-		}
-		if (
-			currentSettings.titleLocked &&
-			data.customTitlePlain.trim() !== currentSettings.customTitlePlain
-		) {
-			return {
-				success: false as const,
-				error: "Your custom title is locked by a moderator",
-			};
-		}
-
-		const bioHtmlLength = data.bio
-			? (await import("@/lib/markdown")).renderCommentMarkdown(data.bio).length
-			: 0;
-		if (bioHtmlLength > 10000) {
-			return {
-				success: false as const,
-				error: "Rendered bio is too long for the legacy database columns",
-			};
-		}
-
-		const customTitleHtmlLength = data.customTitlePlain
-			? (await import("@/lib/markdown")).renderPostTitleHtml(
-					data.customTitlePlain,
-				).length
-			: 0;
-		if (customTitleHtmlLength > 1000) {
-			return {
-				success: false as const,
-				error:
-					"Rendered custom title is too long for the legacy database columns",
-			};
-		}
-
-		let profileCss: string;
-		try {
-			profileCss = (
-				await import("@/lib/profile-css.server")
-			).sanitizeProfileCss(data.profileCss, user.id);
-		} catch (error) {
-			return {
-				success: false as const,
-				error: error instanceof Error ? error.message : "Invalid profile CSS",
-			};
-		}
-		if (profileCss.length > 4000) {
-			return {
-				success: false as const,
-				error: "Sanitized profile CSS must be 4000 characters or fewer",
-			};
-		}
-
-		await updateUserSettings(
-			user.id,
-			{
-				...data,
-				profileCss,
-				nameColor: data.nameColor.toLowerCase(),
-				titleColor: data.titleColor.toLowerCase(),
-				themeColor: data.themeColor.toLowerCase(),
-			},
-			{ preserveCustomTitle: currentSettings.titleLocked },
-		);
-
-		return { success: true as const };
-	});
+import type { UserSettings } from "@/lib/users.server";
 
 export const Route = createFileRoute("/me")({
 	component: MePage,
@@ -196,18 +43,7 @@ export const Route = createFileRoute("/me")({
 	}),
 	loaderDeps: ({ search }) => ({ blockedPage: search.blockedPage }),
 	loader: async ({ deps }) => {
-		const user = await getCurrentUserFn();
-		const settings = await getCurrentUserSettingsFn();
-		const sessionsResult = await listSessionsFn();
-		const blockedUsers = user
-			? await getBlockedUsersPage({ userId: user.id, page: deps.blockedPage })
-			: null;
-		return {
-			user,
-			settings,
-			sessions: sessionsResult.success ? sessionsResult.sessions : [],
-			blockedUsers,
-		};
+		return getMePageFn({ data: { blockedPage: deps.blockedPage } });
 	},
 });
 

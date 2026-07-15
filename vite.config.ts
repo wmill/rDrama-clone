@@ -8,6 +8,17 @@ import { nitro } from "nitro/vite";
 
 export default defineConfig({
 	plugins: [
+		{
+			name: "server-env-client-boundary",
+			enforce: "pre",
+			transform(_code, id, options) {
+				if (!options?.ssr && id.endsWith("/src/lib/env.server.ts")) {
+					this.error(
+						"src/lib/env.server.ts was included in the client module graph. Move the importing handler into a *.server.ts server-function module.",
+					);
+				}
+			},
+		},
 		devtools(),
 		nitro(),
 		// this is the plugin that enables path aliases

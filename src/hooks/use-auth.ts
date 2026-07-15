@@ -1,10 +1,9 @@
 import { useRouterState } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { create } from "zustand";
 
 import type { SafeUser } from "@/lib/auth.server";
-import { getCurrentUser } from "@/lib/sessions.server";
+import { getCurrentUserFn } from "@/lib/session-actions.server";
 
 export type AuthUser = SafeUser;
 
@@ -13,10 +12,6 @@ type AuthState = {
 	ready: boolean;
 	refresh: () => Promise<void>;
 };
-
-const getCurrentUserFn = createServerFn({ method: "GET" }).handler(async () => {
-	return getCurrentUser();
-});
 
 type AuthStoreState = {
 	user: AuthUser | null;

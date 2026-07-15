@@ -1,29 +1,15 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
 import { LogIn, LogOut, UserRound } from "lucide-react";
 
 import { useAuth } from "@/hooks/use-auth";
-import {
-	clearSessionCookie,
-	deleteSession,
-	getSessionIdFromCookie,
-} from "@/lib/sessions.server";
-
-const logoutAction = createServerFn({ method: "POST" }).handler(async () => {
-	const sessionId = getSessionIdFromCookie();
-	if (sessionId) {
-		await deleteSession(sessionId);
-	}
-	clearSessionCookie();
-	return { success: true };
-});
+import { logoutFn } from "@/lib/session-actions.server";
 
 export function AuthButton() {
 	const router = useRouter();
 	const { user, refresh } = useAuth();
 
 	const handleLogout = async () => {
-		await logoutAction();
+		await logoutFn();
 		await refresh();
 		router.invalidate();
 	};

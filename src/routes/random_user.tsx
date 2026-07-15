@@ -1,11 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-
-import { getRandomPublicUsername } from "@/lib/users.server";
-
-export const getRandomUserFn = createServerFn({ method: "GET" }).handler(
-	getRandomPublicUsername,
-);
+import { getRandomUserFn } from "@/lib/discovery-actions.server";
 
 export const Route = createFileRoute("/random_user")({
 	loader: async () => {

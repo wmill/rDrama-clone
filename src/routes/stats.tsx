@@ -1,11 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-
-import { getPublicStats } from "@/lib/transparency.server";
-
-export const getPublicStatsFn = createServerFn({ method: "GET" }).handler(
-	getPublicStats,
-);
+import { getPublicStatsFn } from "@/lib/transparency-actions.server";
 export const Route = createFileRoute("/stats")({
 	loader: () => getPublicStatsFn(),
 	component: StatsPage,

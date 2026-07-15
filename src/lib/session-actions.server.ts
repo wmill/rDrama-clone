@@ -1,10 +1,26 @@
 import { createServerFn } from "@tanstack/react-start";
 import { fail, requireUser } from "@/lib/auth-guards.server";
 import {
+	clearSessionCookie,
 	deleteOtherUserSessions,
+	deleteSession,
+	getCurrentUser,
 	getSessionIdFromCookie,
 	listUserSessions,
 } from "@/lib/sessions.server";
+
+export const getCurrentUserFn = createServerFn({ method: "GET" }).handler(
+	async () => getCurrentUser(),
+);
+
+export const logoutFn = createServerFn({ method: "POST" }).handler(async () => {
+	const sessionId = getSessionIdFromCookie();
+	if (sessionId) {
+		await deleteSession(sessionId);
+	}
+	clearSessionCookie();
+	return { success: true as const };
+});
 
 export type ClientSessionInfo = {
 	// truncated id prefix, safe to render; full session ids are auth tokens

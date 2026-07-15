@@ -1,99 +1,10 @@
 import { useRouter } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
 import arrowBigDownUrl from "lucide-static/icons/arrow-big-down.svg?url";
 import arrowBigUpUrl from "lucide-static/icons/arrow-big-up.svg?url";
 import { useState } from "react";
 import { IconMask } from "@/components/ui/icon-mask";
-import { enforceRateLimit } from "@/lib/rate-limit.server";
-import { getCurrentUser } from "@/lib/sessions.server";
-import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
-import {
-	commentVoteInputSchema,
-	submissionVoteInputSchema,
-} from "@/lib/validation";
-import {
-	type VoteType,
-	voteOnComment,
-	voteOnSubmission,
-} from "@/lib/votes.server";
-
-const NO_VOTE: VoteType = 0;
-
-const voteSubmissionFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { submissionId: number; voteType: VoteType }) =>
-		submissionVoteInputSchema.parse(data),
-	)
-	.handler(
-		async ({
-			data,
-		}: {
-			data: { submissionId: number; voteType: VoteType };
-		}) => {
-			const user = await getCurrentUser();
-			if (!user) {
-				return {
-					success: false,
-					error: "Not logged in",
-					newScore: 0,
-					userVote: NO_VOTE,
-				};
-			}
-			if (await isSiteReadOnly()) {
-				return {
-					success: false,
-					error: READ_ONLY_MESSAGE,
-					newScore: 0,
-					userVote: NO_VOTE,
-				};
-			}
-			const rate = await enforceRateLimit("vote", String(user.id));
-			if (!rate.allowed) {
-				return {
-					success: false,
-					error: rate.error,
-					newScore: 0,
-					userVote: NO_VOTE,
-				};
-			}
-			return voteOnSubmission(user.id, data.submissionId, data.voteType);
-		},
-	);
-
-const voteCommentFn = createServerFn({ method: "POST" })
-	.inputValidator((data: { commentId: number; voteType: VoteType }) =>
-		commentVoteInputSchema.parse(data),
-	)
-	.handler(
-		async ({ data }: { data: { commentId: number; voteType: VoteType } }) => {
-			const user = await getCurrentUser();
-			if (!user) {
-				return {
-					success: false,
-					error: "Not logged in",
-					newScore: 0,
-					userVote: NO_VOTE,
-				};
-			}
-			if (await isSiteReadOnly()) {
-				return {
-					success: false,
-					error: READ_ONLY_MESSAGE,
-					newScore: 0,
-					userVote: NO_VOTE,
-				};
-			}
-			const rate = await enforceRateLimit("vote", String(user.id));
-			if (!rate.allowed) {
-				return {
-					success: false,
-					error: rate.error,
-					newScore: 0,
-					userVote: NO_VOTE,
-				};
-			}
-			return voteOnComment(user.id, data.commentId, data.voteType);
-		},
-	);
+import { voteCommentFn, voteSubmissionFn } from "@/lib/vote-actions.server";
+import type { VoteType } from "@/lib/votes.server";
 
 type VoteButtonsProps = {
 	type: "submission" | "comment";

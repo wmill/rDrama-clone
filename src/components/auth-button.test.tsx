@@ -9,16 +9,8 @@ vi.mock("@/hooks/use-auth", () => ({
 	useAuth: vi.fn(),
 }));
 
-vi.mock("@/lib/sessions.server", () => ({
-	clearSessionCookie: vi.fn(),
-	deleteSession: vi.fn(),
-	getSessionIdFromCookie: vi.fn(),
-}));
-
-vi.mock("@tanstack/react-start", () => ({
-	createServerFn: () => ({
-		handler: (handler: unknown) => handler,
-	}),
+vi.mock("@/lib/session-actions.server", () => ({
+	logoutFn: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({

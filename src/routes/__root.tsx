@@ -6,30 +6,17 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { createServerFn } from "@tanstack/react-start";
 import Header from "../components/Header";
 import { LinkPreferenceController } from "../components/link-preference-controller";
 import { Modals } from "../components/Modals";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { normalizeThemeColor } from "../lib/content-preferences";
-import { getUnreadNotificationCount } from "../lib/notifications.server";
-import { getCurrentUser } from "../lib/sessions.server";
+import { getRootDataFn } from "../lib/root-actions.server";
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
 }
-
-const getRootDataFn = createServerFn({ method: "GET" }).handler(async () => {
-	const user = await getCurrentUser();
-
-	return {
-		user,
-		unreadNotificationCount: user
-			? await getUnreadNotificationCount(user.id)
-			: 0,
-	};
-});
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	head: () => ({
