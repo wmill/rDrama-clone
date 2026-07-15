@@ -12,7 +12,11 @@ import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { enforceRateLimit } from "@/lib/rate-limit.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
-import { createSubmission } from "@/lib/submissions.server";
+import {
+	createSubmission,
+	type ExistingRepostSummary,
+	RepostConfirmationRequiredError,
+} from "@/lib/submissions.server";
 
 const submitSchema = z
 	.object({
@@ -30,6 +34,7 @@ const submitSchema = z
 			.max(20000, "Body must be 20000 characters or less")
 			.optional(),
 		isNsfw: z.boolean().default(false),
+		allowRepost: z.boolean().default(false),
 	})
 	.refine((data) => data.url || data.body, {
 		message: "Either a URL or body text is required",
@@ -69,10 +74,14 @@ const submitAction = createServerFn({ method: "POST" })
 				url: data.url || undefined,
 				body: data.body || undefined,
 				isNsfw: data.isNsfw,
+				allowRepost: data.allowRepost,
 			});
 
 			return { success: true as const, postId };
 		} catch (err) {
+			if (err instanceof RepostConfirmationRequiredError) {
+				return { success: false as const, repost: err.existing };
+			}
 			return {
 				success: false as const,
 				error:
@@ -103,6 +112,7 @@ function SubmitPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [isLoading, setIsLoading] = useState(false);
+	const [repost, setRepost] = useState<ExistingRepostSummary | null>(null);
 	const [submitType, setSubmitType] = useState<"link" | "text">("link");
 
 	const titleId = useId();
@@ -128,9 +138,9 @@ function SubmitPage() {
 		);
 	}
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const submit = async (allowRepost: boolean) => {
 		setError(null);
+		setRepost(null);
 		setFieldErrors({});
 		setIsLoading(true);
 
@@ -140,6 +150,7 @@ function SubmitPage() {
 				url: submitType === "link" ? url : undefined,
 				body: submitType === "text" ? body : undefined,
 				isNsfw,
+				allowRepost,
 			};
 
 			const validation = submitSchema.safeParse(submitData);
@@ -159,7 +170,8 @@ function SubmitPage() {
 			const result = await submitAction({ data: submitData });
 
 			if (!result.success) {
-				setError(result.error);
+				if ("repost" in result && result.repost) setRepost(result.repost);
+				else setError(result.error);
 				return;
 			}
 
@@ -171,6 +183,11 @@ function SubmitPage() {
 		} finally {
 			setIsLoading(false);
 		}
+	};
+
+	const handleSubmit = (event: React.FormEvent) => {
+		event.preventDefault();
+		void submit(false);
 	};
 
 	return (
@@ -208,6 +225,31 @@ function SubmitPage() {
 						{error && (
 							<div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-400">
 								{error}
+							</div>
+						)}
+						{repost && (
+							<div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-200">
+								<p>
+									This URL was already posted as{" "}
+									<Link
+										to="/post/$id"
+										params={{ id: String(repost.id) }}
+										search={{ sort: "top" }}
+										className="font-semibold underline"
+									>
+										{repost.title}
+									</Link>{" "}
+									by @{repost.authorName}.
+								</p>
+								<Button
+									type="button"
+									variant="outline"
+									className="mt-3"
+									disabled={isLoading}
+									onClick={() => void submit(true)}
+								>
+									Post it again
+								</Button>
 							</div>
 						)}
 

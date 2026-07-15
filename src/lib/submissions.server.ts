@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -208,10 +208,52 @@ function normalizeOptionalText(value?: string | null): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
+export function normalizePostUrl(value?: string | null): string | null {
+	const normalized = normalizeOptionalText(value);
+	if (!normalized) return null;
+	try {
+		const url = new URL(normalized);
+		url.protocol = url.protocol.toLowerCase();
+		url.hostname = url.hostname.toLowerCase();
+		url.hash = "";
+		if (
+			(url.protocol === "http:" && url.port === "80") ||
+			(url.protocol === "https:" && url.port === "443")
+		) {
+			url.port = "";
+		}
+		if (url.pathname === "/") url.pathname = "";
+		return url.toString();
+	} catch {
+		return normalized;
+	}
+}
+
 export class BannedDomainError extends Error {
 	constructor(domain: string, reason: string) {
 		super(`Links to ${domain} are not allowed: ${reason}`);
 		this.name = "BannedDomainError";
+	}
+}
+
+export class DuplicateSubmissionError extends Error {
+	constructor() {
+		super("You already submitted an identical active post");
+		this.name = "DuplicateSubmissionError";
+	}
+}
+
+export type ExistingRepostSummary = {
+	id: number;
+	title: string;
+	authorName: string;
+	createdUtc: number;
+};
+
+export class RepostConfirmationRequiredError extends Error {
+	constructor(readonly existing: ExistingRepostSummary) {
+		super("This URL has already been posted");
+		this.name = "RepostConfirmationRequiredError";
 	}
 }
 
@@ -538,10 +580,11 @@ export async function createSubmission(data: {
 	url?: string;
 	body?: string;
 	isNsfw?: boolean;
+	allowRepost?: boolean;
 }): Promise<number> {
 	const createdUtc = Math.floor(Date.now() / 1000);
 	const title = normalizeRequiredText(data.title);
-	const url = normalizeOptionalText(data.url);
+	const url = normalizePostUrl(data.url);
 	const body = normalizeOptionalText(data.body);
 
 	await assertUrlDomainAllowed(url);
@@ -557,6 +600,49 @@ export async function createSubmission(data: {
 			: "VISIBLE";
 
 	const result = await db.transaction(async (tx) => {
+		const fingerprint = JSON.stringify([data.authorId, title, url, body]);
+		await tx.execute(
+			sql`select pg_advisory_xact_lock(hashtext(${url ? `post-url:${url}` : `post:${fingerprint}`}))`,
+		);
+		const [duplicate] = await tx
+			.select({ id: submissions.id })
+			.from(submissions)
+			.where(
+				and(
+					eq(submissions.authorId, data.authorId),
+					eq(submissions.title, title),
+					url === null ? isNull(submissions.url) : eq(submissions.url, url),
+					body === null ? isNull(submissions.body) : eq(submissions.body, body),
+					ne(submissions.stateMod, "REMOVED"),
+					isNull(submissions.stateUserDeletedUtc),
+				),
+			)
+			.limit(1);
+		if (duplicate) throw new DuplicateSubmissionError();
+
+		if (url && !data.allowRepost) {
+			const [existing] = await tx
+				.select({
+					id: submissions.id,
+					title: submissions.title,
+					authorName: users.username,
+					createdUtc: submissions.createdUtc,
+				})
+				.from(submissions)
+				.innerJoin(users, eq(submissions.authorId, users.id))
+				.where(
+					and(
+						eq(submissions.url, url),
+						eq(submissions.stateMod, "VISIBLE"),
+						isNull(submissions.stateUserDeletedUtc),
+						eq(submissions.private, false),
+						isNull(users.shadowBanned),
+					),
+				)
+				.limit(1);
+			if (existing) throw new RepostConfirmationRequiredError(existing);
+		}
+
 		const [createdSubmission] = await tx
 			.insert(submissions)
 			.values({
@@ -611,7 +697,7 @@ export async function updateSubmission(
 ): Promise<boolean> {
 	const editedUtc = Math.floor(Date.now() / 1000);
 	const title = normalizeRequiredText(data.title);
-	const url = normalizeOptionalText(data.url);
+	const url = normalizePostUrl(data.url);
 	const body = normalizeOptionalText(data.body);
 
 	await assertUrlDomainAllowed(url);

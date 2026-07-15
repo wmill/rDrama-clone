@@ -6,6 +6,7 @@ import {
 	gte,
 	inArray,
 	isNull,
+	ne,
 	type SQL,
 	sql,
 } from "drizzle-orm";
@@ -1033,6 +1034,31 @@ export async function createComment(data: {
 	}
 
 	const result = await db.transaction(async (tx) => {
+		const parentKey =
+			data.parentCommentId ?? `submission:${data.parentSubmissionId}`;
+		const fingerprint = JSON.stringify([data.authorId, parentKey, data.body]);
+		await tx.execute(
+			sql`select pg_advisory_xact_lock(hashtext(${`comment:${fingerprint}`}))`,
+		);
+		const [duplicate] = await tx
+			.select({ id: comments.id })
+			.from(comments)
+			.where(
+				and(
+					eq(comments.authorId, data.authorId),
+					eq(comments.parentSubmission, data.parentSubmissionId),
+					data.parentCommentId
+						? eq(comments.parentCommentId, data.parentCommentId)
+						: isNull(comments.parentCommentId),
+					eq(comments.body, data.body),
+					ne(comments.stateMod, "REMOVED"),
+					isNull(comments.stateUserDeletedUtc),
+				),
+			)
+			.limit(1);
+		if (duplicate)
+			throw new Error("You already submitted an identical active comment here");
+
 		const [createdComment] = await tx
 			.insert(comments)
 			.values({

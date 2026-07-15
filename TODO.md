@@ -51,7 +51,7 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
   - *Done when*: deleted content can be restored by its author, cannot be restored by anyone else or while removed/filtered, and becomes visible and searchable again.
   - *Verify*: lifecycle/action/component tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T38: Duplicate and repost protection**
+- [x] **T38: Duplicate and repost protection**
   - *Why*: rDrama detects accidental duplicates and existing URLs; rDreamer currently relies only on rate limits.
   - *Implementation*: normalize post URLs consistently with banned-domain checks. Hard-reject an identical active post by the same author and an identical comment by the same author under the same parent. For an existing visible URL from any author, return the existing post summary and require an explicit `allowRepost` confirmation rather than silently redirecting.
   - *Files*: `src/lib/submissions.server.ts`, `src/lib/comments.server.ts`, submit/comment actions and forms.

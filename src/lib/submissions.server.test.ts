@@ -42,11 +42,14 @@ import { getSiteSetting } from "@/lib/site-settings.server";
 import {
 	BannedDomainError,
 	createSubmission,
+	DuplicateSubmissionError,
 	deleteSubmission,
 	getSubmissionById,
 	getSubmissions,
 	getSubmissionsPage,
 	HOME_FEED_PER_PAGE,
+	normalizePostUrl,
+	RepostConfirmationRequiredError,
 	updateSubmission,
 } from "@/lib/submissions.server";
 
@@ -78,12 +81,14 @@ function createSelectLimitChain(result: unknown) {
 	return chain;
 }
 
-function createSubmissionTx(id = 70) {
+function createSubmissionTx(id = 70, selectResults: unknown[] = [[]]) {
 	const submissionInsert = {
 		values: vi.fn(() => ({ returning: vi.fn().mockResolvedValue([{ id }]) })),
 	};
 	const voteInsert = { values: vi.fn().mockResolvedValue(undefined) };
 	const tx = {
+		execute: vi.fn().mockResolvedValue(undefined),
+		select: vi.fn(() => createSelectLimitChain(selectResults.shift() ?? [])),
 		insert: vi
 			.fn()
 			.mockReturnValueOnce(submissionInsert)
@@ -123,6 +128,84 @@ describe("submissions.server", () => {
 			);
 		},
 	);
+
+	it("normalizes URL casing, default ports, roots, and fragments consistently", () => {
+		expect(normalizePostUrl(" HTTPS://Example.COM:443/#fragment ")).toBe(
+			"https://example.com/",
+		);
+		expect(normalizePostUrl("https://example.com/path#section")).toBe(
+			"https://example.com/path",
+		);
+	});
+
+	it("hard-rejects the same author's identical active post while holding the race lock", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectLimitChain([{ adminLevel: 0 }]) as never,
+		);
+		const { tx } = createSubmissionTx(70, [[{ id: 60 }]]);
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(
+			createSubmission({ authorId: 3, title: "Same", body: "same" }),
+		).rejects.toBeInstanceOf(DuplicateSubmissionError);
+		expect(tx.execute).toHaveBeenCalledTimes(1);
+		expect(tx.insert).not.toHaveBeenCalled();
+	});
+
+	it("returns an existing visible URL summary until repost is explicitly confirmed", async () => {
+		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectFromChain([]) as never)
+			.mockReturnValueOnce(
+				createSelectLimitChain([{ adminLevel: 0 }]) as never,
+			);
+		const existing = {
+			id: 61,
+			title: "Earlier post",
+			authorName: "bob",
+			createdUtc: 100,
+		};
+		const { tx } = createSubmissionTx(70, [[], [existing]]);
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(
+			createSubmission({
+				authorId: 3,
+				title: "Repost",
+				url: "https://example.com/story",
+			}),
+		).rejects.toMatchObject({
+			constructor: RepostConfirmationRequiredError,
+			existing,
+		});
+		expect(tx.insert).not.toHaveBeenCalled();
+	});
+
+	it("allows a deliberate repost and does not warn for hidden URL matches", async () => {
+		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectFromChain([]) as never)
+			.mockReturnValueOnce(
+				createSelectLimitChain([{ adminLevel: 0 }]) as never,
+			);
+		const { tx, submissionInsert } = createSubmissionTx(70, [[]]);
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(
+			createSubmission({
+				authorId: 3,
+				title: "Repost",
+				url: "https://example.com/story",
+				allowRepost: true,
+			}),
+		).resolves.toBe(70);
+		expect(submissionInsert.values).toHaveBeenCalled();
+		expect(tx.select).toHaveBeenCalledTimes(1);
+	});
 
 	it("omits blocked authors from submission feeds", async () => {
 		vi.mocked(db.select).mockReturnValueOnce(

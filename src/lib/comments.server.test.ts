@@ -125,7 +125,7 @@ function createUpdateChain(returningResult?: unknown) {
 	return { set, where, returning };
 }
 
-function createTx(insertedCommentId: number) {
+function createTx(insertedCommentId: number, duplicateRows: unknown[] = []) {
 	const commentInsert = {
 		values: vi.fn(() => ({
 			returning: vi.fn().mockResolvedValue([{ id: insertedCommentId }]),
@@ -134,6 +134,7 @@ function createTx(insertedCommentId: number) {
 	const voteInsert = { values: vi.fn().mockResolvedValue(undefined) };
 	const updateChains: ReturnType<typeof createUpdateChain>[] = [];
 	const tx = {
+		select: vi.fn(() => createCommentRowChain(duplicateRows)),
 		insert: vi
 			.fn()
 			.mockReturnValueOnce(commentInsert)
@@ -287,6 +288,20 @@ describe("createComment", () => {
 		expect(commentInsert.values).toHaveBeenCalledWith(
 			expect.objectContaining({ stateMod: "FILTERED" }),
 		);
+	});
+
+	it("hard-rejects an identical active comment under the same parent while holding the race lock", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(authorChain() as never);
+		const { tx } = createTx(62, [{ id: 50 }]);
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(
+			createComment({ authorId: 7, body: "same", parentSubmissionId: 42 }),
+		).rejects.toThrow("identical active comment");
+		expect(tx.execute).toHaveBeenCalledTimes(1);
+		expect(tx.insert).not.toHaveBeenCalled();
 	});
 });
 
