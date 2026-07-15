@@ -109,6 +109,9 @@ export type UserSettings = {
 	nameColor: string;
 	titleColor: string;
 	themeColor: string;
+	theme: "dark" | "light";
+	over18: boolean;
+	slurReplacer: boolean;
 };
 
 export type UpdateUserSettingsInput = {
@@ -128,6 +131,9 @@ export type UpdateUserSettingsInput = {
 	nameColor: string;
 	titleColor: string;
 	themeColor: string;
+	theme: "dark" | "light";
+	over18: boolean;
+	slurReplacer: boolean;
 };
 
 function getTimeCutoff(time: TimeFilter): number | null {
@@ -214,6 +220,9 @@ export async function getUserSettingsById(
 			nameColor: users.nameColor,
 			titleColor: users.titleColor,
 			themeColor: users.themeColor,
+			theme: users.theme,
+			over18: users.over18,
+			slurReplacer: users.slurReplacer,
 		})
 		.from(users)
 		.where(eq(users.id, userId))
@@ -248,6 +257,9 @@ export async function getUserSettingsById(
 		nameColor: user.nameColor,
 		titleColor: user.titleColor,
 		themeColor: user.themeColor,
+		theme: user.theme === "light" ? "light" : "dark",
+		over18: user.over18,
+		slurReplacer: user.slurReplacer,
 	};
 }
 
@@ -286,6 +298,9 @@ export async function updateUserSettings(
 			nameColor: input.nameColor,
 			titleColor: input.titleColor,
 			themeColor: input.themeColor,
+			theme: input.theme,
+			over18: input.over18,
+			slurReplacer: input.slurReplacer,
 		})
 		.where(eq(users.id, userId));
 }

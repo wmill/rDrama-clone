@@ -173,7 +173,7 @@ Pattern for all admin pages: route guard comes free by nesting under `src/routes
 
 ## Customization & settings
 
-- [ ] **T25: Expose dormant user settings — theme, over18, slur replacer**
+- [x] **T25: Expose dormant user settings — theme, over18, slur replacer** *(done 2026-07-15: persisted light/dark theme, NSFW visibility, and slur-replacer controls; session-safe preferences drive root theme styling and server-side post/feed gating and rendered post/comment replacement; 4 focused tests)*
   - *Why*: `users.theme`, `users.over18`, `users.slurReplacer` columns exist with no UI or enforcement.
   - *Files*: `src/routes/me.tsx` + the settings update in `src/lib/users.server.ts` (follow the existing toggle patterns); theme applied in `src/routes/__root.tsx`; over18 gates NSFW-marked submissions in feed/post queries; slur replacer applied at render time. **Scope-check first**: if a piece has no backing data (e.g. no NSFW flag actually set on submissions), note it in the close-out and skip that toggle rather than shipping a dead switch.
   - *Done when*: each shipped toggle visibly changes behavior and has a server test.

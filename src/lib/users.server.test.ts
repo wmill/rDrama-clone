@@ -70,6 +70,9 @@ function makeSettingsInput(
 		nameColor: "000000",
 		titleColor: "000000",
 		themeColor: "000000",
+		theme: "dark",
+		over18: false,
+		slurReplacer: true,
 		...overrides,
 	};
 }
@@ -188,6 +191,24 @@ describe("updateUserSettings", () => {
 				customTitle: null,
 				profileUrl: null,
 				bannerUrl: null,
+			}),
+		);
+	});
+
+	it("persists the theme and content preferences", async () => {
+		const chain = createQueryChain();
+		vi.mocked(db.update).mockReturnValueOnce(chain as never);
+
+		await updateUserSettings(
+			7,
+			makeSettingsInput({ theme: "light", over18: true, slurReplacer: false }),
+		);
+
+		expect(chain.set).toHaveBeenCalledWith(
+			expect.objectContaining({
+				theme: "light",
+				over18: true,
+				slurReplacer: false,
 			}),
 		);
 	});

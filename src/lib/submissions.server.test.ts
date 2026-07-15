@@ -324,6 +324,63 @@ describe("submissions.server", () => {
 		expect(moderatorResult?.bodyHtml).toBe("<p>body</p>");
 	});
 
+	it("gates NSFW content and applies the slur replacer for the viewer", async () => {
+		const row = {
+			id: 18,
+			title: "A retard title",
+			titleHtml: "A retard title",
+			createdUtc: 1,
+			authorId: 4,
+			authorName: "author",
+			url: "https://example.com/adult",
+			body: "retard body",
+			bodyHtml: "<p>retard body</p>",
+			upvotes: 1,
+			downvotes: 0,
+			commentCount: 0,
+			thumbUrl: "https://example.com/thumb.jpg",
+			flair: null,
+			isPinned: false,
+			isNsfw: true,
+			stickied: null,
+			embedUrl: "https://example.com/embed",
+			editedUtc: 0,
+			views: 0,
+			distinguishLevel: 0,
+			stateUserDeletedUtc: null,
+			stateMod: "VISIBLE",
+			stateModSetBy: null,
+			userVoteType: null,
+			savedSubmissionId: null,
+			subscribedSubmissionId: null,
+			blockedTargetId: null,
+		};
+		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectLimitChain([row]) as never)
+			.mockReturnValueOnce(createSelectLimitChain([row]) as never);
+
+		const gated = await getSubmissionById(18, 9, false, {
+			over18: false,
+			slurReplacer: true,
+		});
+		const visible = await getSubmissionById(18, 9, false, {
+			over18: true,
+			slurReplacer: true,
+		});
+
+		expect(gated).toMatchObject({
+			title: "[NSFW post hidden]",
+			url: null,
+			thumbUrl: null,
+			embedUrl: null,
+		});
+		expect(visible).toMatchObject({
+			title: "A person title",
+			bodyHtml: "<p>person body</p>",
+			url: "https://example.com/adult",
+		});
+	});
+
 	it("rejects edits from non-authors and does not reindex", async () => {
 		vi.mocked(db.update).mockReturnValueOnce({
 			set: vi.fn(() => ({

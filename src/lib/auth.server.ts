@@ -52,6 +52,9 @@ export type SafeUser = {
 	bannerUrl: string | null;
 	bio: string | null;
 	customTitle: string | null;
+	theme?: string;
+	over18?: boolean;
+	slurReplacer?: boolean;
 };
 
 export function sanitizeUser(user: typeof users.$inferSelect): SafeUser {
@@ -72,6 +75,9 @@ export function sanitizeUser(user: typeof users.$inferSelect): SafeUser {
 		bannerUrl: user.bannerUrl,
 		bio: user.bio,
 		customTitle: user.customTitle,
+		theme: user.theme,
+		over18: user.over18,
+		slurReplacer: user.slurReplacer,
 	};
 }
 

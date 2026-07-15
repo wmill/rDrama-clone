@@ -59,7 +59,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 	const { user, unreadNotificationCount } = Route.useLoaderData();
 
 	return (
-		<html lang="en">
+		<html lang="en" data-theme={user?.theme === "light" ? "light" : "dark"}>
 			<head>
 				<HeadContent />
 			</head>

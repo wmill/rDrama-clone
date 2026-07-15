@@ -37,6 +37,8 @@ const loadSubmissions = createServerFn({ method: "GET" })
 					time: data.time ?? "all",
 					page: data.page ?? 1,
 					userId: user?.id,
+					viewerOver18: user?.over18,
+					slurReplacer: user?.slurReplacer,
 				});
 				return {
 					submissions: result.submissions,

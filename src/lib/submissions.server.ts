@@ -12,6 +12,10 @@ import {
 } from "@/db/schema";
 import { type AwardCount, getSubmissionAwardCounts } from "@/lib/awards.server";
 import { deriveModerationVisibility } from "@/lib/comment-visibility.server";
+import {
+	replaceSlursInHtml,
+	replaceSlursInText,
+} from "@/lib/content-preferences";
 import { parseVoteType } from "@/lib/enums";
 import {
 	authorDeleteSubmission,
@@ -104,6 +108,8 @@ function mapSubmissionRow<T extends SubmissionRow>(
 	options?: {
 		includeBlockedPlaceholder?: boolean;
 		viewerCanModerate?: boolean;
+		viewerOver18?: boolean;
+		slurReplacer?: boolean;
 	},
 ) {
 	const moderation = deriveModerationVisibility(
@@ -126,17 +132,35 @@ function mapSubmissionRow<T extends SubmissionRow>(
 		moderation.message ??
 		(showBlockedPlaceholder ? `You are blocking @${row.authorName}` : null);
 	const blockedTitle = `[blocked post by @${row.authorName}]`;
+	const hideNsfw = row.isNsfw && !options?.viewerOver18;
+	const title = hideNsfw ? "[NSFW post hidden]" : row.title;
+	const titleHtml = hideNsfw ? "[NSFW post hidden]" : row.titleHtml;
+	const body = hideNsfw ? "[Enable NSFW posts in settings to view]" : row.body;
+	const bodyHtml = hideNsfw
+		? "<p>[Enable NSFW posts in settings to view]</p>"
+		: row.bodyHtml;
 
 	return {
 		...row,
-		title: showBlockedPlaceholder ? blockedTitle : row.title,
-		titleHtml: showBlockedPlaceholder ? blockedTitle : row.titleHtml,
-		url: showBlockedPlaceholder ? null : row.url,
-		body: visibilityMessage ? `[${visibilityMessage.toLowerCase()}]` : row.body,
+		title: showBlockedPlaceholder
+			? blockedTitle
+			: options?.slurReplacer
+				? replaceSlursInText(title)
+				: title,
+		titleHtml: showBlockedPlaceholder
+			? blockedTitle
+			: options?.slurReplacer
+				? replaceSlursInHtml(titleHtml)
+				: titleHtml,
+		url: showBlockedPlaceholder || hideNsfw ? null : row.url,
+		body: visibilityMessage ? `[${visibilityMessage.toLowerCase()}]` : body,
 		bodyHtml: visibilityMessage
 			? `<p>[${visibilityMessage.toLowerCase()}]</p>`
-			: row.bodyHtml,
-		embedUrl: showBlockedPlaceholder ? null : row.embedUrl,
+			: bodyHtml && options?.slurReplacer
+				? replaceSlursInHtml(bodyHtml)
+				: bodyHtml,
+		thumbUrl: hideNsfw ? null : row.thumbUrl,
+		embedUrl: showBlockedPlaceholder || hideNsfw ? null : row.embedUrl,
 		score: row.upvotes - row.downvotes,
 		userVote: parseVoteType(row.userVoteType),
 		isStickied: row.stickied !== null,
@@ -220,6 +244,8 @@ export async function getSubmissions(options: {
 	authorId?: number;
 	pinnedFirst?: boolean;
 	userId?: number;
+	viewerOver18?: boolean;
+	slurReplacer?: boolean;
 }): Promise<SubmissionSummary[]> {
 	const {
 		sort = "hot",
@@ -368,7 +394,10 @@ export async function getSubmissions(options: {
 	);
 
 	return visibleRows.map((row) => ({
-		...mapSubmissionRow(row),
+		...mapSubmissionRow(row, {
+			viewerOver18: options.viewerOver18,
+			slurReplacer: options.slurReplacer,
+		}),
 		awards: awardsById.get(row.id) ?? [],
 	}));
 }
@@ -386,6 +415,8 @@ export async function getSubmissionsPage(options: {
 	time?: TimeFilter;
 	page?: number;
 	userId?: number;
+	viewerOver18?: boolean;
+	slurReplacer?: boolean;
 }): Promise<SubmissionFeedPage> {
 	const safePage = Math.max(1, Math.floor(options.page ?? 1));
 
@@ -393,6 +424,8 @@ export async function getSubmissionsPage(options: {
 		sort: options.sort,
 		time: options.time,
 		userId: options.userId,
+		viewerOver18: options.viewerOver18,
+		slurReplacer: options.slurReplacer,
 		limit: HOME_FEED_PER_PAGE + 1,
 		offset: (safePage - 1) * HOME_FEED_PER_PAGE,
 	});
@@ -408,6 +441,7 @@ export async function getSubmissionById(
 	id: number,
 	userId?: number,
 	viewerCanModerate = false,
+	preferences?: { over18?: boolean; slurReplacer?: boolean },
 ): Promise<SubmissionDetail | null> {
 	const [result] = await db
 		.select({
@@ -484,6 +518,8 @@ export async function getSubmissionById(
 	const mapped = mapSubmissionRow(result, {
 		includeBlockedPlaceholder: true,
 		viewerCanModerate,
+		viewerOver18: preferences?.over18,
+		slurReplacer: preferences?.slurReplacer,
 	});
 	return { ...mapped, awards: awardsById.get(result.id) ?? [] };
 }

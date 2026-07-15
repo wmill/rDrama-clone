@@ -71,6 +71,9 @@ const settingsSchema = z.object({
 	nameColor: colorSchema,
 	titleColor: colorSchema,
 	themeColor: colorSchema,
+	theme: z.enum(["dark", "light"]),
+	over18: z.boolean(),
+	slurReplacer: z.boolean(),
 });
 
 type SettingsInput = z.infer<typeof settingsSchema>;
@@ -186,6 +189,9 @@ function SettingsForm({
 		nameColor: settings.nameColor,
 		titleColor: settings.titleColor,
 		themeColor: settings.themeColor,
+		theme: settings.theme,
+		over18: settings.over18,
+		slurReplacer: settings.slurReplacer,
 	});
 	const [error, setError] = useState<string | null>(null);
 	const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -480,6 +486,28 @@ function SettingsForm({
 							Behavior toggles
 						</h3>
 						<div className="grid gap-4 md:grid-cols-2">
+							<ToggleRow
+								label="Light theme"
+								description="Use the light color theme across the site."
+								checked={form.theme === "light"}
+								onCheckedChange={(checked) =>
+									updateField("theme", checked ? "light" : "dark")
+								}
+							/>
+							<ToggleRow
+								label="Show NSFW posts"
+								description="Allow adult-marked post titles, bodies, and media to display."
+								checked={form.over18}
+								onCheckedChange={(checked) => updateField("over18", checked)}
+							/>
+							<ToggleRow
+								label="Replace slurs"
+								description="Replace common slurs in rendered post and comment text."
+								checked={form.slurReplacer}
+								onCheckedChange={(checked) =>
+									updateField("slurReplacer", checked)
+								}
+							/>
 							<ToggleRow
 								label="Private profile"
 								description="Restrict posts and comments on your profile to you and admins."

@@ -26,6 +26,7 @@ import {
 	getCommentsBySubmissionFlat,
 } from "@/lib/comments.server";
 import { AWARD_OPTIONS } from "@/lib/constants";
+import { replaceSlursInHtml } from "@/lib/content-preferences";
 import {
 	deleteSubmissionFn,
 	saveSubmissionFn,
@@ -51,7 +52,10 @@ const getPostFn = createServerFn({ method: "GET" })
 		const userId = user?.id;
 
 		const [post, comments] = await Promise.all([
-			getSubmissionById(data.id, userId, (user?.adminLevel ?? 0) >= 2),
+			getSubmissionById(data.id, userId, (user?.adminLevel ?? 0) >= 2, {
+				over18: user?.over18,
+				slurReplacer: user?.slurReplacer,
+			}),
 			getCommentsBySubmissionFlat(data.id, userId),
 		]);
 		if (!post) return null;
@@ -60,7 +64,17 @@ const getPostFn = createServerFn({ method: "GET" })
 			comments.reduce((max, comment) => Math.max(max, comment.createdUtc), 0) ||
 			Math.floor(Date.now() / 1000);
 
-		return { post, comments, commentsLastFetchedAt, user };
+		return {
+			post,
+			comments: user?.slurReplacer
+				? comments.map((comment) => ({
+						...comment,
+						bodyHtml: replaceSlursInHtml(comment.bodyHtml),
+					}))
+				: comments,
+			commentsLastFetchedAt,
+			user,
+		};
 	});
 
 export const Route = createFileRoute("/post/$id")({
