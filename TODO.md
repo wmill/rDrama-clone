@@ -111,28 +111,28 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
 
 ## Priority 2 — community discovery and transparency
 
-- [ ] **T45: Essential community pages**
+- [x] **T45: Essential community pages**
   - *Why*: rules and formatting help are part of the normal participation flow, not optional marketing pages.
   - *Implementation*: add `/rules` from the existing TheMotte rules content and `/formatting` generated from the markdown features rDreamer actually supports. Link formatting help from post and comment create/edit forms.
   - *Files*: new public routes/content modules, markdown options, editor components, header/navigation as appropriate.
   - *Done when*: both pages are usable without login, formatting examples match the renderer, and editor links preserve new-tab preferences.
   - *Verify*: route and markdown-example tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T46: Public transparency pages**
+- [x] **T46: Public transparency pages**
   - *Why*: rDreamer's mod log and user oversight data are admin-only, while rDrama exposes a safe public transparency layer.
   - *Implementation*: add public admin, banned-user, basic-statistics, and moderation-log pages. Define a positive `PUBLIC_MOD_ACTION_KINDS` allowlist and a separate redacted query shape; omit notes, shadowban actions, alt information, investigation data, emails, and private/deleted targets. Keep `/admin/mod-log` unrestricted for moderators.
   - *Files*: new public query module/routes, `src/lib/admin.server.ts` only where shared private helpers are safe.
   - *Done when*: anonymous users can browse paginated public data and no sensitive action or field can be exposed by filters or direct server-function calls.
   - *Verify*: allowlist/redaction/auth/pagination tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T47: Random-user and catalog discovery**
+- [x] **T47: Random-user and catalog discovery**
   - *Why*: random-post exists, but rDrama's random-user and catalog discovery surfaces are missing.
   - *Implementation*: add `/random_user`, excluding private, banned, and shadowbanned profiles for normal viewers. Expose T43's card feed at `/catalog` while keeping query sort/time/page state.
   - *Files*: users server query, two route files or redirects into the canonical feed.
   - *Done when*: both routes work anonymously and obey the same visibility rules as profile and feed discovery.
   - *Verify*: visibility and redirect/query-state tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T48: Key legacy GET redirects**
+- [x] **T48: Key legacy GET redirects**
   - *Why*: bookmarked public rDrama URLs should survive migration without recreating its internal action API.
   - *Implementation*: add permanent redirects for `/forgot`, `/reset`, `/settings`, `/@me`, `/log`, and `/modlog`, preserving safe query parameters. Audit rDrama's public navigation for any other high-value GET aliases. Do not implement legacy POST/AJAX endpoints.
   - *Files*: route aliases and route tests; regenerate `src/routeTree.gen.ts` through the normal router workflow.

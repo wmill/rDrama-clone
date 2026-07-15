@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,7 +81,14 @@ export function CommentForm({
 
 	return (
 		<div className="space-y-2">
-			{/* Write / Preview tabs */}
+			<div className="flex justify-end">
+				<Link
+					to="/formatting"
+					className="text-xs text-cyan-400 hover:text-cyan-300 hover:underline"
+				>
+					Formatting help
+				</Link>
+			</div>
 
 			<Textarea
 				value={text}

@@ -722,9 +722,17 @@ function PostContent({
 								</div>
 							) : (
 								<div className="space-y-2">
-									<Label htmlFor={bodyId} className="text-slate-300">
-										Body
-									</Label>
+									<div className="flex items-center justify-between">
+										<Label htmlFor={bodyId} className="text-slate-300">
+											Body
+										</Label>
+										<Link
+											to="/formatting"
+											className="text-xs text-cyan-400 hover:underline"
+										>
+											Formatting help
+										</Link>
+									</div>
 									<Textarea
 										id={bodyId}
 										value={body}

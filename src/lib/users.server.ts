@@ -34,6 +34,22 @@ export type ProfileTab =
 	| "saved-comments"
 	| "saved-posts";
 
+export async function getRandomPublicUsername(): Promise<string | null> {
+	const [result] = await db
+		.select({ username: users.username })
+		.from(users)
+		.where(
+			and(
+				eq(users.isPrivate, false),
+				eq(users.isBanned, 0),
+				isNull(users.shadowBanned),
+			),
+		)
+		.orderBy(sql`RANDOM()`)
+		.limit(1);
+	return result?.username ?? null;
+}
+
 export type ProfileCommentItem = {
 	id: number;
 	parentSubmissionId: number;

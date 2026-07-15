@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, Home, Menu, Shield, X } from "lucide-react";
+import { Bell, BookOpen, FileText, Home, Menu, Shield, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 import { AuthButton } from "@/components/auth-button";
@@ -105,6 +105,24 @@ export default function Header({
 					>
 						<Home size={20} />
 						<span className="font-medium">Home</span>
+					</Link>
+
+					<Link
+						to="/rules"
+						onClick={() => setIsOpen(false)}
+						className="mb-2 flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-gray-800"
+					>
+						<BookOpen size={20} />
+						<span className="font-medium">Rules</span>
+					</Link>
+
+					<Link
+						to="/formatting"
+						onClick={() => setIsOpen(false)}
+						className="mb-2 flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-gray-800"
+					>
+						<FileText size={20} />
+						<span className="font-medium">Formatting</span>
 					</Link>
 
 					{user && (

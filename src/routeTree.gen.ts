@@ -11,17 +11,31 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SubmitRouteImport } from './routes/submit'
+import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as RulesRouteImport } from './routes/rules'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ResetRouteImport } from './routes/reset'
+import { Route as Random_userRouteImport } from './routes/random_user'
 import { Route as Random_postRouteImport } from './routes/random_post'
 import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as ModlogRouteImport } from './routes/modlog'
+import { Route as ModLogRouteImport } from './routes/mod-log'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LogRouteImport } from './routes/log'
+import { Route as FormattingRouteImport } from './routes/formatting'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as ForgotRouteImport } from './routes/forgot'
 import { Route as CommentsRouteImport } from './routes/comments'
+import { Route as CatalogRouteImport } from './routes/catalog'
+import { Route as BannedRouteImport } from './routes/banned'
+import { Route as AdminsRouteImport } from './routes/admins'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AtmeRouteImport } from './routes/@me'
 import { Route as AtusernameRouteImport } from './routes/@$username'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -57,9 +71,19 @@ const SubmitRoute = SubmitRouteImport.update({
   path: '/submit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StatsRoute = StatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -67,9 +91,24 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RulesRoute = RulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetRoute = ResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Random_userRoute = Random_userRouteImport.update({
+  id: '/random_user',
+  path: '/random_user',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Random_postRoute = Random_postRouteImport.update({
@@ -80,6 +119,16 @@ const Random_postRoute = Random_postRouteImport.update({
 const NotificationsRoute = NotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModlogRoute = ModlogRouteImport.update({
+  id: '/modlog',
+  path: '/modlog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModLogRoute = ModLogRouteImport.update({
+  id: '/mod-log',
+  path: '/mod-log',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeRoute = MeRouteImport.update({
@@ -97,9 +146,24 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LogRoute = LogRouteImport.update({
+  id: '/log',
+  path: '/log',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FormattingRoute = FormattingRouteImport.update({
+  id: '/formatting',
+  path: '/formatting',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotRoute = ForgotRouteImport.update({
+  id: '/forgot',
+  path: '/forgot',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CommentsRoute = CommentsRouteImport.update({
@@ -107,9 +171,29 @@ const CommentsRoute = CommentsRouteImport.update({
   path: '/comments',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CatalogRoute = CatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BannedRoute = BannedRouteImport.update({
+  id: '/banned',
+  path: '/banned',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminsRoute = AdminsRouteImport.update({
+  id: '/admins',
+  path: '/admins',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtmeRoute = AtmeRouteImport.update({
+  id: '/@me',
+  path: '/@me',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AtusernameRoute = AtusernameRouteImport.update({
@@ -236,17 +320,31 @@ const UUsernameSavedCommentsRoute = UUsernameSavedCommentsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
+  '/@me': typeof AtmeRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admins': typeof AdminsRoute
+  '/banned': typeof BannedRoute
+  '/catalog': typeof CatalogRoute
   '/comments': typeof CommentsRoute
+  '/forgot': typeof ForgotRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/formatting': typeof FormattingRoute
+  '/log': typeof LogRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
+  '/mod-log': typeof ModLogRoute
+  '/modlog': typeof ModlogRoute
   '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
+  '/random_user': typeof Random_userRoute
+  '/reset': typeof ResetRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/rules': typeof RulesRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/stats': typeof StatsRoute
   '/submit': typeof SubmitRoute
   '/verify-email': typeof VerifyEmailRoute
   '/@$username/posts': typeof AtusernamePostsRoute
@@ -275,16 +373,30 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
+  '/@me': typeof AtmeRoute
+  '/admins': typeof AdminsRoute
+  '/banned': typeof BannedRoute
+  '/catalog': typeof CatalogRoute
   '/comments': typeof CommentsRoute
+  '/forgot': typeof ForgotRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/formatting': typeof FormattingRoute
+  '/log': typeof LogRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
+  '/mod-log': typeof ModLogRoute
+  '/modlog': typeof ModlogRoute
   '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
+  '/random_user': typeof Random_userRoute
+  '/reset': typeof ResetRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/rules': typeof RulesRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/stats': typeof StatsRoute
   '/submit': typeof SubmitRoute
   '/verify-email': typeof VerifyEmailRoute
   '/@$username/posts': typeof AtusernamePostsRoute
@@ -314,17 +426,31 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/@$username': typeof AtusernameRoute
+  '/@me': typeof AtmeRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admins': typeof AdminsRoute
+  '/banned': typeof BannedRoute
+  '/catalog': typeof CatalogRoute
   '/comments': typeof CommentsRoute
+  '/forgot': typeof ForgotRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/formatting': typeof FormattingRoute
+  '/log': typeof LogRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/me': typeof MeRoute
+  '/mod-log': typeof ModLogRoute
+  '/modlog': typeof ModlogRoute
   '/notifications': typeof NotificationsRoute
   '/random_post': typeof Random_postRoute
+  '/random_user': typeof Random_userRoute
+  '/reset': typeof ResetRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/rules': typeof RulesRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/stats': typeof StatsRoute
   '/submit': typeof SubmitRoute
   '/verify-email': typeof VerifyEmailRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
@@ -355,17 +481,31 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/@$username'
+    | '/@me'
     | '/admin'
+    | '/admins'
+    | '/banned'
+    | '/catalog'
     | '/comments'
+    | '/forgot'
     | '/forgot-password'
+    | '/formatting'
+    | '/log'
     | '/login'
     | '/logout'
     | '/me'
+    | '/mod-log'
+    | '/modlog'
     | '/notifications'
     | '/random_post'
+    | '/random_user'
+    | '/reset'
     | '/reset-password'
+    | '/rules'
     | '/search'
+    | '/settings'
     | '/signup'
+    | '/stats'
     | '/submit'
     | '/verify-email'
     | '/@$username/posts'
@@ -394,16 +534,30 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/@$username'
+    | '/@me'
+    | '/admins'
+    | '/banned'
+    | '/catalog'
     | '/comments'
+    | '/forgot'
     | '/forgot-password'
+    | '/formatting'
+    | '/log'
     | '/login'
     | '/logout'
     | '/me'
+    | '/mod-log'
+    | '/modlog'
     | '/notifications'
     | '/random_post'
+    | '/random_user'
+    | '/reset'
     | '/reset-password'
+    | '/rules'
     | '/search'
+    | '/settings'
     | '/signup'
+    | '/stats'
     | '/submit'
     | '/verify-email'
     | '/@$username/posts'
@@ -432,17 +586,31 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/@$username'
+    | '/@me'
     | '/admin'
+    | '/admins'
+    | '/banned'
+    | '/catalog'
     | '/comments'
+    | '/forgot'
     | '/forgot-password'
+    | '/formatting'
+    | '/log'
     | '/login'
     | '/logout'
     | '/me'
+    | '/mod-log'
+    | '/modlog'
     | '/notifications'
     | '/random_post'
+    | '/random_user'
+    | '/reset'
     | '/reset-password'
+    | '/rules'
     | '/search'
+    | '/settings'
     | '/signup'
+    | '/stats'
     | '/submit'
     | '/verify-email'
     | '/@$username_/posts'
@@ -472,17 +640,31 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AtusernameRoute: typeof AtusernameRoute
+  AtmeRoute: typeof AtmeRoute
   AdminRoute: typeof AdminRouteWithChildren
+  AdminsRoute: typeof AdminsRoute
+  BannedRoute: typeof BannedRoute
+  CatalogRoute: typeof CatalogRoute
   CommentsRoute: typeof CommentsRoute
+  ForgotRoute: typeof ForgotRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  FormattingRoute: typeof FormattingRoute
+  LogRoute: typeof LogRoute
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
   MeRoute: typeof MeRoute
+  ModLogRoute: typeof ModLogRoute
+  ModlogRoute: typeof ModlogRoute
   NotificationsRoute: typeof NotificationsRoute
   Random_postRoute: typeof Random_postRoute
+  Random_userRoute: typeof Random_userRoute
+  ResetRoute: typeof ResetRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  RulesRoute: typeof RulesRoute
   SearchRoute: typeof SearchRoute
+  SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
+  StatsRoute: typeof StatsRoute
   SubmitRoute: typeof SubmitRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   AtusernamePostsRoute: typeof AtusernamePostsRoute
@@ -515,11 +697,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubmitRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/stats': {
+      id: '/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof StatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -529,11 +725,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rules': {
+      id: '/rules'
+      path: '/rules'
+      fullPath: '/rules'
+      preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset': {
+      id: '/reset'
+      path: '/reset'
+      fullPath: '/reset'
+      preLoaderRoute: typeof ResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/random_user': {
+      id: '/random_user'
+      path: '/random_user'
+      fullPath: '/random_user'
+      preLoaderRoute: typeof Random_userRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/random_post': {
@@ -548,6 +765,20 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/notifications'
       preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/modlog': {
+      id: '/modlog'
+      path: '/modlog'
+      fullPath: '/modlog'
+      preLoaderRoute: typeof ModlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mod-log': {
+      id: '/mod-log'
+      path: '/mod-log'
+      fullPath: '/mod-log'
+      preLoaderRoute: typeof ModLogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me': {
@@ -571,11 +802,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/log': {
+      id: '/log'
+      path: '/log'
+      fullPath: '/log'
+      preLoaderRoute: typeof LogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/formatting': {
+      id: '/formatting'
+      path: '/formatting'
+      fullPath: '/formatting'
+      preLoaderRoute: typeof FormattingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/forgot-password': {
       id: '/forgot-password'
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot': {
+      id: '/forgot'
+      path: '/forgot'
+      fullPath: '/forgot'
+      preLoaderRoute: typeof ForgotRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/comments': {
@@ -585,11 +837,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/catalog': {
+      id: '/catalog'
+      path: '/catalog'
+      fullPath: '/catalog'
+      preLoaderRoute: typeof CatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/banned': {
+      id: '/banned'
+      path: '/banned'
+      fullPath: '/banned'
+      preLoaderRoute: typeof BannedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admins': {
+      id: '/admins'
+      path: '/admins'
+      fullPath: '/admins'
+      preLoaderRoute: typeof AdminsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/@me': {
+      id: '/@me'
+      path: '/@me'
+      fullPath: '/@me'
+      preLoaderRoute: typeof AtmeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/@$username': {
@@ -794,17 +1074,31 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtusernameRoute: AtusernameRoute,
+  AtmeRoute: AtmeRoute,
   AdminRoute: AdminRouteWithChildren,
+  AdminsRoute: AdminsRoute,
+  BannedRoute: BannedRoute,
+  CatalogRoute: CatalogRoute,
   CommentsRoute: CommentsRoute,
+  ForgotRoute: ForgotRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  FormattingRoute: FormattingRoute,
+  LogRoute: LogRoute,
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
   MeRoute: MeRoute,
+  ModLogRoute: ModLogRoute,
+  ModlogRoute: ModlogRoute,
   NotificationsRoute: NotificationsRoute,
   Random_postRoute: Random_postRoute,
+  Random_userRoute: Random_userRoute,
+  ResetRoute: ResetRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  RulesRoute: RulesRoute,
   SearchRoute: SearchRoute,
+  SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
+  StatsRoute: StatsRoute,
   SubmitRoute: SubmitRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   AtusernamePostsRoute: AtusernamePostsRoute,
