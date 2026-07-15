@@ -75,6 +75,9 @@ const settingsSchema = z.object({
 		.max(100, "Custom title must be 100 characters or fewer"),
 	profileUrl: optionalUrlSchema,
 	bannerUrl: optionalUrlSchema,
+	profileCss: z
+		.string()
+		.max(4000, "Profile CSS must be 4000 characters or fewer"),
 	defaultSorting: z.enum(SortTypes),
 	defaultSortingComments: z.enum(CommentSortTypes),
 	defaultTime: z.enum(TimeFilters),
@@ -148,10 +151,29 @@ const updateSettingsFn = createServerFn({ method: "POST" })
 			};
 		}
 
+		let profileCss: string;
+		try {
+			profileCss = (
+				await import("@/lib/profile-css.server")
+			).sanitizeProfileCss(data.profileCss, user.id);
+		} catch (error) {
+			return {
+				success: false as const,
+				error: error instanceof Error ? error.message : "Invalid profile CSS",
+			};
+		}
+		if (profileCss.length > 4000) {
+			return {
+				success: false as const,
+				error: "Sanitized profile CSS must be 4000 characters or fewer",
+			};
+		}
+
 		await updateUserSettings(
 			user.id,
 			{
 				...data,
+				profileCss,
 				nameColor: data.nameColor.toLowerCase(),
 				titleColor: data.titleColor.toLowerCase(),
 				themeColor: data.themeColor.toLowerCase(),
@@ -233,6 +255,7 @@ function SettingsForm({
 		customTitlePlain: settings.customTitlePlain,
 		profileUrl: settings.profileUrl,
 		bannerUrl: settings.bannerUrl,
+		profileCss: settings.profileCss,
 		defaultSorting: settings.defaultSorting,
 		defaultSortingComments: settings.defaultSortingComments,
 		defaultTime: settings.defaultTime,
@@ -258,6 +281,7 @@ function SettingsForm({
 	const customTitleId = useId();
 	const profileUrlId = useId();
 	const bannerUrlId = useId();
+	const profileCssId = useId();
 	const nameColorId = useId();
 	const titleColorId = useId();
 	const themeColorId = useId();
@@ -423,6 +447,28 @@ function SettingsForm({
 									{form.bio.length}/1500 characters
 								</p>
 								<FieldError error={fieldErrors.bio} />
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor={profileCssId} className="text-slate-300">
+									Profile CSS
+								</Label>
+								<Textarea
+									id={profileCssId}
+									value={form.profileCss}
+									onChange={(event) =>
+										updateField("profileCss", event.target.value)
+									}
+									maxLength={4000}
+									placeholder=".profile-bio { color: rebeccapurple; }"
+									className="min-h-32 font-mono text-sm border-slate-700 bg-slate-800 text-white"
+								/>
+								<p className="text-xs text-slate-500">
+									Safe visual rules are scoped to your profile. URLs, at-rules,
+									positioning, custom properties, and global selectors are
+									rejected.
+								</p>
+								<FieldError error={fieldErrors.profileCss} />
 							</div>
 
 							<div className="space-y-2">

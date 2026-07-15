@@ -141,28 +141,28 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
 
 ## Priority 3 — administrative depth and customization
 
-- [ ] **T49: Finish user-investigation controls**
+- [x] **T49: Finish user-investigation controls**
   - *Why*: investigation can add notes and display alts, but cannot delete notes, set filtering behavior, or actually ban known alts.
   - *Implementation*: add note deletion, `AUTOMATIC`/`UNFILTERED`/`FILTERED` controls, and a transactional ban-known-alts option. Normalize/deduplicate alt pairs, require explicit confirmation, apply the same ban parameters to each account, and log each affected account.
   - *Files*: admin queries/actions, `src/routes/admin.users_.$id.tsx`, ban UI/modal.
   - *Done when*: each control is server-authorized, idempotent, auditable, and loader-driven after mutation.
   - *Verify*: admin-level, partial-alt, transaction, and UI tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T50: Bulk anti-abuse moderation**
+- [x] **T50: Bulk anti-abuse moderation**
   - *Why*: moderators lack rDrama's nuke/unnuke workflow and a direct list of shadowbanned accounts.
   - *Implementation*: add transactional nuke/unnuke actions that change moderation state rather than deleting rows; log one summary action plus enough target information for audit. Add a paginated shadowbanned-user list. Require typed confirmation and level-3 authorization for bulk state changes.
   - *Files*: admin server/actions, a dedicated admin route, lifecycle helpers.
   - *Done when*: bulk changes are reversible, preserve user-deleted state, do not double-count, and cannot partially commit.
   - *Verify*: authorization, rollback, mixed-state, pagination, and confirmation tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T51: Level-3 administrator management**
+- [x] **T51: Level-3 administrator management**
   - *Why*: rDreamer reads `adminLevel` but cannot promote or demote administrators.
   - *Implementation*: add level-3-only promote/demote actions and investigation-page controls. Prevent self-demotion and removal of the final level-3 account. Log before/after levels.
   - *Files*: admin server/actions and user-investigation UI.
   - *Done when*: lower-level admins cannot call the actions directly and the last-level-3 invariant is enforced transactionally.
   - *Verify*: role matrix, concurrency/invariant, and mod-log tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T27: Safe profile CSS**
+- [x] **T27: Safe profile CSS**
   - *Why*: `users.profileCss` is a signature rDrama feature, but unrestricted CSS can exfiltrate data or cover trusted UI.
   - *Implementation*: use a CSS AST parser, not regex. Reject malformed input, all at-rules, remote-resource functions, custom properties, nesting, global/root selectors, positioning, z-index, and other container-escape capabilities. Allowlist visual declarations, prefix every selector with a stable profile-owner container, regenerate CSS, store only the sanitized result, and inject it only on that user's profile routes. See the OWASP CSS guidance and CSSTree documentation linked below.
   - *Files*: sanitizer module/tests, `src/lib/users.server.ts`, `src/routes/me.tsx`, `src/components/profile/user-page.tsx`, `package.json`.

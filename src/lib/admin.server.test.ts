@@ -11,12 +11,14 @@ import {
 	getModQueueSubmissions,
 	getReportedComments,
 	getReportedSubmissions,
+	getShadowbannedUsers,
 	getUserAdminDetails,
 	getUserAlts,
 	getUserRecentActivity,
 	getUserReportHistory,
 	MOD_LOG_PER_PAGE,
 	REPORTED_PER_PAGE,
+	SHADOWBANNED_USERS_PER_PAGE,
 	searchUsers,
 } from "@/lib/admin.server";
 import { createQueryChain } from "@/test/mocks";
@@ -443,5 +445,27 @@ describe("getUserAlts", () => {
 			{ id: 12, username: "bob", isManual: false },
 		]);
 		expect(db.select).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("getShadowbannedUsers", () => {
+	it("returns a bounded page and detects another page", async () => {
+		const rows = Array.from(
+			{ length: SHADOWBANNED_USERS_PER_PAGE + 1 },
+			(_, id) => ({
+				id,
+				username: `user${id}`,
+				adminLevel: 0,
+				isBanned: 0,
+				shadowBanned: "shadowbanned",
+			}),
+		);
+		const chain = createQueryChain(rows);
+		vi.mocked(db.select).mockReturnValueOnce(chain as never);
+		const result = await getShadowbannedUsers(2);
+		expect(result.entries).toHaveLength(SHADOWBANNED_USERS_PER_PAGE);
+		expect(result).toMatchObject({ page: 2, hasMore: true });
+		expect(chain.limit).toHaveBeenCalledWith(SHADOWBANNED_USERS_PER_PAGE + 1);
+		expect(chain.offset).toHaveBeenCalledWith(SHADOWBANNED_USERS_PER_PAGE);
 	});
 });

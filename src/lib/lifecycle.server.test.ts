@@ -21,6 +21,7 @@ import {
 	setSubmissionRemovedState,
 	setSubmissionSavedState,
 	setSubmissionStickyState,
+	setUserContentNukedState,
 } from "@/lib/lifecycle.server";
 
 function createUpdateChain(result = [{ id: 1 }]) {
@@ -392,5 +393,36 @@ describe("lifecycle helpers", () => {
 			targetCommentId: 4,
 			kind: "mark_comment_nsfw",
 		});
+	});
+
+	it("nukes and restores mixed content states without touching deletion state", async () => {
+		const nukeChains = [
+			createUpdateChain([{ id: 1 }]),
+			createUpdateChain([{ id: 2 }]),
+			createUpdateChain([{ id: 3 }]),
+			createUpdateChain([]),
+		];
+		const nukeTx = {
+			update: vi.fn().mockImplementation(() => nukeChains.shift()),
+		};
+		await expect(
+			setUserContentNukedState({ userId: 9, nuked: true }, nukeTx as never),
+		).resolves.toEqual({ submissionIds: [1, 3], commentIds: [2] });
+		expect(nukeTx.update).toHaveBeenCalledTimes(4);
+		expect(nukeChains).toHaveLength(0);
+
+		const restoreChains = [
+			createUpdateChain([{ id: 1 }]),
+			createUpdateChain([{ id: 2 }]),
+			createUpdateChain([{ id: 3 }]),
+			createUpdateChain([]),
+		];
+		const restoreTx = {
+			update: vi.fn().mockImplementation(() => restoreChains.shift()),
+		};
+		await expect(
+			setUserContentNukedState({ userId: 9, nuked: false }, restoreTx as never),
+		).resolves.toEqual({ submissionIds: [1, 3], commentIds: [2] });
+		expect(restoreChains).toHaveLength(0);
 	});
 });

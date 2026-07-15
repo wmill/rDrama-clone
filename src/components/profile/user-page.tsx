@@ -158,7 +158,10 @@ export function UserPage({
 	};
 
 	return (
-		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
+		<div
+			className={`profile-owner-${user.id} min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4`}
+		>
+			{user.profileCss && <style>{user.profileCss}</style>}
 			<div className="mx-auto max-w-5xl space-y-6">
 				<section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/80 shadow-xl">
 					<div

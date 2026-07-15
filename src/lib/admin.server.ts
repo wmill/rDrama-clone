@@ -402,6 +402,37 @@ export async function searchUsers(
 		.limit(20);
 }
 
+export const SHADOWBANNED_USERS_PER_PAGE = 50;
+export type ShadowbannedUsersPage = {
+	entries: AdminUserSearchResult[];
+	page: number;
+	hasMore: boolean;
+};
+
+export async function getShadowbannedUsers(
+	page = 1,
+): Promise<ShadowbannedUsersPage> {
+	const safePage = Math.max(1, Math.floor(page));
+	const rows = await db
+		.select({
+			id: users.id,
+			username: users.username,
+			adminLevel: users.adminLevel,
+			isBanned: users.isBanned,
+			shadowBanned: users.shadowBanned,
+		})
+		.from(users)
+		.where(isNotNull(users.shadowBanned))
+		.orderBy(users.username, users.id)
+		.limit(SHADOWBANNED_USERS_PER_PAGE + 1)
+		.offset((safePage - 1) * SHADOWBANNED_USERS_PER_PAGE);
+	return {
+		entries: rows.slice(0, SHADOWBANNED_USERS_PER_PAGE),
+		page: safePage,
+		hasMore: rows.length > SHADOWBANNED_USERS_PER_PAGE,
+	};
+}
+
 export type UserRecentSubmission = {
 	id: number;
 	title: string;

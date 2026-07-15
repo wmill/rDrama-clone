@@ -17,6 +17,76 @@ export type ModerationState = "VISIBLE" | "FILTERED" | "REMOVED";
 
 type DbLike = AppDbExecutor;
 
+export type BulkModerationResult = {
+	submissionIds: number[];
+	commentIds: number[];
+};
+
+export async function setUserContentNukedState(
+	input: { userId: number; nuked: boolean },
+	tx: DbLike,
+): Promise<BulkModerationResult> {
+	const submissionIds: number[] = [];
+	const commentIds: number[] = [];
+	if (input.nuked) {
+		for (const state of ["VISIBLE", "FILTERED"] as const) {
+			const changedPosts = await tx
+				.update(submissions)
+				.set({ stateMod: "REMOVED", stateModSetBy: `NUKE:${state}` })
+				.where(
+					and(
+						eq(submissions.authorId, input.userId),
+						eq(submissions.stateMod, state),
+					),
+				)
+				.returning({ id: submissions.id });
+			submissionIds.push(...changedPosts.map(({ id }) => id));
+
+			const changedComments = await tx
+				.update(comments)
+				.set({ stateMod: "REMOVED", stateModSetBy: `NUKE:${state}` })
+				.where(
+					and(
+						eq(comments.authorId, input.userId),
+						eq(comments.stateMod, state),
+					),
+				)
+				.returning({ id: comments.id });
+			commentIds.push(...changedComments.map(({ id }) => id));
+		}
+	} else {
+		for (const state of ["VISIBLE", "FILTERED"] as const) {
+			const marker = `NUKE:${state}`;
+			const changedPosts = await tx
+				.update(submissions)
+				.set({ stateMod: state, stateModSetBy: null })
+				.where(
+					and(
+						eq(submissions.authorId, input.userId),
+						eq(submissions.stateMod, "REMOVED"),
+						eq(submissions.stateModSetBy, marker),
+					),
+				)
+				.returning({ id: submissions.id });
+			submissionIds.push(...changedPosts.map(({ id }) => id));
+
+			const changedComments = await tx
+				.update(comments)
+				.set({ stateMod: state, stateModSetBy: null })
+				.where(
+					and(
+						eq(comments.authorId, input.userId),
+						eq(comments.stateMod, "REMOVED"),
+						eq(comments.stateModSetBy, marker),
+					),
+				)
+				.returning({ id: comments.id });
+			commentIds.push(...changedComments.map(({ id }) => id));
+		}
+	}
+	return { submissionIds, commentIds };
+}
+
 async function logModAction(
 	tx: DbLike,
 	input:

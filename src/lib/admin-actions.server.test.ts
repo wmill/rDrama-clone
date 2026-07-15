@@ -20,6 +20,7 @@ vi.mock("@/lib/lifecycle.server", () => ({
 	setSubmissionModerationState: vi.fn(),
 	setSubmissionRemovedState: vi.fn(),
 	setSubmissionStickyState: vi.fn(),
+	setUserContentNukedState: vi.fn(),
 }));
 
 vi.mock("@/lib/users.server", () => ({
@@ -30,7 +31,9 @@ import { db } from "@/db";
 import {
 	addBannedDomainFn,
 	banUserFn,
+	bulkModerateUserContentFn,
 	createUserNoteFn,
+	deleteUserNoteFn,
 	distinguishCommentFn,
 	distinguishSubmissionFn,
 	linkUserAltFn,
@@ -41,6 +44,8 @@ import {
 	setCommentModerationStateFn,
 	setCommentNsfwFn,
 	setSubmissionModerationStateFn,
+	setUserAdminLevelFn,
+	setUserFilterBehaviorFn,
 	shadowbanUserFn,
 	stickySubmissionFn,
 	unbanUserFn,
@@ -60,6 +65,7 @@ import {
 	setSubmissionModerationState,
 	setSubmissionRemovedState,
 	setSubmissionStickyState,
+	setUserContentNukedState,
 } from "@/lib/lifecycle.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getUserByUsernameCanonical } from "@/lib/users.server";
@@ -88,6 +94,7 @@ const janitor = makeSafeUser({
 describe("admin-actions.server", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		dbMock.transaction.mockImplementation(async (callback) => callback(dbMock));
 	});
 
 	it("rejects filter updates from unauthorized users", async () => {
@@ -331,7 +338,7 @@ describe("admin-actions.server", () => {
 
 	it("updates user ban and shadowban state with modaction logs", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
-		const banUpdate = createQueryChain();
+		const banUpdate = createQueryChain([{ id: 9 }]);
 		const unbanUpdate = createQueryChain();
 		const shadowbanUpdate = createQueryChain();
 		const unshadowbanUpdate = createQueryChain();
@@ -339,6 +346,9 @@ describe("admin-actions.server", () => {
 		const secondInsert = createQueryChain();
 		const thirdInsert = createQueryChain();
 		const fourthInsert = createQueryChain();
+		dbMock.select.mockReturnValueOnce(
+			createQueryChain([{ id: 9, isBanned: 0, banReason: null, unbanUtc: 0 }]),
+		);
 		dbMock.update
 			.mockReturnValueOnce(banUpdate)
 			.mockReturnValueOnce(unbanUpdate)
@@ -401,6 +411,204 @@ describe("admin-actions.server", () => {
 			targetUserId: 9,
 			kind: "unshadowban",
 		});
+	});
+
+	it("requires confirmation and transactionally bans each deduplicated known alt", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		await expect(
+			banUserFn({
+				data: { userId: 9, reason: "spam", banKnownAlts: true },
+			}),
+		).resolves.toEqual({ success: false, error: "Confirm banning known alts" });
+		expect(dbMock.transaction).not.toHaveBeenCalled();
+
+		dbMock.select
+			.mockReturnValueOnce(
+				createQueryChain([
+					{ user1: 4, user2: 9 },
+					{ user1: 9, user2: 12 },
+					{ user1: 4, user2: 9 },
+				]),
+			)
+			.mockReturnValueOnce(
+				createQueryChain([
+					{ id: 4, isBanned: 0, banReason: null, unbanUtc: 0 },
+					{ id: 9, isBanned: 0, banReason: null, unbanUtc: 0 },
+					{ id: 12, isBanned: 1, banReason: "spam", unbanUtc: 0 },
+				]),
+			);
+		const update = createQueryChain([{ id: 4 }, { id: 9 }]);
+		dbMock.update.mockReturnValueOnce(update);
+		const firstLog = createQueryChain();
+		const secondLog = createQueryChain();
+		dbMock.insert.mockReturnValueOnce(firstLog).mockReturnValueOnce(secondLog);
+
+		await expect(
+			banUserFn({
+				data: {
+					userId: 9,
+					reason: "spam",
+					banKnownAlts: true,
+					confirmKnownAlts: true,
+				},
+			}),
+		).resolves.toEqual({ success: true });
+		expect(update.set).toHaveBeenCalledWith({
+			isBanned: 1,
+			banReason: "spam",
+			unbanUtc: 0,
+		});
+		expect(firstLog.values).toHaveBeenCalledWith(
+			expect.objectContaining({ targetUserId: 4, kind: "ban_known_alt" }),
+		);
+		expect(secondLog.values).toHaveBeenCalledWith(
+			expect.objectContaining({ targetUserId: 9, kind: "ban_user" }),
+		);
+	});
+
+	it("enforces level-3 administrator management invariants and logs level changes", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		await expect(
+			setUserAdminLevelFn({ data: { userId: 9, adminLevel: 2 } }),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+		expect(dbMock.transaction).not.toHaveBeenCalled();
+
+		const owner = makeSafeUser({ id: 2, adminLevel: 3 });
+		vi.mocked(getCurrentUser).mockResolvedValue(owner);
+		dbMock.select.mockReturnValueOnce(
+			createQueryChain([{ id: 2, adminLevel: 3 }]),
+		);
+		await expect(
+			setUserAdminLevelFn({ data: { userId: 2, adminLevel: 2 } }),
+		).resolves.toEqual({
+			success: false,
+			error: "Cannot demote your own account",
+		});
+
+		dbMock.select
+			.mockReturnValueOnce(createQueryChain([{ id: 9, adminLevel: 3 }]))
+			.mockReturnValueOnce(createQueryChain([{ id: 9 }]));
+		await expect(
+			setUserAdminLevelFn({ data: { userId: 9, adminLevel: 2 } }),
+		).resolves.toEqual({
+			success: false,
+			error: "Cannot demote the final level-3 administrator",
+		});
+
+		dbMock.select
+			.mockReturnValueOnce(createQueryChain([{ id: 9, adminLevel: 3 }]))
+			.mockReturnValueOnce(createQueryChain([{ id: 2 }, { id: 9 }]));
+		const update = createQueryChain();
+		const log = createQueryChain();
+		dbMock.update.mockReturnValueOnce(update);
+		dbMock.insert.mockReturnValueOnce(log);
+		await expect(
+			setUserAdminLevelFn({ data: { userId: 9, adminLevel: 1 } }),
+		).resolves.toEqual({ success: true });
+		expect(update.set).toHaveBeenCalledWith({ adminLevel: 1 });
+		expect(log.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetUserId: 9,
+			kind: "set_admin_level",
+			note: "3 -> 1",
+		});
+		expect(dbMock.execute).toHaveBeenCalledTimes(3);
+	});
+
+	it("requires level 3 and typed confirmation for transactional bulk moderation", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		await expect(
+			bulkModerateUserContentFn({
+				data: { userId: 9, action: "nuke", confirmation: "NUKE 9" },
+			}),
+		).resolves.toEqual({ success: false, error: "Unauthorized" });
+
+		vi.mocked(getCurrentUser).mockResolvedValue(
+			makeSafeUser({ id: 2, adminLevel: 3 }),
+		);
+		await expect(
+			bulkModerateUserContentFn({
+				data: { userId: 9, action: "nuke", confirmation: "nuke" },
+			}),
+		).resolves.toEqual({ success: false, error: "Type NUKE 9 to confirm" });
+
+		vi.mocked(setUserContentNukedState).mockResolvedValue({
+			submissionIds: [10],
+			commentIds: [20],
+		});
+		const summary = createQueryChain();
+		const postLog = createQueryChain();
+		const commentLog = createQueryChain();
+		dbMock.insert
+			.mockReturnValueOnce(summary)
+			.mockReturnValueOnce(postLog)
+			.mockReturnValueOnce(commentLog);
+		await expect(
+			bulkModerateUserContentFn({
+				data: { userId: 9, action: "nuke", confirmation: "NUKE 9" },
+			}),
+		).resolves.toEqual({
+			success: true,
+			submissionIds: [10],
+			commentIds: [20],
+		});
+		expect(summary.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetUserId: 9,
+			kind: "nuke_user_content",
+			note: "1 posts, 1 comments",
+		});
+		expect(postLog.values).toHaveBeenCalledWith(
+			expect.objectContaining({ targetSubmissionId: 10, kind: "nuke_post" }),
+		);
+		expect(commentLog.values).toHaveBeenCalledWith(
+			expect.objectContaining({ targetCommentId: 20, kind: "nuke_comment" }),
+		);
+	});
+
+	it("deletes notes and changes filter behavior idempotently with audit logs", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		const deleted = createQueryChain([{ id: 5 }]);
+		const deleteLog = createQueryChain();
+		dbMock.delete.mockReturnValueOnce(deleted);
+		dbMock.insert.mockReturnValueOnce(deleteLog);
+		await expect(
+			deleteUserNoteFn({ data: { noteId: 5, userId: 9 } }),
+		).resolves.toEqual({ success: true });
+		expect(deleteLog.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetUserId: 9,
+			kind: "delete_user_note",
+			note: "note 5",
+		});
+
+		dbMock.select.mockReturnValueOnce(
+			createQueryChain([{ filterBehavior: "AUTOMATIC" }]),
+		);
+		const filterUpdate = createQueryChain([{ id: 9 }]);
+		const filterLog = createQueryChain();
+		dbMock.update.mockReturnValueOnce(filterUpdate);
+		dbMock.insert.mockReturnValueOnce(filterLog);
+		await expect(
+			setUserFilterBehaviorFn({
+				data: { userId: 9, filterBehavior: "FILTERED" },
+			}),
+		).resolves.toEqual({ success: true });
+		expect(filterLog.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				targetUserId: 9,
+				kind: "set_user_filter",
+				note: "FILTERED",
+			}),
+		);
+
+		dbMock.select.mockReturnValueOnce(
+			createQueryChain([{ filterBehavior: "FILTERED" }]),
+		);
+		await setUserFilterBehaviorFn({
+			data: { userId: 9, filterBehavior: "FILTERED" },
+		});
+		expect(dbMock.update).toHaveBeenCalledTimes(1);
 	});
 
 	it("updates user presentation fields and logs verification/custom title actions", async () => {

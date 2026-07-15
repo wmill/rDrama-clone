@@ -49,6 +49,7 @@ import { Route as AdminReportedPostsRouteImport } from './routes/admin.reported-
 import { Route as AdminReportedCommentsRouteImport } from './routes/admin.reported-comments'
 import { Route as AdminModLogRouteImport } from './routes/admin.mod-log'
 import { Route as AdminFilteredRouteImport } from './routes/admin.filtered'
+import { Route as AdminBulkModerationRouteImport } from './routes/admin.bulk-moderation'
 import { Route as AdminBannedDomainsRouteImport } from './routes/admin.banned-domains'
 import { Route as AdminBadgesRouteImport } from './routes/admin.badges'
 import { Route as AtusernamePostsRouteImport } from './routes/@$username_.posts'
@@ -261,6 +262,11 @@ const AdminFilteredRoute = AdminFilteredRouteImport.update({
   path: '/filtered',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBulkModerationRoute = AdminBulkModerationRouteImport.update({
+  id: '/bulk-moderation',
+  path: '/bulk-moderation',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBannedDomainsRoute = AdminBannedDomainsRouteImport.update({
   id: '/banned-domains',
   path: '/banned-domains',
@@ -350,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/@$username/posts': typeof AtusernamePostsRoute
   '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
+  '/admin/bulk-moderation': typeof AdminBulkModerationRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
@@ -402,6 +409,7 @@ export interface FileRoutesByTo {
   '/@$username/posts': typeof AtusernamePostsRoute
   '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
+  '/admin/bulk-moderation': typeof AdminBulkModerationRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
@@ -456,6 +464,7 @@ export interface FileRoutesById {
   '/@$username_/posts': typeof AtusernamePostsRoute
   '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
+  '/admin/bulk-moderation': typeof AdminBulkModerationRoute
   '/admin/filtered': typeof AdminFilteredRoute
   '/admin/mod-log': typeof AdminModLogRoute
   '/admin/reported-comments': typeof AdminReportedCommentsRoute
@@ -511,6 +520,7 @@ export interface FileRouteTypes {
     | '/@$username/posts'
     | '/admin/badges'
     | '/admin/banned-domains'
+    | '/admin/bulk-moderation'
     | '/admin/filtered'
     | '/admin/mod-log'
     | '/admin/reported-comments'
@@ -563,6 +573,7 @@ export interface FileRouteTypes {
     | '/@$username/posts'
     | '/admin/badges'
     | '/admin/banned-domains'
+    | '/admin/bulk-moderation'
     | '/admin/filtered'
     | '/admin/mod-log'
     | '/admin/reported-comments'
@@ -616,6 +627,7 @@ export interface FileRouteTypes {
     | '/@$username_/posts'
     | '/admin/badges'
     | '/admin/banned-domains'
+    | '/admin/bulk-moderation'
     | '/admin/filtered'
     | '/admin/mod-log'
     | '/admin/reported-comments'
@@ -963,6 +975,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFilteredRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/bulk-moderation': {
+      id: '/admin/bulk-moderation'
+      path: '/bulk-moderation'
+      fullPath: '/admin/bulk-moderation'
+      preLoaderRoute: typeof AdminBulkModerationRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/banned-domains': {
       id: '/admin/banned-domains'
       path: '/banned-domains'
@@ -1046,6 +1065,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminBadgesRoute: typeof AdminBadgesRoute
   AdminBannedDomainsRoute: typeof AdminBannedDomainsRoute
+  AdminBulkModerationRoute: typeof AdminBulkModerationRoute
   AdminFilteredRoute: typeof AdminFilteredRoute
   AdminModLogRoute: typeof AdminModLogRoute
   AdminReportedCommentsRoute: typeof AdminReportedCommentsRoute
@@ -1059,6 +1079,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminBadgesRoute: AdminBadgesRoute,
   AdminBannedDomainsRoute: AdminBannedDomainsRoute,
+  AdminBulkModerationRoute: AdminBulkModerationRoute,
   AdminFilteredRoute: AdminFilteredRoute,
   AdminModLogRoute: AdminModLogRoute,
   AdminReportedCommentsRoute: AdminReportedCommentsRoute,

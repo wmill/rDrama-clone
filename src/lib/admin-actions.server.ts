@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
@@ -22,6 +22,7 @@ import {
 	setSubmissionModerationState,
 	setSubmissionRemovedState,
 	setSubmissionStickyState,
+	setUserContentNukedState,
 } from "@/lib/lifecycle.server";
 import { renderPostTitleHtml } from "@/lib/markdown";
 import { getUserByUsernameCanonical } from "@/lib/users.server";
@@ -62,6 +63,25 @@ export const banUserInputSchema = z.object({
 	userId: idSchema,
 	reason: z.string().max(1000),
 	durationDays: z.number().int().positive().optional(),
+	banKnownAlts: z.boolean().optional().default(false),
+	confirmKnownAlts: z.boolean().optional().default(false),
+});
+export const deleteUserNoteInputSchema = z.object({
+	noteId: idSchema,
+	userId: idSchema,
+});
+export const filterBehaviorInputSchema = z.object({
+	userId: idSchema,
+	filterBehavior: z.enum(["AUTOMATIC", "UNFILTERED", "FILTERED"]),
+});
+export const adminLevelInputSchema = z.object({
+	userId: idSchema,
+	adminLevel: z.number().int().min(0).max(3),
+});
+export const bulkUserModerationInputSchema = z.object({
+	userId: idSchema,
+	action: z.enum(["nuke", "unnuke"]),
+	confirmation: z.string(),
 });
 export const moderationProfileInputSchema = z.object({
 	userId: idSchema,
@@ -428,8 +448,13 @@ export const setCommentNsfwFn = createServerFn({ method: "POST" })
 
 export const banUserFn = createServerFn({ method: "POST" })
 	.inputValidator(
-		(data: { userId: number; reason: string; durationDays?: number }) =>
-			banUserInputSchema.parse(data),
+		(data: {
+			userId: number;
+			reason: string;
+			durationDays?: number;
+			banKnownAlts?: boolean;
+			confirmKnownAlts?: boolean;
+		}) => banUserInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
 		const guard = await requireAdmin();
@@ -442,16 +467,58 @@ export const banUserFn = createServerFn({ method: "POST" })
 			? Math.floor(Date.now() / 1000) + data.durationDays * 86400
 			: 0;
 
-		await db
-			.update(users)
-			.set({ isBanned: 1, banReason: data.reason, unbanUtc })
-			.where(eq(users.id, data.userId));
+		if (data.banKnownAlts && !data.confirmKnownAlts) {
+			return fail("Confirm banning known alts");
+		}
 
-		await db.insert(modActions).values({
-			userId: user.id,
-			targetUserId: data.userId,
-			kind: "ban_user",
-			note: data.reason,
+		await db.transaction(async (tx) => {
+			const targetIds = new Set([data.userId]);
+			if (data.banKnownAlts) {
+				const pairs = await tx
+					.select({ user1: alts.user1, user2: alts.user2 })
+					.from(alts)
+					.where(or(eq(alts.user1, data.userId), eq(alts.user2, data.userId)));
+				for (const pair of pairs) {
+					targetIds.add(pair.user1);
+					targetIds.add(pair.user2);
+				}
+			}
+
+			const existing = await tx
+				.select({
+					id: users.id,
+					isBanned: users.isBanned,
+					banReason: users.banReason,
+					unbanUtc: users.unbanUtc,
+				})
+				.from(users)
+				.where(inArray(users.id, [...targetIds]));
+			const changedIds = existing
+				.filter(
+					(target) =>
+						target.isBanned !== 1 ||
+						target.banReason !== data.reason ||
+						target.unbanUtc !== unbanUtc,
+				)
+				.map((target) => target.id);
+			if (changedIds.length === 0) return;
+
+			const changed = await tx
+				.update(users)
+				.set({ isBanned: 1, banReason: data.reason, unbanUtc })
+				.where(inArray(users.id, changedIds))
+				.returning({
+					id: users.id,
+				});
+
+			for (const affected of changed) {
+				await tx.insert(modActions).values({
+					userId: user.id,
+					targetUserId: affected.id,
+					kind: affected.id === data.userId ? "ban_user" : "ban_known_alt",
+					note: data.reason,
+				});
+			}
 		});
 
 		return { success: true as const };
@@ -725,6 +792,167 @@ export const createUserNoteFn = createServerFn({ method: "POST" })
 		});
 
 		return { success: true as const };
+	});
+
+export const deleteUserNoteFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { noteId: number; userId: number }) =>
+		deleteUserNoteInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireAdmin();
+		if (!guard.ok) return guard.failure;
+
+		await db.transaction(async (tx) => {
+			const deleted = await tx
+				.delete(userNotes)
+				.where(
+					and(
+						eq(userNotes.id, data.noteId),
+						eq(userNotes.referenceUser, data.userId),
+					),
+				)
+				.returning({ id: userNotes.id });
+			if (deleted.length > 0) {
+				await tx.insert(modActions).values({
+					userId: guard.user.id,
+					targetUserId: data.userId,
+					kind: "delete_user_note",
+					note: `note ${data.noteId}`,
+				});
+			}
+		});
+		return { success: true as const };
+	});
+
+export const setUserFilterBehaviorFn = createServerFn({ method: "POST" })
+	.inputValidator(
+		(data: {
+			userId: number;
+			filterBehavior: "AUTOMATIC" | "UNFILTERED" | "FILTERED";
+		}) => filterBehaviorInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireAdmin();
+		if (!guard.ok) return guard.failure;
+
+		await db.transaction(async (tx) => {
+			const [current] = await tx
+				.select({ filterBehavior: users.filterBehavior })
+				.from(users)
+				.where(eq(users.id, data.userId))
+				.limit(1);
+			if (!current || current.filterBehavior === data.filterBehavior) return;
+
+			const changed = await tx
+				.update(users)
+				.set({ filterBehavior: data.filterBehavior })
+				.where(eq(users.id, data.userId))
+				.returning({ id: users.id });
+			if (changed.length > 0) {
+				await tx.insert(modActions).values({
+					userId: guard.user.id,
+					targetUserId: data.userId,
+					kind: "set_user_filter",
+					note: data.filterBehavior,
+				});
+			}
+		});
+		return { success: true as const };
+	});
+
+export const setUserAdminLevelFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { userId: number; adminLevel: number }) =>
+		adminLevelInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireAdmin(3);
+		if (!guard.ok) return guard.failure;
+
+		return db.transaction(async (tx) => {
+			// Serialize administrator-level changes so two demotions cannot both
+			// observe another level-3 administrator and violate the invariant.
+			await tx.execute(sql`select pg_advisory_xact_lock(73490051)`);
+			const [target] = await tx
+				.select({ id: users.id, adminLevel: users.adminLevel })
+				.from(users)
+				.where(eq(users.id, data.userId))
+				.limit(1);
+			if (!target) return fail("User not found");
+			if (target.adminLevel === data.adminLevel) {
+				return { success: true as const };
+			}
+			if (target.id === guard.user.id && data.adminLevel < target.adminLevel) {
+				return fail("Cannot demote your own account");
+			}
+			if (target.adminLevel === 3 && data.adminLevel < 3) {
+				const levelThree = await tx
+					.select({ id: users.id })
+					.from(users)
+					.where(eq(users.adminLevel, 3));
+				if (levelThree.length <= 1) {
+					return fail("Cannot demote the final level-3 administrator");
+				}
+			}
+
+			await tx
+				.update(users)
+				.set({ adminLevel: data.adminLevel })
+				.where(eq(users.id, data.userId));
+			await tx.insert(modActions).values({
+				userId: guard.user.id,
+				targetUserId: data.userId,
+				kind: "set_admin_level",
+				note: `${target.adminLevel} -> ${data.adminLevel}`,
+			});
+			return { success: true as const };
+		});
+	});
+
+export const bulkModerateUserContentFn = createServerFn({ method: "POST" })
+	.inputValidator(
+		(data: {
+			userId: number;
+			action: "nuke" | "unnuke";
+			confirmation: string;
+		}) => bulkUserModerationInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireAdmin(3);
+		if (!guard.ok) return guard.failure;
+		const expected = `${data.action.toUpperCase()} ${data.userId}`;
+		if (data.confirmation !== expected) {
+			return fail(`Type ${expected} to confirm`);
+		}
+
+		return db.transaction(async (tx) => {
+			const result = await setUserContentNukedState(
+				{ userId: data.userId, nuked: data.action === "nuke" },
+				tx,
+			);
+			await tx.insert(modActions).values({
+				userId: guard.user.id,
+				targetUserId: data.userId,
+				kind: `${data.action}_user_content`,
+				note: `${result.submissionIds.length} posts, ${result.commentIds.length} comments`,
+			});
+			for (const targetSubmissionId of result.submissionIds) {
+				await tx.insert(modActions).values({
+					userId: guard.user.id,
+					targetUserId: data.userId,
+					targetSubmissionId,
+					kind: `${data.action}_post`,
+				});
+			}
+			for (const targetCommentId of result.commentIds) {
+				await tx.insert(modActions).values({
+					userId: guard.user.id,
+					targetUserId: data.userId,
+					targetCommentId,
+					kind: `${data.action}_comment`,
+				});
+			}
+			return { success: true as const, ...result };
+		});
 	});
 
 export function normalizeBannedDomainInput(value: string): string | null {

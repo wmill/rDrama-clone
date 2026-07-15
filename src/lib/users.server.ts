@@ -116,6 +116,7 @@ export type UserSettings = {
 	titleLocked: boolean;
 	profileUrl: string;
 	bannerUrl: string;
+	profileCss: string;
 	defaultSorting: SortType;
 	defaultSortingComments: CommentFeedSortType;
 	defaultTime: TimeFilter;
@@ -138,6 +139,7 @@ export type UpdateUserSettingsInput = {
 	customTitlePlain: string;
 	profileUrl: string;
 	bannerUrl: string;
+	profileCss: string;
 	defaultSorting: SortType;
 	defaultSortingComments: CommentFeedSortType;
 	defaultTime: TimeFilter;
@@ -234,6 +236,7 @@ export async function getUserSettingsById(
 			flairChanged: users.flairChanged,
 			profileUrl: users.profileUrl,
 			bannerUrl: users.bannerUrl,
+			profileCss: users.profileCss,
 			defaultSorting: users.defaultSorting,
 			defaultSortingComments: users.defaultSortingComments,
 			defaultTime: users.defaultTime,
@@ -273,6 +276,7 @@ export async function getUserSettingsById(
 		titleLocked: user.flairChanged !== null,
 		profileUrl: user.profileUrl ?? "",
 		bannerUrl: user.bannerUrl ?? "",
+		profileCss: user.profileCss ?? "",
 		defaultSorting: user.defaultSorting as SortType,
 		defaultSortingComments: user.defaultSortingComments as CommentFeedSortType,
 		defaultTime: user.defaultTime as TimeFilter,
@@ -321,6 +325,7 @@ export async function updateUserSettings(
 			...titleFields,
 			profileUrl: profileUrl || null,
 			bannerUrl: bannerUrl || null,
+			profileCss: input.profileCss || null,
 			defaultSorting: input.defaultSorting,
 			defaultSortingComments: input.defaultSortingComments,
 			defaultTime: input.defaultTime,

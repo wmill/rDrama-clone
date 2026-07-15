@@ -20,8 +20,13 @@ import {
 	type UserReportHistoryEntry,
 } from "@/lib/admin.server";
 import {
+	banUserFn,
+	bulkModerateUserContentFn,
 	createUserNoteFn,
+	deleteUserNoteFn,
 	linkUserAltFn,
+	setUserAdminLevelFn,
+	setUserFilterBehaviorFn,
 	unlinkUserAltFn,
 } from "@/lib/admin-actions.server";
 import { assertAdmin } from "@/lib/auth-guards.server";
@@ -40,6 +45,7 @@ const NOTE_TAGS = [
 ] as const;
 
 type UserInvestigation = {
+	viewer: { id: number; adminLevel: number };
 	user: {
 		id: number;
 		username: string;
@@ -51,6 +57,7 @@ type UserInvestigation = {
 		shadowBanned: string | null;
 		postCount: number;
 		commentCount: number;
+		filterBehavior: "AUTOMATIC" | "UNFILTERED" | "FILTERED";
 	};
 	notes: UserAdminDetails["notes"];
 	activity: UserRecentActivity;
@@ -61,7 +68,7 @@ type UserInvestigation = {
 export const getUserInvestigationFn = createServerFn({ method: "GET" })
 	.inputValidator((data: { userId: number }) => userIdInputSchema.parse(data))
 	.handler(async ({ data }): Promise<UserInvestigation | null> => {
-		await assertAdmin();
+		const viewer = await assertAdmin();
 		const details = await getUserAdminDetails(data.userId);
 		if (!details) return null;
 
@@ -73,6 +80,7 @@ export const getUserInvestigationFn = createServerFn({ method: "GET" })
 
 		const { user } = details;
 		return {
+			viewer: { id: viewer.id, adminLevel: viewer.adminLevel },
 			user: {
 				id: user.id,
 				username: user.username,
@@ -84,6 +92,7 @@ export const getUserInvestigationFn = createServerFn({ method: "GET" })
 				shadowBanned: user.shadowBanned,
 				postCount: user.postCount,
 				commentCount: user.commentCount,
+				filterBehavior: user.filterBehavior,
 			},
 			notes: details.notes,
 			activity,
@@ -104,7 +113,8 @@ export const Route = createFileRoute("/admin/users_/$id")({
 });
 
 function UserInvestigationPage() {
-	const { user, notes, activity, reports, alts } = Route.useLoaderData();
+	const { viewer, user, notes, activity, reports, alts } =
+		Route.useLoaderData();
 
 	return (
 		<div className="space-y-4">
@@ -145,6 +155,8 @@ function UserInvestigationPage() {
 
 			<NotesSection userId={user.id} notes={notes} />
 
+			<InvestigationControls viewer={viewer} user={user} alts={alts} />
+
 			<AltsSection userId={user.id} alts={alts} />
 
 			<ReportsSection reports={reports} />
@@ -166,6 +178,17 @@ function NotesSection({
 	const [tag, setTag] = useState<(typeof NOTE_TAGS)[number]>("Comment");
 	const [isPending, setIsPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const handleDelete = async (noteId: number) => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await deleteUserNoteFn({ data: { noteId, userId } });
+			if (res.success) await router.invalidate();
+			else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -210,7 +233,17 @@ function NotesSection({
 									{new Date(note.createdDatetimez).toLocaleString()}
 								</span>
 							</div>
-							<p className="mt-1 text-slate-200">{note.note}</p>
+							<div className="mt-1 flex items-start gap-3">
+								<p className="grow text-slate-200">{note.note}</p>
+								<button
+									type="button"
+									disabled={isPending}
+									onClick={() => handleDelete(note.id)}
+									className="text-xs text-slate-500 underline hover:text-red-400 disabled:opacity-50"
+								>
+									Delete
+								</button>
+							</div>
 						</div>
 					))}
 				</div>
@@ -241,6 +274,211 @@ function NotesSection({
 				>
 					Add Note
 				</Button>
+			</form>
+			{error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+		</div>
+	);
+}
+
+function InvestigationControls({
+	viewer,
+	user,
+	alts,
+}: {
+	viewer: UserInvestigation["viewer"];
+	user: UserInvestigation["user"];
+	alts: UserAlt[];
+}) {
+	const router = useRouter();
+	const [filterBehavior, setFilterBehavior] = useState(user.filterBehavior);
+	const [adminLevel, setAdminLevel] = useState(user.adminLevel);
+	const [reason, setReason] = useState("");
+	const [confirmation, setConfirmation] = useState("");
+	const [bulkConfirmation, setBulkConfirmation] = useState("");
+	const [isPending, setIsPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const saveFilter = async () => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await setUserFilterBehaviorFn({
+				data: { userId: user.id, filterBehavior },
+			});
+			if (res.success) await router.invalidate();
+			else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	const banAll = async (event: React.FormEvent) => {
+		event.preventDefault();
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await banUserFn({
+				data: {
+					userId: user.id,
+					reason: reason.trim(),
+					banKnownAlts: true,
+					confirmKnownAlts: confirmation === user.username,
+				},
+			});
+			if (res.success) {
+				setReason("");
+				setConfirmation("");
+				await router.invalidate();
+			} else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
+	const saveAdminLevel = async () => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await setUserAdminLevelFn({
+				data: { userId: user.id, adminLevel },
+			});
+			if (res.success) await router.invalidate();
+			else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
+	const bulkModerate = async (action: "nuke" | "unnuke") => {
+		setIsPending(true);
+		setError(null);
+		try {
+			const res = await bulkModerateUserContentFn({
+				data: {
+					userId: user.id,
+					action,
+					confirmation: bulkConfirmation,
+				},
+			});
+			if (res.success) {
+				setBulkConfirmation("");
+				await router.invalidate();
+			} else setError(res.error);
+		} finally {
+			setIsPending(false);
+		}
+	};
+
+	return (
+		<div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
+			<h3 className="mb-3 text-base font-semibold text-white">
+				Investigation Controls
+			</h3>
+			<div className="flex flex-wrap items-end gap-2">
+				<label className="text-sm text-slate-300">
+					<span className="mb-1 block">Comment filtering</span>
+					<select
+						value={filterBehavior}
+						onChange={(event) =>
+							setFilterBehavior(event.target.value as typeof filterBehavior)
+						}
+						className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+					>
+						<option value="AUTOMATIC">Automatic</option>
+						<option value="UNFILTERED">Unfiltered</option>
+						<option value="FILTERED">Always filtered</option>
+					</select>
+				</label>
+				<Button type="button" disabled={isPending} onClick={saveFilter}>
+					Save filtering
+				</Button>
+			</div>
+			{viewer.adminLevel >= 3 && (
+				<div className="mt-4 space-y-4 border-t border-slate-800 pt-4">
+					<div className="flex flex-wrap items-end gap-2">
+						<label className="text-sm text-slate-300">
+							<span className="mb-1 block">Administrator level</span>
+							<select
+								value={adminLevel}
+								onChange={(event) => setAdminLevel(Number(event.target.value))}
+								className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+							>
+								{[0, 1, 2, 3].map((level) => (
+									<option key={level} value={level}>
+										Level {level}
+									</option>
+								))}
+							</select>
+						</label>
+						<Button
+							type="button"
+							disabled={
+								isPending ||
+								adminLevel === user.adminLevel ||
+								(viewer.id === user.id && adminLevel < user.adminLevel)
+							}
+							onClick={saveAdminLevel}
+						>
+							Update administrator level
+						</Button>
+					</div>
+					<div className="flex flex-wrap items-end gap-2">
+						<div className="grow text-sm text-slate-300">
+							<span className="mb-1 block">
+								Type NUKE {user.id} or UNNUKE {user.id}
+							</span>
+							<Input
+								value={bulkConfirmation}
+								onChange={(event) => setBulkConfirmation(event.target.value)}
+								placeholder={`NUKE ${user.id}`}
+							/>
+						</div>
+						<Button
+							type="button"
+							variant="destructive"
+							disabled={isPending || bulkConfirmation !== `NUKE ${user.id}`}
+							onClick={() => bulkModerate("nuke")}
+						>
+							Nuke content
+						</Button>
+						<Button
+							type="button"
+							disabled={isPending || bulkConfirmation !== `UNNUKE ${user.id}`}
+							onClick={() => bulkModerate("unnuke")}
+						>
+							Restore nuked content
+						</Button>
+					</div>
+				</div>
+			)}
+
+			<form
+				onSubmit={banAll}
+				className="mt-5 space-y-2 border-t border-slate-800 pt-4"
+			>
+				<p className="text-sm text-slate-300">
+					Ban this account and {alts.length} known alt
+					{alts.length === 1 ? "" : "s"} with identical parameters.
+				</p>
+				<div className="flex flex-wrap gap-2">
+					<Input
+						value={reason}
+						onChange={(event) => setReason(event.target.value)}
+						placeholder="Ban reason"
+					/>
+					<Input
+						value={confirmation}
+						onChange={(event) => setConfirmation(event.target.value)}
+						placeholder={`Type ${user.username} to confirm`}
+					/>
+					<Button
+						type="submit"
+						variant="destructive"
+						disabled={
+							isPending || !reason.trim() || confirmation !== user.username
+						}
+					>
+						Ban known alts
+					</Button>
+				</div>
 			</form>
 			{error && <p className="mt-2 text-xs text-red-400">{error}</p>}
 		</div>

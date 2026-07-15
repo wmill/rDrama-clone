@@ -47,6 +47,7 @@ function createProfileData(
 			highRes: null,
 			profileUrl: null,
 			bannerUrl: null,
+			profileCss: null,
 			verified: null,
 			verifiedColor: null,
 			patron: 0,
@@ -212,5 +213,27 @@ describe("UserPage", () => {
 				name: "Lock custom title against user edits",
 			}),
 		).not.toBeNull();
+	});
+
+	it("injects stored CSS only inside the stable profile-owner container", () => {
+		const { container } = render(
+			<UserPage
+				data={createProfileData({
+					profileUser: {
+						...createProfileData().profileUser,
+						profileCss: ".profile-owner-2 h1{color:rebeccapurple}",
+					},
+				})}
+				onSortChange={vi.fn()}
+				onTimeChange={vi.fn()}
+				onPageChange={vi.fn()}
+			/>,
+		);
+		expect(
+			container.firstElementChild?.classList.contains("profile-owner-2"),
+		).toBe(true);
+		expect(container.querySelector("style")?.textContent).toBe(
+			".profile-owner-2 h1{color:rebeccapurple}",
+		);
 	});
 });

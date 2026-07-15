@@ -58,6 +58,7 @@ function makeSettingsInput(
 		customTitlePlain: "",
 		profileUrl: "",
 		bannerUrl: "",
+		profileCss: "",
 		defaultSorting: "hot",
 		defaultSortingComments: "new",
 		defaultTime: "all",
