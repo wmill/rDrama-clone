@@ -32,6 +32,10 @@ vi.mock("@/lib/search.server", () => ({
 	indexCommentBestEffort: vi.fn(),
 }));
 
+vi.mock("@/lib/site-settings.server", () => ({
+	getSiteSetting: vi.fn(),
+}));
+
 vi.mock("@/lib/awards.server", () => ({
 	getCommentAwardCounts: vi.fn(async () => new Map()),
 }));
@@ -52,6 +56,7 @@ import { authorDeleteComment } from "@/lib/lifecycle.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
 import { createNotificationsForComment } from "@/lib/notifications.server";
 import { indexCommentBestEffort } from "@/lib/search.server";
+import { getSiteSetting } from "@/lib/site-settings.server";
 
 function makeViewer(
 	overrides: Partial<CommentViewerContext> = {},
@@ -146,9 +151,24 @@ function createTx(insertedCommentId: number) {
 describe("createComment", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(getSiteSetting).mockResolvedValue(0 as never);
 	});
 
+	function authorChain(overrides: Record<string, unknown> = {}) {
+		return createCommentRowChain([
+			{
+				adminLevel: 0,
+				commentCount: 10,
+				createdUtc: 0,
+				filterBehavior: "AUTOMATIC",
+				trueScore: 10,
+				...overrides,
+			},
+		]);
+	}
+
 	it("creates a top-level comment with rendered bodyHtml, level 1, and a self-upvote", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(authorChain() as never);
 		const { tx, commentInsert, voteInsert } = createTx(55);
 		vi.mocked(db.transaction).mockImplementationOnce(
 			async (fn) => fn(tx as never) as never,
@@ -182,13 +202,15 @@ describe("createComment", () => {
 	});
 
 	it("nests a reply one level under its parent and bumps the descendant count", async () => {
-		vi.mocked(db.select).mockReturnValueOnce({
-			from: vi.fn(() => ({
-				where: vi.fn(() => ({
-					limit: vi.fn().mockResolvedValue([{ level: 2, topCommentId: 9 }]),
+		vi.mocked(db.select)
+			.mockReturnValueOnce(authorChain() as never)
+			.mockReturnValueOnce({
+				from: vi.fn(() => ({
+					where: vi.fn(() => ({
+						limit: vi.fn().mockResolvedValue([{ level: 2, topCommentId: 9 }]),
+					})),
 				})),
-			})),
-		} as never);
+			} as never);
 		const { tx, commentInsert, updateChains } = createTx(56);
 		vi.mocked(db.transaction).mockImplementationOnce(
 			async (fn) => fn(tx as never) as never,
@@ -213,6 +235,58 @@ describe("createComment", () => {
 		// descendant count on the parent comment + comment count on the author
 		expect(tx.update).toHaveBeenCalledTimes(2);
 		expect(updateChains).toHaveLength(2);
+	});
+
+	it.each([
+		["FILTERED", 0, "FILTERED"],
+		["UNFILTERED", 0, "VISIBLE"],
+		["FILTERED", 2, "VISIBLE"],
+	] as const)(
+		"applies %s behavior at admin level %i",
+		async (filterBehavior, adminLevel, expectedState) => {
+			vi.mocked(db.select).mockReturnValueOnce(
+				authorChain({ filterBehavior, adminLevel }) as never,
+			);
+			const { tx, commentInsert } = createTx(60);
+			vi.mocked(db.transaction).mockImplementationOnce(
+				async (fn) => fn(tx as never) as never,
+			);
+
+			await createComment({
+				authorId: 7,
+				body: "test",
+				parentSubmissionId: 42,
+			});
+			expect(commentInsert.values).toHaveBeenCalledWith(
+				expect.objectContaining({ stateMod: expectedState }),
+			);
+		},
+	);
+
+	it("filters automatic comments when any configured threshold is unmet", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			authorChain({
+				commentCount: 2,
+				createdUtc: Math.floor(Date.now() / 1000),
+				trueScore: 50,
+			}) as never,
+		);
+		vi.mocked(getSiteSetting).mockImplementation(async (key) =>
+			key === "filter_comments_min_comments"
+				? 3
+				: key === "filter_comments_min_age_days"
+					? 1
+					: (0 as never),
+		);
+		const { tx, commentInsert } = createTx(61);
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await createComment({ authorId: 7, body: "test", parentSubmissionId: 42 });
+		expect(commentInsert.values).toHaveBeenCalledWith(
+			expect.objectContaining({ stateMod: "FILTERED" }),
+		);
 	});
 });
 

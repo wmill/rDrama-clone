@@ -26,6 +26,7 @@ describe("site-settings.server", () => {
 
 		await expect(getSiteSetting("signups_enabled")).resolves.toBe(true);
 		await expect(getSiteSetting("read_only")).resolves.toBe(false);
+		await expect(getSiteSetting("filter_comments_min_karma")).resolves.toBe(0);
 	});
 
 	it("reads stored values over defaults", async () => {
@@ -45,6 +46,12 @@ describe("site-settings.server", () => {
 			"site_setting:signups_enabled",
 			"0",
 		);
+
+		await setSiteSetting("filter_comments_min_comments", 25);
+		expect(redisMock.set).toHaveBeenCalledWith(
+			"site_setting:filter_comments_min_comments",
+			"25",
+		);
 	});
 
 	it("returns every defined setting from getAllSiteSettings", async () => {
@@ -53,6 +60,10 @@ describe("site-settings.server", () => {
 		await expect(getAllSiteSettings()).resolves.toEqual({
 			signups_enabled: true,
 			read_only: false,
+			filter_new_posts: false,
+			filter_comments_min_age_days: 0,
+			filter_comments_min_comments: 0,
+			filter_comments_min_karma: 0,
 		});
 	});
 

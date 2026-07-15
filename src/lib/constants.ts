@@ -23,19 +23,59 @@ export type CommentFeedSortType = (typeof CommentSortTypes)[number];
 export const SITE_SETTINGS = [
 	{
 		key: "signups_enabled",
+		type: "boolean",
 		label: "Signups enabled",
 		description: "When off, new account registration is rejected.",
 		defaultValue: true,
 	},
 	{
 		key: "read_only",
+		type: "boolean",
 		label: "Read-only mode",
 		description:
 			"When on, posting, commenting, and voting are disabled site-wide.",
 		defaultValue: false,
 	},
+	{
+		key: "filter_new_posts",
+		type: "boolean",
+		label: "Filter new posts",
+		description: "Send all new posts by non-admins to the filtered queue.",
+		defaultValue: false,
+	},
+	{
+		key: "filter_comments_min_age_days",
+		type: "integer",
+		label: "Minimum account age for comments",
+		description: "Automatically filter comments from newer accounts (days).",
+		defaultValue: 0,
+		min: 0,
+		max: 3650,
+	},
+	{
+		key: "filter_comments_min_comments",
+		type: "integer",
+		label: "Minimum comment count",
+		description: "Automatically filter comments from users below this count.",
+		defaultValue: 0,
+		min: 0,
+		max: 1000000,
+	},
+	{
+		key: "filter_comments_min_karma",
+		type: "integer",
+		label: "Minimum karma",
+		description: "Automatically filter comments from users below this karma.",
+		defaultValue: 0,
+		min: -1000000,
+		max: 1000000,
+	},
 ] as const;
 export type SiteSettingKey = (typeof SITE_SETTINGS)[number]["key"];
+export type SiteSettingValue<K extends SiteSettingKey = SiteSettingKey> =
+	Extract<(typeof SITE_SETTINGS)[number], { key: K }>["type"] extends "boolean"
+		? boolean
+		: number;
 
 export const AWARD_OPTIONS = [
 	{

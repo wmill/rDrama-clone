@@ -25,6 +25,10 @@ vi.mock("@/lib/search.server", () => ({
 	indexSubmissionBestEffort: vi.fn(),
 }));
 
+vi.mock("@/lib/site-settings.server", () => ({
+	getSiteSetting: vi.fn(),
+}));
+
 vi.mock("@/lib/awards.server", () => ({
 	getSubmissionAwardCounts: vi.fn(async () => new Map()),
 }));
@@ -34,6 +38,7 @@ import { getSubmissionAwardCounts } from "@/lib/awards.server";
 import { authorDeleteSubmission } from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { indexSubmissionBestEffort } from "@/lib/search.server";
+import { getSiteSetting } from "@/lib/site-settings.server";
 import {
 	BannedDomainError,
 	createSubmission,
@@ -73,10 +78,51 @@ function createSelectLimitChain(result: unknown) {
 	return chain;
 }
 
+function createSubmissionTx(id = 70) {
+	const submissionInsert = {
+		values: vi.fn(() => ({ returning: vi.fn().mockResolvedValue([{ id }]) })),
+	};
+	const voteInsert = { values: vi.fn().mockResolvedValue(undefined) };
+	const tx = {
+		insert: vi
+			.fn()
+			.mockReturnValueOnce(submissionInsert)
+			.mockReturnValueOnce(voteInsert),
+		update: vi.fn(() => ({
+			set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+		})),
+	};
+	return { tx, submissionInsert };
+}
+
 describe("submissions.server", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(getSiteSetting).mockResolvedValue(false as never);
 	});
+
+	it.each([
+		[0, true, "FILTERED"],
+		[0, false, "VISIBLE"],
+		[2, true, "VISIBLE"],
+	] as const)(
+		"creates posts for admin level %i with filtering %s as %s",
+		async (adminLevel, filterNewPosts, expectedState) => {
+			vi.mocked(db.select).mockReturnValueOnce(
+				createSelectLimitChain([{ adminLevel }]) as never,
+			);
+			vi.mocked(getSiteSetting).mockResolvedValue(filterNewPosts as never);
+			const { tx, submissionInsert } = createSubmissionTx();
+			vi.mocked(db.transaction).mockImplementationOnce(
+				async (fn) => fn(tx as never) as never,
+			);
+
+			await createSubmission({ authorId: 3, title: "A post" });
+			expect(submissionInsert.values).toHaveBeenCalledWith(
+				expect.objectContaining({ stateMod: expectedState }),
+			);
+		},
+	);
 
 	it("omits blocked authors from submission feeds", async () => {
 		vi.mocked(db.select).mockReturnValueOnce(

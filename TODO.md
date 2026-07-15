@@ -23,7 +23,7 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
 
 ## Priority 0 — security and moderation correctness
 
-- [ ] **T34: Complete automatic content filtering**
+- [x] **T34: Complete automatic content filtering**
   - *Why*: filtered-content queues exist, but normal creation always writes `VISIBLE`; `users.filterBehavior` and rDrama's automatic thresholds are dormant.
   - *Implementation*: generalize site-setting metadata to support booleans and bounded integers stored in Redis. Add `filter_new_posts`, `filter_comments_min_age_days`, `filter_comments_min_comments`, and `filter_comments_min_karma`. For comments, `UNFILTERED` bypasses filtering, `FILTERED` always filters, and `AUTOMATIC` evaluates the thresholds; admins bypass filtering. New non-admin posts use `filter_new_posts`. Write the derived `stateMod` in the creation transaction so existing queues pick it up immediately.
   - *Files*: `src/lib/site-settings.server.ts`, `src/lib/site-settings-actions.server.ts`, `src/routes/admin.settings.tsx`, `src/lib/submissions.server.ts`, `src/lib/comments.server.ts`.

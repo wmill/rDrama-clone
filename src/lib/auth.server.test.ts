@@ -67,11 +67,11 @@ function makeUserRow(overrides: Record<string, unknown> = {}) {
 describe("createUser", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(getSiteSetting).mockResolvedValue(true);
+		vi.mocked(getSiteSetting).mockResolvedValue(true as never);
 	});
 
 	it("rejects signups while the signups_enabled toggle is off", async () => {
-		vi.mocked(getSiteSetting).mockResolvedValue(false);
+		vi.mocked(getSiteSetting).mockResolvedValue(false as never);
 
 		await expect(
 			createUser("newname", "new@example.com", PASSWORD),

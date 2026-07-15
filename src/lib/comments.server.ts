@@ -31,6 +31,7 @@ import { authorDeleteComment } from "@/lib/lifecycle.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
 import { createNotificationsForComment } from "@/lib/notifications.server";
 import { indexCommentBestEffort } from "@/lib/search.server";
+import { getSiteSetting } from "@/lib/site-settings.server";
 import type { VoteType } from "@/lib/votes.server";
 import type { CommentFeedSortType, TimeFilter } from "./constants";
 import type { ModerationState } from "./lifecycle.server";
@@ -983,6 +984,36 @@ export async function createComment(data: {
 	parentCommentId?: number;
 }): Promise<number> {
 	const createdUtc = Math.floor(Date.now() / 1000);
+	const [author] = await db
+		.select({
+			adminLevel: users.adminLevel,
+			commentCount: users.commentCount,
+			createdUtc: users.createdUtc,
+			filterBehavior: users.filterBehavior,
+			trueScore: users.trueScore,
+		})
+		.from(users)
+		.where(eq(users.id, data.authorId))
+		.limit(1);
+	if (!author) throw new Error("Author not found");
+
+	let shouldFilter = false;
+	if (author.adminLevel === 0) {
+		if (author.filterBehavior === "FILTERED") shouldFilter = true;
+		else if (author.filterBehavior === "AUTOMATIC") {
+			const [minAgeDays, minComments, minKarma] = await Promise.all([
+				getSiteSetting("filter_comments_min_age_days"),
+				getSiteSetting("filter_comments_min_comments"),
+				getSiteSetting("filter_comments_min_karma"),
+			]);
+			const ageDays = Math.floor((createdUtc - author.createdUtc) / 86400);
+			shouldFilter =
+				author.commentCount < minComments ||
+				ageDays < minAgeDays ||
+				author.trueScore < minKarma;
+		}
+	}
+	const stateMod = shouldFilter ? "FILTERED" : "VISIBLE";
 
 	// Determine level based on parent comment
 	let level = 1;
@@ -1013,7 +1044,7 @@ export async function createComment(data: {
 				level,
 				topCommentId,
 				createdUtc,
-				stateMod: "VISIBLE",
+				stateMod,
 				stateReport: "UNREPORTED",
 				volunteerJanitorBadness: 0,
 			})

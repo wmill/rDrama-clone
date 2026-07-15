@@ -64,11 +64,19 @@ describe("site-settings-actions.server", () => {
 		vi.mocked(getAllSiteSettings).mockResolvedValue({
 			signups_enabled: true,
 			read_only: false,
+			filter_new_posts: false,
+			filter_comments_min_age_days: 0,
+			filter_comments_min_comments: 0,
+			filter_comments_min_karma: 0,
 		});
 
 		await expect(getSiteSettingsFn()).resolves.toEqual({
 			signups_enabled: true,
 			read_only: false,
+			filter_new_posts: false,
+			filter_comments_min_age_days: 0,
+			filter_comments_min_comments: 0,
+			filter_comments_min_karma: 0,
 		});
 	});
 
@@ -152,5 +160,30 @@ describe("site-settings input schema", () => {
 			updateSiteSettingInputSchema.safeParse({ key: "read_only", value: true })
 				.success,
 		).toBe(true);
+	});
+
+	it("accepts bounded integer settings and rejects wrong types and bounds", () => {
+		expect(
+			updateSiteSettingInputSchema.safeParse({
+				key: "filter_comments_min_age_days",
+				value: 30,
+			}).success,
+		).toBe(true);
+		expect(
+			updateSiteSettingInputSchema.safeParse({
+				key: "filter_comments_min_age_days",
+				value: true,
+			}).success,
+		).toBe(false);
+		expect(
+			updateSiteSettingInputSchema.safeParse({
+				key: "filter_comments_min_age_days",
+				value: 3651,
+			}).success,
+		).toBe(false);
+		expect(
+			updateSiteSettingInputSchema.safeParse({ key: "read_only", value: 1 })
+				.success,
+		).toBe(false);
 	});
 });

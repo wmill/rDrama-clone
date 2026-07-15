@@ -27,6 +27,7 @@ import {
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
 import { indexSubmissionBestEffort } from "@/lib/search.server";
+import { getSiteSetting } from "@/lib/site-settings.server";
 import type { VoteType } from "@/lib/votes.server";
 import type { SortType, TimeFilter } from "./constants";
 
@@ -544,6 +545,16 @@ export async function createSubmission(data: {
 	const body = normalizeOptionalText(data.body);
 
 	await assertUrlDomainAllowed(url);
+	const [author] = await db
+		.select({ adminLevel: users.adminLevel })
+		.from(users)
+		.where(eq(users.id, data.authorId))
+		.limit(1);
+	if (!author) throw new Error("Author not found");
+	const stateMod =
+		author.adminLevel === 0 && (await getSiteSetting("filter_new_posts"))
+			? "FILTERED"
+			: "VISIBLE";
 
 	const result = await db.transaction(async (tx) => {
 		const [createdSubmission] = await tx
@@ -557,7 +568,7 @@ export async function createSubmission(data: {
 				bodyHtml: body ? renderPostBodyMarkdown(body) : null,
 				createdUtc,
 				over18: data.isNsfw ?? false,
-				stateMod: "VISIBLE",
+				stateMod,
 				stateReport: "UNREPORTED",
 			})
 			.returning({ id: submissions.id });

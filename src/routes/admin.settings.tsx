@@ -35,6 +35,17 @@ function SiteSettingsPage() {
 			setPendingKey(null);
 		}
 	};
+	const handleInteger = async (key: SiteSettingKey, value: number) => {
+		setPendingKey(key);
+		setError(null);
+		try {
+			const res = await updateSiteSettingFn({ data: { key, value } });
+			if (res.success) await router.invalidate();
+			else setError(res.error);
+		} finally {
+			setPendingKey(null);
+		}
+	};
 
 	return (
 		<div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
@@ -55,11 +66,25 @@ function SiteSettingsPage() {
 							<p className="text-sm font-medium text-white">{setting.label}</p>
 							<p className="text-xs text-slate-400">{setting.description}</p>
 						</div>
-						<Switch
-							checked={settings[setting.key]}
-							disabled={pendingKey === setting.key}
-							onCheckedChange={(value) => handleToggle(setting.key, value)}
-						/>
+						{setting.type === "boolean" ? (
+							<Switch
+								checked={settings[setting.key] as boolean}
+								disabled={pendingKey === setting.key}
+								onCheckedChange={(value) => handleToggle(setting.key, value)}
+							/>
+						) : (
+							<input
+								className="w-28 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-white"
+								type="number"
+								min={setting.min}
+								max={setting.max}
+								defaultValue={settings[setting.key] as number}
+								disabled={pendingKey === setting.key}
+								onBlur={(event) =>
+									handleInteger(setting.key, event.currentTarget.valueAsNumber)
+								}
+							/>
+						)}
 					</div>
 				))}
 			</div>
