@@ -88,6 +88,7 @@ export type UserSettings = {
 	id: number;
 	username: string;
 	email: string | null;
+	isActivated: boolean;
 	createdUtc: number;
 	isBanned: number;
 	banReason: string | null;
@@ -199,6 +200,7 @@ export async function getUserSettingsById(
 			id: users.id,
 			username: users.username,
 			email: users.email,
+			isActivated: users.isActivated,
 			createdUtc: users.createdUtc,
 			isBanned: users.isBanned,
 			banReason: users.banReason,
@@ -236,6 +238,7 @@ export async function getUserSettingsById(
 		id: user.id,
 		username: user.username,
 		email: user.email,
+		isActivated: user.isActivated,
 		createdUtc: user.createdUtc,
 		isBanned: user.isBanned,
 		banReason: user.banReason,

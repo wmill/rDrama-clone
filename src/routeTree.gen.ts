@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SearchRouteImport } from './routes/search'
@@ -46,6 +47,11 @@ import { Route as AtusernameSavedCommentsRouteImport } from './routes/@$username
 import { Route as UUsernameSavedPostsRouteImport } from './routes/u.$username_.saved.posts'
 import { Route as UUsernameSavedCommentsRouteImport } from './routes/u.$username_.saved.comments'
 
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubmitRoute = SubmitRouteImport.update({
   id: '/submit',
   path: '/submit',
@@ -242,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/@$username/posts': typeof AtusernamePostsRoute
   '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
@@ -279,6 +286,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/@$username/posts': typeof AtusernamePostsRoute
   '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
@@ -318,6 +326,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/signup': typeof SignupRoute
   '/submit': typeof SubmitRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/@$username_/posts': typeof AtusernamePostsRoute
   '/admin/badges': typeof AdminBadgesRoute
   '/admin/banned-domains': typeof AdminBannedDomainsRoute
@@ -358,6 +367,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/signup'
     | '/submit'
+    | '/verify-email'
     | '/@$username/posts'
     | '/admin/badges'
     | '/admin/banned-domains'
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/signup'
     | '/submit'
+    | '/verify-email'
     | '/@$username/posts'
     | '/admin/badges'
     | '/admin/banned-domains'
@@ -433,6 +444,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/signup'
     | '/submit'
+    | '/verify-email'
     | '/@$username_/posts'
     | '/admin/badges'
     | '/admin/banned-domains'
@@ -472,6 +484,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SignupRoute: typeof SignupRoute
   SubmitRoute: typeof SubmitRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
   AtusernamePostsRoute: typeof AtusernamePostsRoute
   CommentIdRoute: typeof CommentIdRoute
   PostIdRoute: typeof PostIdRoute
@@ -488,6 +501,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/submit': {
       id: '/submit'
       path: '/submit'
@@ -786,6 +806,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SignupRoute: SignupRoute,
   SubmitRoute: SubmitRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   AtusernamePostsRoute: AtusernamePostsRoute,
   CommentIdRoute: CommentIdRoute,
   PostIdRoute: PostIdRoute,

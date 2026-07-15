@@ -21,6 +21,11 @@ import {
 	TimeFilters,
 } from "@/lib/constants";
 import {
+	emailChangeInputSchema,
+	requestEmailChangeFn,
+	resendEmailVerificationFn,
+} from "@/lib/email-verification-actions.server";
+import {
 	type ClientSessionInfo,
 	listSessionsFn,
 	logoutOtherSessionsFn,
@@ -567,10 +572,136 @@ function SettingsForm({
 					</div>
 				</form>
 
+				<EmailCard email={settings.email} isActivated={settings.isActivated} />
 				<PasswordCard />
 				<SessionsCard sessions={sessions} />
 			</div>
 		</div>
+	);
+}
+
+function EmailCard({
+	email,
+	isActivated,
+}: {
+	email: string | null;
+	isActivated: boolean;
+}) {
+	const [nextEmail, setNextEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const [message, setMessage] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [isWorking, setIsWorking] = useState(false);
+	const emailId = useId();
+	const passwordId = useId();
+
+	const resend = async () => {
+		setError(null);
+		setMessage(null);
+		setIsWorking(true);
+		try {
+			const result = await resendEmailVerificationFn();
+			if (!result.success) setError(result.error);
+			else
+				setMessage(
+					"If verification is still needed, a new link has been sent.",
+				);
+		} catch (err) {
+			setError(
+				err instanceof Error
+					? err.message
+					: "Failed to send verification email",
+			);
+		} finally {
+			setIsWorking(false);
+		}
+	};
+
+	const requestChange = async (event: React.FormEvent) => {
+		event.preventDefault();
+		setError(null);
+		setMessage(null);
+		const validation = emailChangeInputSchema.safeParse({
+			email: nextEmail,
+			currentPassword: password,
+		});
+		if (!validation.success) {
+			setError(
+				validation.error.issues[0]?.message ?? "Invalid email change request",
+			);
+			return;
+		}
+		setIsWorking(true);
+		try {
+			const result = await requestEmailChangeFn({ data: validation.data });
+			if (!result.success) setError(result.error);
+			else {
+				setNextEmail("");
+				setPassword("");
+				setMessage(
+					"Confirmation sent. Your email will change only after you use the link.",
+				);
+			}
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "Failed to request email change",
+			);
+		} finally {
+			setIsWorking(false);
+		}
+	};
+
+	return (
+		<form
+			onSubmit={requestChange}
+			className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl"
+		>
+			<div className="flex items-start justify-between gap-4">
+				<div>
+					<h2 className="text-xl font-semibold text-white">Email address</h2>
+					<p className="text-sm text-slate-400">
+						{email ?? "No email"} · {isActivated ? "Verified" : "Unverified"}
+					</p>
+				</div>
+				{!isActivated && (
+					<Button
+						type="button"
+						variant="outline"
+						disabled={isWorking}
+						onClick={resend}
+					>
+						Resend verification
+					</Button>
+				)}
+			</div>
+			{error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+			{message && <p className="mt-3 text-sm text-emerald-400">{message}</p>}
+			<div className="mt-4 grid gap-4 md:grid-cols-2">
+				<div className="space-y-2">
+					<Label htmlFor={emailId}>New email</Label>
+					<Input
+						id={emailId}
+						type="email"
+						autoComplete="email"
+						value={nextEmail}
+						onChange={(event) => setNextEmail(event.target.value)}
+					/>
+				</div>
+				<div className="space-y-2">
+					<Label htmlFor={passwordId}>Current password</Label>
+					<Input
+						id={passwordId}
+						type="password"
+						autoComplete="current-password"
+						value={password}
+						onChange={(event) => setPassword(event.target.value)}
+					/>
+				</div>
+			</div>
+			<Button className="mt-4" type="submit" disabled={isWorking}>
+				Send confirmation
+			</Button>
+		</form>
 	);
 }
 

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createUser } from "@/lib/auth.server";
+import { sendSignupVerification } from "@/lib/email-verification.server";
 import {
 	createSession,
 	getCurrentUser,
@@ -47,6 +48,9 @@ const signupAction = createServerFn({ method: "POST" })
 		const { userAgent, ipAddress } = getRequestInfo();
 		const sessionId = await createSession(result.user.id, userAgent, ipAddress);
 		setSessionCookie(sessionId);
+		if (result.user.email) {
+			await sendSignupVerification(result.user.id, result.user.email);
+		}
 
 		return { success: true as const, user: result.user };
 	});

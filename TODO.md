@@ -37,7 +37,7 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
   - *Done when*: a valid change preserves the current session, revokes other sessions and reset links, and the old password no longer authenticates; incorrect-current-password requests make no writes.
   - *Verify*: focused auth/session/reset tests; `pnpm test --run && pnpm check`; manual two-browser check.
 
-- [ ] **T36: Verified email ownership and email changes**
+- [x] **T36: Verified email ownership and email changes**
   - *Why*: signup accepts an email and password reset trusts it, but `users.isActivated` is never set and users cannot safely change addresses.
   - *Implementation*: issue opaque, single-use Redis tokens with a one-hour TTL after signup and on a rate-limited resend. Existing unverified accounts remain usable. An email-change request requires the current password, verifies uniqueness, and stores the pending address only in the token payload; consuming it atomically updates `email` and `isActivated`. Do not reveal account existence from public responses.
   - *Files*: `src/lib/auth.server.ts`, `src/lib/mail.server.ts`, a new email-verification server module, `src/routes/signup.tsx`, `src/routes/me.tsx`, and a verification route.
