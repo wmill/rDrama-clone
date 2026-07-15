@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/db", () => ({
-	db: {},
+	db: { transaction: vi.fn() },
 }));
 
+import { db } from "@/db";
 import {
 	authorDeleteComment,
 	authorDeleteSubmission,
+	authorRestoreComment,
+	authorRestoreSubmission,
 	setCommentModerationState,
 	setCommentPinnedState,
 	setCommentRemovedState,
@@ -69,6 +72,39 @@ describe("lifecycle helpers", () => {
 		await expect(authorDeleteComment(11, 21, tx as never)).resolves.toBe(true);
 		expect(submissionUpdate.set).toHaveBeenCalled();
 		expect(commentUpdate.set).toHaveBeenCalled();
+	});
+
+	it("restores author-deleted content transactionally without touching counts", async () => {
+		const submissionUpdate = createUpdateChain();
+		const commentUpdate = createUpdateChain();
+		const tx = {
+			update: vi
+				.fn()
+				.mockReturnValueOnce(submissionUpdate)
+				.mockReturnValueOnce(commentUpdate),
+		};
+		vi.mocked(db.transaction).mockImplementation(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(authorRestoreSubmission(10, 20)).resolves.toBe(true);
+		await expect(authorRestoreComment(11, 21)).resolves.toBe(true);
+		expect(submissionUpdate.set).toHaveBeenCalledWith(
+			expect.objectContaining({ stateUserDeletedUtc: null }),
+		);
+		expect(commentUpdate.set).toHaveBeenCalledWith(
+			expect.objectContaining({ stateUserDeletedUtc: null }),
+		);
+		expect(tx.update).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not restore content rejected by ownership or lifecycle predicates", async () => {
+		const tx = { update: vi.fn(() => createUpdateChain([])) };
+		vi.mocked(db.transaction).mockImplementation(
+			async (fn) => fn(tx as never) as never,
+		);
+		await expect(authorRestoreSubmission(10, 999)).resolves.toBe(false);
+		await expect(authorRestoreComment(11, 999)).resolves.toBe(false);
 	});
 
 	it("logs submission moderation actions", async () => {

@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import chevronDownUrl from "lucide-static/icons/chevron-down.svg?url";
 import chevronUpUrl from "lucide-static/icons/chevron-up.svg?url";
 import clockUrl from "lucide-static/icons/clock.svg?url";
@@ -17,6 +17,7 @@ import {
 import {
 	createCommentFn,
 	deleteCommentFn,
+	restoreCommentFn,
 	saveCommentFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
@@ -46,10 +47,12 @@ export const Comment = memo(function Comment({
 	maxDepth = 10,
 	onReplyAdded,
 }: CommentProps) {
+	const router = useRouter();
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [showReplyForm, setShowReplyForm] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
 	const [isDeleted, setIsDeleted] = useState(comment.isDeleted);
+	const [isRestoring, setIsRestoring] = useState(false);
 	const [currentBody, setCurrentBody] = useState(comment.bodyHtml);
 	const [reportMessage, setReportMessage] = useState<string | null>(null);
 	const [isReporting, setIsReporting] = useState(false);
@@ -92,6 +95,20 @@ export const Comment = memo(function Comment({
 		if (result.success) {
 			setIsDeleted(true);
 			setCurrentBody("<p>[deleted by author]</p>");
+		}
+	};
+
+	const handleRestore = async () => {
+		setIsRestoring(true);
+		try {
+			const result = await restoreCommentFn({ data: { id: comment.id } });
+			if (result.success) {
+				setIsDeleted(false);
+				setCurrentBody(comment.bodyHtml);
+				await router.invalidate();
+			}
+		} finally {
+			setIsRestoring(false);
 		}
 	};
 
@@ -411,6 +428,17 @@ export const Comment = memo(function Comment({
 													Delete
 												</button>
 											</>
+										)}
+
+										{isAuthor && isDeleted && stateMod === "VISIBLE" && (
+											<button
+												type="button"
+												onClick={handleRestore}
+												disabled={isRestoring}
+												className="text-slate-500 hover:text-cyan-400 disabled:opacity-60"
+											>
+												{isRestoring ? "Restoring..." : "Restore"}
+											</button>
 										)}
 
 										{canDistinguish && !isDeleted && !isModHidden && (

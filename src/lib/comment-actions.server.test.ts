@@ -23,8 +23,11 @@ vi.mock("@/lib/comments.server", () => ({
 }));
 
 vi.mock("@/lib/lifecycle.server", () => ({
+	authorRestoreComment: vi.fn(),
 	setCommentSavedState: vi.fn(),
 }));
+
+vi.mock("@/lib/search.server", () => ({ indexCommentBestEffort: vi.fn() }));
 
 vi.mock("@/lib/site-settings.server", () => ({
 	isSiteReadOnly: vi.fn().mockResolvedValue(false),
@@ -37,6 +40,7 @@ import {
 	createCommentFn,
 	deleteCommentFn,
 	getCommentsSinceFn,
+	restoreCommentFn,
 	saveCommentFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
@@ -47,7 +51,11 @@ import {
 	getCommentsBySubmissionSince,
 	updateComment,
 } from "@/lib/comments.server";
-import { setCommentSavedState } from "@/lib/lifecycle.server";
+import {
+	authorRestoreComment,
+	setCommentSavedState,
+} from "@/lib/lifecycle.server";
+import { indexCommentBestEffort } from "@/lib/search.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly } from "@/lib/site-settings.server";
 
@@ -74,6 +82,22 @@ describe("comment-actions.server", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.mocked(isSiteReadOnly).mockResolvedValue(false);
+	});
+
+	it("restores only the author's eligible comment and reindexes it", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		vi.mocked(authorRestoreComment)
+			.mockResolvedValueOnce(false)
+			.mockResolvedValueOnce(true);
+		await expect(restoreCommentFn({ data: { id: 4 } })).resolves.toEqual({
+			success: false,
+			error: "You cannot restore this comment",
+		});
+		await expect(restoreCommentFn({ data: { id: 4 } })).resolves.toEqual({
+			success: true,
+		});
+		expect(authorRestoreComment).toHaveBeenCalledWith(4, 11);
+		expect(indexCommentBestEffort).toHaveBeenCalledWith(4);
 	});
 
 	it("rejects comment creation while the site is read-only", async () => {

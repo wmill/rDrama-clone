@@ -1,8 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { fail, requireUser } from "@/lib/auth-guards.server";
-import { setSubmissionSavedState } from "@/lib/lifecycle.server";
+import {
+	authorRestoreSubmission,
+	setSubmissionSavedState,
+} from "@/lib/lifecycle.server";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
+import { indexSubmissionBestEffort } from "@/lib/search.server";
 import {
 	BannedDomainError,
 	deleteSubmission,
@@ -91,6 +95,17 @@ export const deleteSubmissionFn = createServerFn({ method: "POST" })
 			return fail("You cannot delete this post");
 		}
 
+		return { success: true as const };
+	});
+
+export const restoreSubmissionFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
+	.handler(async ({ data }: { data: { id: number } }) => {
+		const guard = await requireUser();
+		if (!guard.ok) return guard.failure;
+		const restored = await authorRestoreSubmission(data.id, guard.user.id);
+		if (!restored) return fail("You cannot restore this post");
+		void indexSubmissionBestEffort(data.id);
 		return { success: true as const };
 	});
 

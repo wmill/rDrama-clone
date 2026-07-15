@@ -8,8 +8,12 @@ import {
 	getCommentsBySubmissionSince,
 	updateComment,
 } from "@/lib/comments.server";
-import { setCommentSavedState } from "@/lib/lifecycle.server";
+import {
+	authorRestoreComment,
+	setCommentSavedState,
+} from "@/lib/lifecycle.server";
 import { enforceRateLimit } from "@/lib/rate-limit.server";
+import { indexCommentBestEffort } from "@/lib/search.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly, READ_ONLY_MESSAGE } from "@/lib/site-settings.server";
 import { idInputSchema, idSchema } from "@/lib/validation";
@@ -108,6 +112,17 @@ export const deleteCommentFn = createServerFn({ method: "POST" })
 		const user = guard.user;
 		const result = await deleteComment(data.id, user.id);
 		return { success: result };
+	});
+
+export const restoreCommentFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
+	.handler(async ({ data }: { data: { id: number } }) => {
+		const guard = await requireUser();
+		if (!guard.ok) return guard.failure;
+		const restored = await authorRestoreComment(data.id, guard.user.id);
+		if (!restored) return fail("You cannot restore this comment");
+		void indexCommentBestEffort(data.id);
+		return { success: true as const };
 	});
 
 export const saveCommentFn = createServerFn({ method: "POST" })

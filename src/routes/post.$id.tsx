@@ -29,6 +29,7 @@ import { AWARD_OPTIONS } from "@/lib/constants";
 import { replaceSlursInHtml } from "@/lib/content-preferences";
 import {
 	deleteSubmissionFn,
+	restoreSubmissionFn,
 	saveSubmissionFn,
 	setSubmissionSubscriptionFn,
 	type UpdateSubmissionInput,
@@ -185,6 +186,7 @@ function PostContent({
 	);
 	const [isSaving, setIsSaving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isRestoring, setIsRestoring] = useState(false);
 	const [isReporting, setIsReporting] = useState(false);
 	const [isAwarding, setIsAwarding] = useState(false);
 	const [awardMessage, setAwardMessage] = useState<string | null>(null);
@@ -279,6 +281,24 @@ function PostContent({
 			setError(err instanceof Error ? err.message : "Failed to delete post");
 		} finally {
 			setIsDeleting(false);
+		}
+	};
+
+	const handleRestore = async () => {
+		setError(null);
+		setIsRestoring(true);
+		try {
+			const result = await restoreSubmissionFn({ data: { id: post.id } });
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			setVisibilityMessage(null);
+			await router.invalidate();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to restore post");
+		} finally {
+			setIsRestoring(false);
 		}
 	};
 
@@ -951,6 +971,18 @@ function PostContent({
 							onClick={handleDelete}
 						>
 							{isDeleting ? "Deleting..." : "Delete"}
+						</Button>
+					</div>
+				)}
+				{isAuthor && post.isDeleted && stateMod === "VISIBLE" && (
+					<div className="ml-auto">
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={isRestoring}
+							onClick={handleRestore}
+						>
+							{isRestoring ? "Restoring..." : "Restore"}
 						</Button>
 					</div>
 				)}

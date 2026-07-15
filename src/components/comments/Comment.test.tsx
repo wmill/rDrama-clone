@@ -5,7 +5,10 @@ import type { CommentWithReplies } from "@/lib/comments.server";
 import { renderCommentMarkdown } from "@/lib/markdown";
 import { Comment } from "./Comment";
 
+const { invalidate } = vi.hoisted(() => ({ invalidate: vi.fn() }));
+
 vi.mock("@tanstack/react-router", () => ({
+	useRouter: () => ({ invalidate }),
 	Link: ({ children, to, ...props }: { children: ReactNode; to: string }) => (
 		<a href={to} {...props}>
 			{children}
@@ -28,9 +31,12 @@ vi.mock("@/stores/modals", () => ({
 vi.mock("@/lib/comment-actions.server", () => ({
 	createCommentFn: vi.fn(),
 	deleteCommentFn: vi.fn(),
+	restoreCommentFn: vi.fn(),
 	saveCommentFn: vi.fn(),
 	updateCommentFn: vi.fn(),
 }));
+
+import { restoreCommentFn } from "@/lib/comment-actions.server";
 
 vi.mock("@/lib/admin-actions.server", () => ({
 	distinguishCommentFn: vi.fn(),
@@ -125,5 +131,21 @@ describe("Comment editing", () => {
 		expect(body?.innerHTML).toContain("<strong>bold</strong>");
 		expect(body?.innerHTML).toContain('<span class="spoiler">spoiler</span>');
 		expect(body?.textContent).not.toContain("**bold**");
+	});
+});
+
+describe("Comment restore", () => {
+	it("renders Restore for the author placeholder and restores its body", async () => {
+		vi.mocked(restoreCommentFn).mockResolvedValue({ success: true });
+		const comment = { ...makeComment(), isDeleted: true };
+		const { container } = render(
+			<Comment comment={comment} submissionId={42} currentUserId={7} />,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+		await waitFor(() => expect(invalidate).toHaveBeenCalled());
+		expect(container.querySelector(".prose")?.innerHTML).toContain(
+			"original body",
+		);
 	});
 });

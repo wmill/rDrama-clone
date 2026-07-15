@@ -44,7 +44,7 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
   - *Done when*: signup/resend/change links are expiring and single-use, address collisions are rejected, and no email is changed before verification.
   - *Verify*: token, mail, expiry, replay, collision, and authorization tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T37: Restore self-deleted posts and comments**
+- [x] **T37: Restore self-deleted posts and comments**
   - *Why*: rDreamer exposes author deletion but not rDrama's inverse lifecycle operation.
   - *Implementation*: add transactional restore helpers and actions. Only the author may restore, and only while `stateMod` is `VISIBLE`; moderator removal always wins. Render Restore on author-visible deleted placeholders. Do not modify counts, scores, saves, or votes because deletion currently leaves them intact.
   - *Files*: `src/lib/lifecycle.server.ts`, `src/lib/post-actions.server.ts`, `src/lib/comment-actions.server.ts`, post/comment components.

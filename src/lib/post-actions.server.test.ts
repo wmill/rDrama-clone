@@ -20,22 +20,30 @@ vi.mock("@/lib/submissions.server", () => ({
 }));
 
 vi.mock("@/lib/lifecycle.server", () => ({
+	authorRestoreSubmission: vi.fn(),
 	setSubmissionSavedState: vi.fn(),
 }));
+
+vi.mock("@/lib/search.server", () => ({ indexSubmissionBestEffort: vi.fn() }));
 
 vi.mock("@/lib/notifications.server", () => ({
 	setSubmissionSubscriptionState: vi.fn(),
 }));
 
 import type { SafeUser } from "@/lib/auth.server";
-import { setSubmissionSavedState } from "@/lib/lifecycle.server";
+import {
+	authorRestoreSubmission,
+	setSubmissionSavedState,
+} from "@/lib/lifecycle.server";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
 import {
 	deleteSubmissionFn,
+	restoreSubmissionFn,
 	saveSubmissionFn,
 	setSubmissionSubscriptionFn,
 	updateSubmissionFn,
 } from "@/lib/post-actions.server";
+import { indexSubmissionBestEffort } from "@/lib/search.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { deleteSubmission, updateSubmission } from "@/lib/submissions.server";
 
@@ -61,6 +69,22 @@ const mockUser: SafeUser = {
 describe("post-actions.server", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+	});
+
+	it("restores only the author's eligible post and reindexes it", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		vi.mocked(authorRestoreSubmission)
+			.mockResolvedValueOnce(false)
+			.mockResolvedValueOnce(true);
+		await expect(restoreSubmissionFn({ data: { id: 4 } })).resolves.toEqual({
+			success: false,
+			error: "You cannot restore this post",
+		});
+		await expect(restoreSubmissionFn({ data: { id: 4 } })).resolves.toEqual({
+			success: true,
+		});
+		expect(authorRestoreSubmission).toHaveBeenCalledWith(4, 7);
+		expect(indexSubmissionBestEffort).toHaveBeenCalledWith(4);
 	});
 
 	it("rejects submission updates when logged out", async () => {

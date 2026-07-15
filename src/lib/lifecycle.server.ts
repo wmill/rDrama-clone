@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -93,6 +93,30 @@ export async function authorDeleteSubmission(
 		.returning({ id: submissions.id });
 
 	return result.length > 0;
+}
+
+export async function authorRestoreSubmission(
+	submissionId: number,
+	authorId: number,
+): Promise<boolean> {
+	return db.transaction(async (tx) => {
+		const result = await tx
+			.update(submissions)
+			.set({
+				stateUserDeletedUtc: null,
+				editedUtc: Math.floor(Date.now() / 1000),
+			})
+			.where(
+				and(
+					eq(submissions.id, submissionId),
+					eq(submissions.authorId, authorId),
+					eq(submissions.stateMod, "VISIBLE"),
+					isNotNull(submissions.stateUserDeletedUtc),
+				),
+			)
+			.returning({ id: submissions.id });
+		return result.length > 0;
+	});
 }
 
 export async function setSubmissionModerationState(
@@ -246,6 +270,30 @@ export async function authorDeleteComment(
 		.returning({ id: comments.id });
 
 	return result.length > 0;
+}
+
+export async function authorRestoreComment(
+	commentId: number,
+	authorId: number,
+): Promise<boolean> {
+	return db.transaction(async (tx) => {
+		const result = await tx
+			.update(comments)
+			.set({
+				stateUserDeletedUtc: null,
+				editedUtc: Math.floor(Date.now() / 1000),
+			})
+			.where(
+				and(
+					eq(comments.id, commentId),
+					eq(comments.authorId, authorId),
+					eq(comments.stateMod, "VISIBLE"),
+					isNotNull(comments.stateUserDeletedUtc),
+				),
+			)
+			.returning({ id: comments.id });
+		return result.length > 0;
+	});
 }
 
 export async function setCommentModerationState(
