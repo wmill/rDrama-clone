@@ -1,82 +1,80 @@
-Project to rewrite the themotte/rDrama codebase in node & react because the flask / jinja / bootstrap site got unwheildly. Aims to be completely db compatable. Uses tanstack start. 
+# rDreamer
 
-Documentation about the old site is in project_specs.
+rDreamer is a TypeScript and React rewrite of [rDrama](https://github.com/themotte/rDrama) using TanStack Start. It aims to preserve compatibility with rDrama's PostgreSQL data model while replacing the Flask/Jinja/Bootstrap application with a modern client-rendered interface.
 
-The specs include generated test db data so that llms will have something to inspect.
+The comment system deliberately moves thread construction and incremental rendering into the browser. Comments also have an `ltree` path for efficient permalink ancestor/subtree queries without recursively rebuilding full threads in PostgreSQL.
 
-Project goal is to move the threading to the client as much as possible. Running recursive queries puts a lot of load on the db when bots hit the page, and a few thousand comments isn't going to cause any problem on modern devices. 
+## Current feature state
 
-I had to chunk the rendering of full comment threads because react is not happy when you try to insert that many dom nodes at once. The browser notcibly froze.
+Implemented and covered by the current test suite:
 
-There's a new ltree column on comments to make things a lot easier when you're viewing a single comment and need to find it's ancestors & children. 
+- Signup, login/logout, password reset, Redis-backed sessions, and revocation of other sessions.
+- Sortable/paginated post and comment feeds, post/comment permalinks, threaded replies, editing, deletion, voting, saves, and post subscriptions.
+- User profiles, privacy, follows/followers, blocks, saved content, profile settings, themes, NSFW preferences, and slur replacement.
+- Elasticsearch-backed post/comment search with visibility filtering and reindex tooling.
+- Notifications for replies, mentions, subscribed threads, follows, and awards.
+- Reporting and moderation queues, approve/filter/remove moderation states, sticky/pin/distinguish actions, bans and shadowbans, user investigation/notes/alts, banned domains, badges, awards, site settings, and a moderation audit log.
+- Server-side authorization, zod validation, rate limiting, Sentry instrumentation, Vitest coverage, and Playwright infrastructure.
 
-I've been focussed on rendering, the admin and moderation stuff is still missing. Not production ready, but you can point it at a copy of your rdrama based site's db and play around with it.
+The application is still a work in progress. The prioritized gaps—account security settings, complete content lifecycle and filtering, remaining profile/preferences behavior, public community/transparency pages, and deeper administration—are tracked in [TODO.md](./TODO.md). Large subsystems such as chat, 2FA, OAuth applications, the virtual economy, volunteer moderation, and media uploads are intentionally deferred.
 
+The original implementation and generated database/route notes can be inspected in `../rDrama` and `project_specs/` respectively. JSON fixtures for local prototyping live in `prototyping-data/`.
 
-# Getting Started
+## Getting started
 
-To run this application:
-
-# Set up .env.local
-
-```bash
-mv .env.local.sample .env.local
-```
+Install dependencies and create local configuration:
 
 ```bash
 pnpm install
+cp .env.local.sample .env.local
+```
+
+Start PostgreSQL and Redis, then run the development server on port 3000:
+
+```bash
+docker compose up -d postgres redis
 pnpm dev
 ```
 
-# Set up Postgres and Redis using docker
-
-```bash
-docker commpose up -d postgres redis
-```
-
-# Generate some sample data to get going on development
+To generate a larger local dataset:
 
 ```bash
 pnpm generate-data --comments 5000 --max-depth 30 --submissions 30
 ```
 
-# Building For Production
+## Verification
 
-To build this application for production:
-
-```bash
-pnpm build
-```
-
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+Run the full required checks before opening a pull request:
 
 ```bash
-pnpm test
-```
-
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-
-## Linting & Formatting
-
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
-
-
-```bash
-pnpm lint
-pnpm format
 pnpm check
+pnpm test --run
 ```
 
-## Shadcn
-
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
+Other useful commands:
 
 ```bash
-pnpx shadcn@latest add button
+pnpm test:watch
+pnpm e2e
+pnpm build
+pnpm serve
+pnpm start
 ```
 
+## Database and search tools
+
+Drizzle schema definitions live in `src/db/schema.ts`:
+
+```bash
+pnpm db:generate
+pnpm db:migrate
+pnpm db:studio
+```
+
+Elasticsearch can be rebuilt from PostgreSQL with:
+
+```bash
+pnpm reindex-search
+```
+
+See `AGENTS.md` and `CLAUDE.md` for repository conventions, testing patterns, environment variables, and operational details.
