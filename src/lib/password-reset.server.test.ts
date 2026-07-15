@@ -97,6 +97,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 
 import { sendMail } from "@/lib/mail.server";
 import {
+	invalidatePasswordResetTokens,
 	requestPasswordReset,
 	resetPasswordWithToken,
 	validatePasswordResetToken,
@@ -159,6 +160,18 @@ describe("password reset", () => {
 
 		expect(mocks.redisPipeline).not.toHaveBeenCalled();
 		expect(sendMail).not.toHaveBeenCalled();
+	});
+
+	it("invalidates the outstanding reset token for an account", async () => {
+		mocks.redisGet.mockResolvedValueOnce("outstanding-token");
+
+		await invalidatePasswordResetTokens(42);
+
+		expect(mocks.pipelineDel).toHaveBeenCalledWith(
+			"password_reset:outstanding-token",
+		);
+		expect(mocks.pipelineDel).toHaveBeenCalledWith("password_reset_user:42");
+		expect(mocks.pipelineExec).toHaveBeenCalledTimes(1);
 	});
 
 	it("validates a token against the stored login nonce", async () => {

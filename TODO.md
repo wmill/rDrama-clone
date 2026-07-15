@@ -30,7 +30,7 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
   - *Done when*: an admin can configure the policy, per-user behavior affects new comments, and filtered creations are absent from public feeds/search but present in `/admin/filtered`.
   - *Verify*: focused settings/submission/comment tests; `pnpm test --run && pnpm check`; manually create content under each behavior.
 
-- [ ] **T35: In-account password changes**
+- [x] **T35: In-account password changes**
   - *Why*: password reset exists, but a signed-in user cannot rotate a known password.
   - *Implementation*: add a security-settings action requiring the current password, a valid replacement and confirmation. Hash the replacement, invalidate outstanding password-reset tokens, and revoke every session except the current one. Rate-limit attempts by user ID.
   - *Files*: new `src/lib/account-actions.server.ts` (or a clearly separated security module), `src/lib/sessions.server.ts`, `src/lib/password-reset.server.ts`, `src/routes/me.tsx`.

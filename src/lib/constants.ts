@@ -105,6 +105,7 @@ export const RATE_LIMITS = {
 	signup: { limit: 5, windowSeconds: 60 * 60 },
 	password_reset_request: { limit: 3, windowSeconds: 15 * 60 },
 	password_reset_consume: { limit: 10, windowSeconds: 15 * 60 },
+	account_password_change: { limit: 5, windowSeconds: 15 * 60 },
 	create_post: { limit: 6, windowSeconds: 10 * 60 },
 	create_comment: { limit: 20, windowSeconds: 10 * 60 },
 	vote: { limit: 60, windowSeconds: 60 },

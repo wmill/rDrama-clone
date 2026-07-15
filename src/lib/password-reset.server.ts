@@ -100,6 +100,16 @@ async function deletePasswordResetToken(
 	await pipeline.exec();
 }
 
+export async function invalidatePasswordResetTokens(
+	userId: number,
+): Promise<void> {
+	const token = await redis.get(passwordResetUserKey(userId));
+	const pipeline = redis.pipeline();
+	if (token) pipeline.del(passwordResetTokenKey(token));
+	pipeline.del(passwordResetUserKey(userId));
+	await pipeline.exec();
+}
+
 export async function requestPasswordReset(
 	email: string,
 ): Promise<{ success: true } | { success: false; error: string }> {

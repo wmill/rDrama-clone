@@ -9,6 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
+	changePasswordFn,
+	changePasswordInputSchema,
+} from "@/lib/account-actions.server";
+import {
 	type CommentFeedSortType,
 	CommentSortTypes,
 	type SortType,
@@ -563,9 +567,105 @@ function SettingsForm({
 					</div>
 				</form>
 
+				<PasswordCard />
 				<SessionsCard sessions={sessions} />
 			</div>
 		</div>
+	);
+}
+
+function PasswordCard() {
+	const [currentPassword, setCurrentPassword] = useState("");
+	const [newPassword, setNewPassword] = useState("");
+	const [confirmPassword, setConfirmPassword] = useState("");
+	const [message, setMessage] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [isWorking, setIsWorking] = useState(false);
+	const currentPasswordId = useId();
+	const newPasswordId = useId();
+	const confirmPasswordId = useId();
+
+	const handleSubmit = async (event: React.FormEvent) => {
+		event.preventDefault();
+		setMessage(null);
+		setError(null);
+		const validation = changePasswordInputSchema.safeParse({
+			currentPassword,
+			newPassword,
+			confirmPassword,
+		});
+		if (!validation.success) {
+			setError(validation.error.issues[0]?.message ?? "Invalid password");
+			return;
+		}
+		setIsWorking(true);
+		try {
+			const result = await changePasswordFn({ data: validation.data });
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			setCurrentPassword("");
+			setNewPassword("");
+			setConfirmPassword("");
+			setMessage("Password changed. Other sessions have been logged out.");
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "Failed to change password",
+			);
+		} finally {
+			setIsWorking(false);
+		}
+	};
+
+	return (
+		<form
+			onSubmit={handleSubmit}
+			className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl"
+		>
+			<h2 className="text-xl font-semibold text-white">Change password</h2>
+			<p className="mb-4 text-sm text-slate-400">
+				Changing your password logs out every other device and invalidates reset
+				links.
+			</p>
+			{error && <p className="mb-3 text-sm text-red-400">{error}</p>}
+			{message && <p className="mb-3 text-sm text-emerald-400">{message}</p>}
+			<div className="grid gap-4 md:grid-cols-3">
+				<div className="space-y-2">
+					<Label htmlFor={currentPasswordId}>Current password</Label>
+					<Input
+						id={currentPasswordId}
+						type="password"
+						autoComplete="current-password"
+						value={currentPassword}
+						onChange={(event) => setCurrentPassword(event.target.value)}
+					/>
+				</div>
+				<div className="space-y-2">
+					<Label htmlFor={newPasswordId}>New password</Label>
+					<Input
+						id={newPasswordId}
+						type="password"
+						autoComplete="new-password"
+						value={newPassword}
+						onChange={(event) => setNewPassword(event.target.value)}
+					/>
+				</div>
+				<div className="space-y-2">
+					<Label htmlFor={confirmPasswordId}>Confirm new password</Label>
+					<Input
+						id={confirmPasswordId}
+						type="password"
+						autoComplete="new-password"
+						value={confirmPassword}
+						onChange={(event) => setConfirmPassword(event.target.value)}
+					/>
+				</div>
+			</div>
+			<Button className="mt-4" type="submit" disabled={isWorking}>
+				{isWorking ? "Changing..." : "Change password"}
+			</Button>
+		</form>
 	);
 }
 
