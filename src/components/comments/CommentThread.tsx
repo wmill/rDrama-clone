@@ -16,6 +16,7 @@ const sortOptions: { value: CommentSortType; label: string }[] = [
 
 type CommentThreadProps = {
 	submissionId: number;
+	submissionAuthorId: number;
 	comments: CommentFlat[];
 	commentCount: number;
 	commentsLastFetchedAt: number;
@@ -23,10 +24,13 @@ type CommentThreadProps = {
 	currentUserAdminLevel?: number;
 	initialSort?: CommentSortType;
 	onCommentCountChange?: (count: number) => void;
+	highlightComments?: boolean;
+	highlightSince?: number;
 };
 
 export function CommentThreadBase({
 	submissionId,
+	submissionAuthorId,
 	comments,
 	commentCount,
 	commentsLastFetchedAt,
@@ -34,6 +38,8 @@ export function CommentThreadBase({
 	currentUserAdminLevel = 0,
 	initialSort = "top",
 	onCommentCountChange,
+	highlightComments = false,
+	highlightSince = Number.POSITIVE_INFINITY,
 }: CommentThreadProps) {
 	const {
 		sort,
@@ -81,6 +87,7 @@ export function CommentThreadBase({
 
 			<CommentThreadList
 				submissionId={submissionId}
+				submissionAuthorId={submissionAuthorId}
 				currentUserId={currentUserId}
 				currentUserAdminLevel={currentUserAdminLevel}
 				onReplyAdded={handleReplyAdded}
@@ -88,6 +95,8 @@ export function CommentThreadBase({
 				comments={commentTree}
 				visibleLimit={visibleLimit}
 				onVisibleLimitChange={setVisibleLimit}
+				highlightComments={highlightComments}
+				highlightSince={highlightSince}
 			/>
 		</div>
 	);

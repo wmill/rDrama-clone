@@ -21,6 +21,7 @@ vi.mock("@/lib/submissions.server", () => ({
 
 vi.mock("@/lib/lifecycle.server", () => ({
 	authorRestoreSubmission: vi.fn(),
+	setSubmissionProfilePinnedState: vi.fn(),
 	setSubmissionSavedState: vi.fn(),
 }));
 
@@ -33,11 +34,13 @@ vi.mock("@/lib/notifications.server", () => ({
 import type { SafeUser } from "@/lib/auth.server";
 import {
 	authorRestoreSubmission,
+	setSubmissionProfilePinnedState,
 	setSubmissionSavedState,
 } from "@/lib/lifecycle.server";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
 import {
 	deleteSubmissionFn,
+	pinSubmissionToProfileFn,
 	restoreSubmissionFn,
 	saveSubmissionFn,
 	setSubmissionSubscriptionFn,
@@ -87,6 +90,19 @@ describe("post-actions.server", () => {
 		expect(indexSubmissionBestEffort).toHaveBeenCalledWith(4);
 	});
 
+	it("allows an author to pin their post to their profile", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		vi.mocked(setSubmissionProfilePinnedState).mockResolvedValue(true);
+		await expect(
+			pinSubmissionToProfileFn({ data: { id: 5, pinned: true } }),
+		).resolves.toEqual({ success: true });
+		expect(setSubmissionProfilePinnedState).toHaveBeenCalledWith({
+			submissionId: 5,
+			authorId: 7,
+			pinned: true,
+		});
+	});
+
 	it("rejects submission updates when logged out", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(null);
 
@@ -122,12 +138,17 @@ describe("post-actions.server", () => {
 			}),
 		).resolves.toEqual({ success: true });
 
-		expect(updateSubmission).toHaveBeenCalledWith(12, 7, {
-			title: "Updated title",
-			url: undefined,
-			body: undefined,
-			isNsfw: true,
-		});
+		expect(updateSubmission).toHaveBeenCalledWith(
+			12,
+			7,
+			{
+				title: "Updated title",
+				url: undefined,
+				body: undefined,
+				isNsfw: true,
+			},
+			false,
+		);
 	});
 
 	it("returns an authorization-style error when submission edits fail", async () => {

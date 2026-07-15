@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, or, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -57,6 +57,7 @@ export type ProfilePostItem = {
 	downvotes: number;
 	score: number;
 	commentCount: number;
+	isDraft?: boolean;
 };
 
 export type UserBadge = {
@@ -96,6 +97,7 @@ export type UserSettings = {
 	proCoins: number;
 	bio: string;
 	customTitlePlain: string;
+	titleLocked: boolean;
 	profileUrl: string;
 	bannerUrl: string;
 	defaultSorting: SortType;
@@ -186,7 +188,12 @@ export async function getUserByUsernameCanonical(
 	const [user] = await db
 		.select()
 		.from(users)
-		.where(sql`lower(${users.username}) = ${normalized}`)
+		.where(
+			or(
+				sql`lower(${users.username}) = ${normalized}`,
+				sql`lower(${users.originalUsername}) = ${normalized}`,
+			),
+		)
 		.limit(1);
 
 	return user ?? null;
@@ -208,6 +215,7 @@ export async function getUserSettingsById(
 			proCoins: users.proCoins,
 			bio: users.bio,
 			customTitlePlain: users.customTitlePlain,
+			flairChanged: users.flairChanged,
 			profileUrl: users.profileUrl,
 			bannerUrl: users.bannerUrl,
 			defaultSorting: users.defaultSorting,
@@ -246,6 +254,7 @@ export async function getUserSettingsById(
 		proCoins: user.proCoins,
 		bio: user.bio ?? "",
 		customTitlePlain: user.customTitlePlain ?? "",
+		titleLocked: user.flairChanged !== null,
 		profileUrl: user.profileUrl ?? "",
 		bannerUrl: user.bannerUrl ?? "",
 		defaultSorting: user.defaultSorting as SortType,
@@ -269,6 +278,7 @@ export async function getUserSettingsById(
 export async function updateUserSettings(
 	userId: number,
 	input: UpdateUserSettingsInput,
+	options: { preserveCustomTitle?: boolean } = {},
 ): Promise<void> {
 	const bio = input.bio.trim();
 	const customTitlePlain = input.customTitlePlain.trim();
@@ -280,13 +290,19 @@ export async function updateUserSettings(
 		? renderPostTitleHtml(customTitlePlain)
 		: null;
 
+	const titleFields = options.preserveCustomTitle
+		? {}
+		: {
+				customTitlePlain: customTitlePlain || null,
+				customTitle: customTitleHtml,
+			};
+
 	await db
 		.update(users)
 		.set({
 			bio: bio || null,
 			bioHtml,
-			customTitlePlain: customTitlePlain || null,
-			customTitle: customTitleHtml,
+			...titleFields,
 			profileUrl: profileUrl || null,
 			bannerUrl: bannerUrl || null,
 			defaultSorting: input.defaultSorting,
@@ -322,11 +338,15 @@ async function getFollowingCount(userId: number): Promise<number> {
 function buildPostOrderBy(sort: SortType): SQL[] {
 	switch (sort) {
 		case "new":
-			return [desc(submissions.createdUtc)];
+			return [desc(submissions.isPinned), desc(submissions.createdUtc)];
 		case "top":
-			return [desc(sql`${submissions.upvotes} - ${submissions.downvotes}`)];
+			return [
+				desc(submissions.isPinned),
+				desc(sql`${submissions.upvotes} - ${submissions.downvotes}`),
+			];
 		case "controversial":
 			return [
+				desc(submissions.isPinned),
 				desc(
 					sql`CASE WHEN ${submissions.upvotes} + ${submissions.downvotes} = 0 THEN 0
 					ELSE (${submissions.upvotes} + ${submissions.downvotes}) *
@@ -335,9 +355,10 @@ function buildPostOrderBy(sort: SortType): SQL[] {
 				),
 			];
 		case "comments":
-			return [desc(submissions.commentCount)];
+			return [desc(submissions.isPinned), desc(submissions.commentCount)];
 		default:
 			return [
+				desc(submissions.isPinned),
 				desc(
 					sql`(${submissions.upvotes} - ${submissions.downvotes}) /
 					POWER(((EXTRACT(EPOCH FROM NOW()) - ${submissions.createdUtc}) / 3600) + 2, 1.8)`,
@@ -369,6 +390,7 @@ async function getProfilePosts(options: {
 	sort: SortType;
 	t: TimeFilter;
 	page: number;
+	includeDrafts?: boolean;
 }): Promise<{ rows: ProfilePostItem[]; hasNextPage: boolean }> {
 	const limit = PAGE_SIZE;
 	const offset = (options.page - 1) * limit;
@@ -378,6 +400,7 @@ async function getProfilePosts(options: {
 		eq(submissions.authorId, options.authorId),
 		eq(submissions.stateMod, "VISIBLE"),
 	];
+	if (!options.includeDrafts) conditions.push(eq(submissions.private, false));
 	if (timeCutoff !== null) {
 		conditions.push(gte(submissions.createdUtc, timeCutoff));
 	}
@@ -393,6 +416,7 @@ async function getProfilePosts(options: {
 			upvotes: submissions.upvotes,
 			downvotes: submissions.downvotes,
 			commentCount: submissions.commentCount,
+			isDraft: submissions.private,
 		})
 		.from(submissions)
 		.where(and(...conditions))
@@ -423,6 +447,7 @@ async function getSavedProfilePosts(options: {
 		eq(saveRelationship.userId, options.userId),
 		eq(submissions.stateMod, "VISIBLE"),
 		isNull(submissions.stateUserDeletedUtc),
+		eq(submissions.private, false),
 	];
 	if (timeCutoff !== null) {
 		conditions.push(gte(submissions.createdUtc, timeCutoff));
@@ -496,6 +521,7 @@ async function getProfileComments(options: {
 			submissionTitle: submissions.title,
 			authorName: users.username,
 			authorShadowBanned: users.shadowBanned,
+			isNsfw: comments.over18,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
 			upvotes: comments.upvotes,
@@ -562,7 +588,10 @@ async function getProfileComments(options: {
 			id: row.id,
 			parentSubmissionId: row.parentSubmissionId as number,
 			submissionTitle: row.submissionTitle,
-			bodyHtml: row.bodyHtml,
+			bodyHtml:
+				row.isNsfw && !viewer.over18
+					? "<p>Enable NSFW content in settings to view this comment</p>"
+					: row.bodyHtml,
 			createdUtc: row.createdUtc,
 			upvotes: row.upvotes,
 			downvotes: row.downvotes,
@@ -605,6 +634,7 @@ async function getSavedProfileComments(options: {
 			authorId: comments.authorId,
 			authorName: users.username,
 			authorShadowBanned: users.shadowBanned,
+			isNsfw: comments.over18,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
 			upvotes: comments.upvotes,
@@ -672,7 +702,10 @@ async function getSavedProfileComments(options: {
 			id: row.id,
 			parentSubmissionId: row.parentSubmissionId as number,
 			submissionTitle: row.submissionTitle,
-			bodyHtml: row.bodyHtml,
+			bodyHtml:
+				row.isNsfw && !viewer.over18
+					? "<p>Enable NSFW content in settings to view this comment</p>"
+					: row.bodyHtml,
 			createdUtc: row.createdUtc,
 			upvotes: row.upvotes,
 			downvotes: row.downvotes,
@@ -720,6 +753,7 @@ export async function getProfilePageData(options: {
 				sort: options.sort as SortType,
 				t: options.t,
 				page: options.page,
+				includeDrafts: isOwner || isAdmin,
 			});
 			posts = result.rows;
 			hasNextPage = result.hasNextPage;

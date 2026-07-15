@@ -25,7 +25,9 @@ function VerifyEmailPage() {
 				{result.success ? `${result.email} is now verified.` : result.error}
 			</p>
 			<Button className="mt-6" asChild>
-				<Link to="/me">Account settings</Link>
+				<Link to="/me" search={{ blockedPage: 1 }}>
+					Account settings
+				</Link>
 			</Button>
 		</div>
 	);

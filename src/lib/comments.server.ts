@@ -60,6 +60,8 @@ export type CommentFeedItem = {
 	userVote: VoteType;
 	stateMod: ModerationState;
 	stateModSetBy: string | null;
+	isNsfw?: boolean;
+	isNsfwHidden?: boolean;
 };
 
 export type CommentSummary = {
@@ -90,6 +92,8 @@ export type CommentSummary = {
 	stateMod: ModerationState;
 	stateModSetBy: string | null;
 	awards?: AwardCount[];
+	isNsfw?: boolean;
+	isNsfwHidden?: boolean;
 };
 
 export type CommentWithReplies = CommentSummary & {
@@ -128,6 +132,7 @@ export type RawCommentRow = {
 	parentSubmissionPrivate?: boolean | null;
 	parentSubmissionDeletedUtc?: Date | null;
 	parentSubmissionStateMod?: string | null;
+	isNsfw?: boolean;
 };
 
 export async function getCommentsBySubmission(
@@ -209,6 +214,7 @@ function mapCommentRow(row: RawCommentRow): CommentFlat {
 		userVote: parseVoteType(row.userVoteType),
 		stateMod: parseModerationState(row.stateMod),
 		stateModSetBy: row.stateModSetBy,
+		isNsfw: row.isNsfw ?? false,
 	};
 }
 
@@ -227,12 +233,23 @@ function mapThreadCommentRow(
 			stateUserDeletedUtc: row.stateUserDeletedUtc,
 			authorShadowBanned: row.authorShadowBanned,
 			isBlocking: row.isBlocking,
+			isNsfw: row.isNsfw,
 		},
 		viewer,
 	);
 
 	if (!visibility.isVisible && !includeAsPlaceholder) {
 		return null;
+	}
+
+	if (visibility.bodyHidden) {
+		return {
+			...mapCommentRow(row),
+			body: "[NSFW comment hidden]",
+			bodyHtml: `<p>${visibility.message}</p>`,
+			isNsfwHidden: true,
+			visibilityMessage: visibility.message,
+		};
 	}
 
 	if (!visibility.isVisible) {
@@ -277,6 +294,7 @@ export function filterThreadComments(
 				stateUserDeletedUtc: row.stateUserDeletedUtc,
 				authorShadowBanned: row.authorShadowBanned,
 				isBlocking: row.isBlocking,
+				isNsfw: row.isNsfw,
 			},
 			viewer,
 		);
@@ -313,6 +331,7 @@ async function getSubmissionCommentRows(
 			authorId: comments.authorId,
 			authorName: users.username,
 			authorShadowBanned: users.shadowBanned,
+			isNsfw: comments.over18,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -416,6 +435,7 @@ async function getRawCommentRowById(
 			authorId: comments.authorId,
 			authorName: users.username,
 			authorShadowBanned: users.shadowBanned,
+			isNsfw: comments.over18,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -483,6 +503,7 @@ type RawCommentSqlRow = {
 	author_id: number;
 	author_name: string;
 	author_shadow_banned: string | null;
+	over_18: boolean;
 	body: string | null;
 	body_html: string;
 	created_utc: number;
@@ -509,6 +530,7 @@ function mapRawCommentSqlRow(row: RawCommentSqlRow): RawCommentRow {
 		authorId: row.author_id,
 		authorName: row.author_name,
 		authorShadowBanned: row.author_shadow_banned,
+		isNsfw: row.over_18,
 		body: row.body,
 		bodyHtml: row.body_html,
 		createdUtc: row.created_utc,
@@ -545,6 +567,7 @@ async function getRawCommentSubtreeRows(
 			u.username AS author_name,
 			u.shadowbanned AS author_shadow_banned,
 			c.body,
+			c.over_18,
 			c.body_html,
 			c.created_utc,
 			c.edited_utc,
@@ -660,6 +683,7 @@ export async function getRecentComments(
 			id: comments.id,
 			authorId: comments.authorId,
 			authorName: users.username,
+			isNsfw: comments.over18,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -692,8 +716,10 @@ export async function getRecentComments(
 		id: row.id,
 		authorId: row.authorId,
 		authorName: row.authorName,
-		body: row.body,
-		bodyHtml: row.bodyHtml,
+		body: row.isNsfw ? "[NSFW comment hidden]" : row.body,
+		bodyHtml: row.isNsfw
+			? "<p>Enable NSFW content in settings to view this comment</p>"
+			: row.bodyHtml,
 		createdUtc: row.createdUtc,
 		editedUtc: row.editedUtc,
 		upvotes: row.upvotes,
@@ -714,6 +740,8 @@ export async function getRecentComments(
 		userVote: 0 as const,
 		stateMod: "VISIBLE" as const,
 		stateModSetBy: null,
+		isNsfw: row.isNsfw,
+		isNsfwHidden: row.isNsfw,
 	}));
 }
 
@@ -785,6 +813,7 @@ export async function getCommentsFeed(
 			authorId: comments.authorId,
 			authorName: users.username,
 			authorShadowBanned: users.shadowBanned,
+			isNsfw: comments.over18,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -868,8 +897,11 @@ export async function getCommentsFeed(
 			id: row.id,
 			authorId: row.authorId,
 			authorName: row.authorName,
-			body: row.body,
-			bodyHtml: row.bodyHtml,
+			body: row.isNsfw && !viewer.over18 ? "[NSFW comment hidden]" : row.body,
+			bodyHtml:
+				row.isNsfw && !viewer.over18
+					? "<p>Enable NSFW content in settings to view this comment</p>"
+					: row.bodyHtml,
 			createdUtc: row.createdUtc,
 			editedUtc: row.editedUtc,
 			upvotes: row.upvotes,
@@ -886,6 +918,8 @@ export async function getCommentsFeed(
 			userVote: parseVoteType(row.userVoteType),
 			stateMod: parseModerationState(row.stateMod),
 			stateModSetBy: row.stateModSetBy,
+			isNsfw: row.isNsfw,
+			isNsfwHidden: row.isNsfw && !viewer.over18,
 		}));
 }
 
@@ -912,6 +946,7 @@ export async function getCommentAncestors(
 			authorId: comments.authorId,
 			authorName: users.username,
 			authorShadowBanned: users.shadowBanned,
+			isNsfw: comments.over18,
 			body: comments.body,
 			bodyHtml: comments.bodyHtml,
 			createdUtc: comments.createdUtc,
@@ -1040,6 +1075,21 @@ export async function createComment(data: {
 		await tx.execute(
 			sql`select pg_advisory_xact_lock(hashtext(${`comment:${fingerprint}`}))`,
 		);
+		const [availableSubmission] = await tx
+			.select({ id: submissions.id })
+			.from(submissions)
+			.where(
+				and(
+					eq(submissions.id, data.parentSubmissionId),
+					eq(submissions.private, false),
+					eq(submissions.stateMod, "VISIBLE"),
+					isNull(submissions.stateUserDeletedUtc),
+				),
+			)
+			.limit(1);
+		if (!availableSubmission) {
+			throw new Error("This post is not available for comments");
+		}
 		const [duplicate] = await tx
 			.select({ id: comments.id })
 			.from(comments)

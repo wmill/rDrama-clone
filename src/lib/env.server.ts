@@ -1,15 +1,7 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { config } from "dotenv";
 
-const cwd = process.cwd();
-const envLocalPath = resolve(cwd, ".env.local");
-const envPath = resolve(cwd, ".env");
-
-if (existsSync(envLocalPath)) {
-	config({ path: envLocalPath });
-}
-
-if (existsSync(envPath)) {
-	config({ path: envPath });
-}
+// Vite/Nitro load these files for application builds. Explicit loading keeps
+// standalone operational scripts consistent without importing Node path/fs,
+// which can otherwise leak through server-function modules into client builds.
+config({ path: ".env.local" });
+config({ path: ".env" });

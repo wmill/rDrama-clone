@@ -287,3 +287,10 @@ code {
     border-radius: 0.375rem;
   }
 }
+html {
+	accent-color: var(--theme-color, #06b6d4);
+}
+
+::selection {
+	background: color-mix(in srgb, var(--theme-color, #06b6d4) 45%, transparent);
+}

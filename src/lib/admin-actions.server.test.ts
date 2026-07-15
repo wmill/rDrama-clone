@@ -14,6 +14,7 @@ vi.mock("@/lib/sessions.server", async () =>
 
 vi.mock("@/lib/lifecycle.server", () => ({
 	setCommentPinnedState: vi.fn(),
+	setCommentNsfwState: vi.fn(),
 	setCommentModerationState: vi.fn(),
 	setCommentRemovedState: vi.fn(),
 	setSubmissionModerationState: vi.fn(),
@@ -38,6 +39,7 @@ import {
 	removeCommentFn,
 	removeSubmissionFn,
 	setCommentModerationStateFn,
+	setCommentNsfwFn,
 	setSubmissionModerationStateFn,
 	shadowbanUserFn,
 	stickySubmissionFn,
@@ -52,6 +54,7 @@ import {
 import type { SafeUser } from "@/lib/auth.server";
 import {
 	setCommentModerationState,
+	setCommentNsfwState,
 	setCommentPinnedState,
 	setCommentRemovedState,
 	setSubmissionModerationState,
@@ -270,6 +273,20 @@ describe("admin-actions.server", () => {
 		});
 	});
 
+	it("delegates moderator NSFW changes and reindexes", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		vi.mocked(setCommentNsfwState).mockResolvedValue(true);
+		await expect(
+			setCommentNsfwFn({ data: { id: 6, nsfw: true } }),
+		).resolves.toEqual({ success: true });
+		expect(setCommentNsfwState).toHaveBeenCalledWith({
+			commentId: 6,
+			actorId: 2,
+			nsfw: true,
+			moderator: true,
+		});
+	});
+
 	it("edits submission title/flair and logs both actions", async () => {
 		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
 		const updateChain = createQueryChain([
@@ -395,6 +412,7 @@ describe("admin-actions.server", () => {
 				verifiedColor: "00ff00",
 				customTitlePlain: "Trusted voice",
 				customTitle: "<p>Trusted voice</p>",
+				flairChanged: 2 ** 31 - 1,
 			},
 		]);
 		const firstInsert = createQueryChain();
@@ -411,6 +429,7 @@ describe("admin-actions.server", () => {
 					verified: "Staff",
 					verifiedColor: "#00ff00",
 					customTitlePlain: "Trusted voice",
+					titleLocked: true,
 				},
 			}),
 		).resolves.toEqual({
@@ -419,6 +438,7 @@ describe("admin-actions.server", () => {
 			verifiedColor: "00ff00",
 			customTitlePlain: "Trusted voice",
 			customTitle: "<p>Trusted voice</p>",
+			titleLocked: true,
 		});
 
 		expect(firstInsert.values).toHaveBeenCalledWith({
@@ -430,9 +450,47 @@ describe("admin-actions.server", () => {
 		expect(secondInsert.values).toHaveBeenCalledWith({
 			userId: 2,
 			targetUserId: 9,
-			kind: "set_custom_title",
+			kind: "set_flair_locked",
 			note: '"Trusted voice"',
 		});
+		expect(updateChain.set).toHaveBeenCalledWith(
+			expect.objectContaining({ flairChanged: 2 ** 31 - 1 }),
+		);
+	});
+
+	it("clears a moderator title lock and logs the unlock", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(moderator);
+		const updateChain = createQueryChain([
+			{
+				id: 9,
+				verified: null,
+				verifiedColor: null,
+				customTitlePlain: "User editable",
+				customTitle: "<p>User editable</p>",
+				flairChanged: null,
+			},
+		]);
+		dbMock.update.mockReturnValueOnce(updateChain);
+		dbMock.insert
+			.mockReturnValueOnce(createQueryChain())
+			.mockReturnValueOnce(createQueryChain());
+
+		await expect(
+			updateUserModerationProfileFn({
+				data: {
+					userId: 9,
+					customTitlePlain: "User editable",
+					titleLocked: false,
+				},
+			}),
+		).resolves.toMatchObject({ success: true, titleLocked: false });
+
+		expect(updateChain.set).toHaveBeenCalledWith(
+			expect.objectContaining({ flairChanged: null }),
+		);
+		expect(dbMock.insert.mock.results[1]?.value.values).toHaveBeenCalledWith(
+			expect.objectContaining({ kind: "set_flair_unlocked" }),
+		);
 	});
 
 	it("creates user notes, rejects bad tags, and enforces admin-only access", async () => {

@@ -10,6 +10,7 @@ export type CommentViewerContext = {
 	canModerate: boolean;
 	canSeeShadowbanned: boolean;
 	blockedAuthorIds: Set<number>;
+	over18?: boolean;
 };
 
 export type CommentVisibilityInput = {
@@ -21,11 +22,13 @@ export type CommentVisibilityInput = {
 	stateUserDeletedUtc: Date | null;
 	authorShadowBanned: string | null;
 	isBlocking: boolean;
+	isNsfw?: boolean;
 };
 
 export type CommentVisibilityResult = {
 	isVisible: boolean;
 	message: string | null;
+	bodyHidden?: boolean;
 };
 
 export async function getCommentViewerContext(
@@ -47,6 +50,7 @@ export async function getCommentViewerContext(
 				id: users.id,
 				adminLevel: users.adminLevel,
 				shadowBanned: users.shadowBanned,
+				over18: users.over18,
 			})
 			.from(users)
 			.where(eq(users.id, userId))
@@ -71,6 +75,7 @@ export async function getCommentViewerContext(
 		canModerate: viewer.adminLevel >= 2,
 		canSeeShadowbanned: viewer.adminLevel >= 2 || viewer.shadowBanned !== null,
 		blockedAuthorIds: socialViewer.blockedUserIds,
+		...(typeof viewer.over18 === "boolean" ? { over18: viewer.over18 } : {}),
 	};
 }
 
@@ -134,6 +139,13 @@ export function getCommentVisibility(
 	input: CommentVisibilityInput,
 	viewer: CommentViewerContext,
 ): CommentVisibilityResult {
+	if (input.isNsfw && !viewer.over18) {
+		return {
+			isVisible: true,
+			message: "Enable NSFW content in settings to view this comment",
+			bodyHidden: true,
+		};
+	}
 	if (viewer.viewerId !== null && viewer.viewerId === input.authorId) {
 		return { isVisible: true, message: null };
 	}

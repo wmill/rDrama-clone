@@ -49,6 +49,7 @@ import { getUserByUsernameCanonical } from "@/lib/users.server";
 function createSelectChain<T>(result: T) {
 	return {
 		from: vi.fn().mockReturnThis(),
+		innerJoin: vi.fn().mockReturnThis(),
 		where: vi.fn().mockReturnThis(),
 		limit: vi.fn().mockResolvedValue(result),
 	};
@@ -303,6 +304,18 @@ describe("award-actions.server", () => {
 			body: "gave your post a Gold award",
 			url: "/post/42",
 		});
+	});
+
+	it("does not award or notify for a private draft", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(regular);
+		dbMock.select.mockReturnValueOnce(createSelectChain([]));
+
+		await expect(
+			awardContentFn({ data: { submissionId: 42, kind: "gold" } }),
+		).resolves.toEqual({ success: false, error: "Content not found" });
+		expect(dbMock.insert).not.toHaveBeenCalled();
+		expect(dbMock.update).not.toHaveBeenCalled();
+		expect(createSimpleNotification).not.toHaveBeenCalled();
 	});
 
 	it("awards a comment and reports missing content", async () => {

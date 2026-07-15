@@ -65,6 +65,7 @@ describe("search.server", () => {
 			documentType: "comment",
 			from: 0,
 			size: 25,
+			allowNsfw: false,
 		});
 
 		expect(postQuery.query.bool.must[0].simple_query_string.fields).toContain(
@@ -73,6 +74,9 @@ describe("search.server", () => {
 		expect(
 			commentQuery.query.bool.must[0].simple_query_string.fields,
 		).toContain("authorUsername^3");
+		expect(commentQuery.query.bool.filter).toContainEqual({
+			bool: { must_not: [{ term: { over18: true } }] },
+		});
 	});
 
 	it("filters blocked, removed, deleted, private, and shadowbanned post hits", () => {

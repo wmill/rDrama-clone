@@ -60,49 +60,49 @@ Current baseline: `pnpm test --run && pnpm check` passes (45 test files, 335 tes
 
 ## Priority 1 — everyday forum behavior
 
-- [ ] **T26: Finish moderator-assigned titles**
+- [x] **T26: Finish moderator-assigned titles**
   - *Why*: moderators can already set rendered title text, but the `flairChanged` lock is not written and users can overwrite it.
   - *Implementation*: extend the existing moderation-profile action and UI with explicit set/clear lock behavior, write a dedicated mod-log entry, expose the lock state to settings, and reject self-service title changes while locked. Use the existing markdown rendering path.
   - *Files*: `src/lib/admin-actions.server.ts`, `src/routes/admin.users_.$id.tsx`, `src/lib/users.server.ts`, `src/routes/me.tsx`.
   - *Done when*: a moderator can assign and lock a title, the user receives a clear read-only explanation, and unlocking restores self-service editing.
   - *Verify*: admin/user action and settings component tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T39: Profile-post and OP-comment pinning**
+- [x] **T39: Profile-post and OP-comment pinning**
   - *Why*: profile queries already sort `submissions.isPinned`, while the only working comment pin is a moderator action.
   - *Implementation*: let an author toggle their post's profile pin. Let a post author pin/unpin a comment using an `(OP)` `pinnedBy` marker and notify the comment author when it changes. OP actions must not remove moderator pins; moderator behavior and mod logging stay unchanged.
   - *Files*: `src/lib/lifecycle.server.ts`, post/comment actions, `src/routes/post.$id.tsx`, `src/components/comments/Comment.tsx`, notifications.
   - *Done when*: pinned posts lead the author's profile and OP versus moderator comment pins have distinct permissions and labels.
   - *Verify*: permission, precedence, notification, and rendering tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T40: Blocked-users and follower management**
+- [x] **T40: Blocked-users and follower management**
   - *Why*: users can block from a profile but cannot review their block list or remove an unwanted follower.
   - *Implementation*: add a paginated blocked-users query and settings surface with unblock controls. Add an owner-only remove-follower action. Reuse the existing block/follow transactions and visibility rules; do not expose private profiles through list results.
   - *Files*: `src/lib/social.server.ts`, `src/lib/social-actions.server.ts`, a settings route/component, relationship pages.
   - *Done when*: users can list/unblock everyone they block and remove a follower, with stored counters remaining correct and actions idempotent.
   - *Verify*: privacy, pagination, counter, and action tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T41: Username changes and canonical profile redirects**
+- [x] **T41: Username changes and canonical profile redirects**
   - *Why*: `originalUsername` exists and rDrama supports renames, but rDreamer does not.
   - *Implementation*: require the current password; apply signup's username rules; enforce case-insensitive uniqueness against both `username` and `originalUsername`; preserve the first original name. Canonical profile lookup should redirect matches on the original name to the current URL. Relationships and sessions remain ID-based.
   - *Files*: account actions, `src/lib/users.server.ts`, profile loaders, `src/routes/me.tsx`.
   - *Done when*: renames cannot steal current or original names, old profile links redirect, and existing content/relationships show the new canonical name.
   - *Verify*: collision, case-only, password, canonicalization, and relationship tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T42: Complete NSFW behavior**
+- [x] **T42: Complete NSFW behavior**
   - *Why*: post create/edit and preference gating exist, but comments cannot be marked NSFW and comment-level visibility is incomplete.
   - *Implementation*: add author/moderator comment toggles; retain existing post editing; hide NSFW comment bodies/media from guests and users without `over18` while retaining thread structure. Log moderator-initiated changes and avoid indexing hidden bodies for ineligible viewers.
   - *Files*: comment/admin actions, comment visibility and search filtering, `src/components/comments/Comment.tsx`.
   - *Done when*: authors and moderators can toggle the flag with correct permissions and every feed/permalink/search surface applies the same gate.
   - *Verify*: viewer matrix, moderation log, search, and component tests; `pnpm test --run && pnpm check`.
 
-- [ ] **T43: Make exposed preferences functional**
+- [x] **T43: Make exposed preferences functional**
   - *Why*: settings persist `defaultSorting`, `defaultTime`, `defaultSortingComments`, `hideVotedOn`, `cardView`, `highlightComments`, link-target choices, and colors, but most do not affect the UI.
   - *Implementation*: apply saved defaults only when URL parameters are absent; exclude already-voted posts server-side when requested; add list/card (catalog) feed presentation; honor new-comment highlighting and internal/external new-tab choices; render username/title colors and a safe root theme-color variable. Remove a control rather than leaving it dead if its behavior cannot be made observable.
   - *Files*: root/index/post routes, feed/comment/profile components, submission query, settings tests.
   - *Done when*: every exposed control has a visible, tested effect and explicit URLs continue to override defaults.
   - *Verify*: loader/query/component matrix tests; `pnpm test --run && pnpm check`; manual settings walkthrough.
 
-- [ ] **T44: Draft posts and publishing**
+- [x] **T44: Draft posts and publishing**
   - *Why*: `submissions.private` is read in visibility paths but no user flow creates or publishes drafts.
   - *Implementation*: allow draft creation, owner/admin-only viewing and editing, and explicit publish. Exclude drafts from public feeds, other users' profiles, search, notifications, and public counters. Publishing is a transaction that assigns the public timestamp and performs normal author vote, subscription, counter, and indexing work exactly once.
   - *Files*: `src/lib/submissions.server.ts`, post actions, submit/post/profile routes, search/notification tests.

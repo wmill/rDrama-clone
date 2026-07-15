@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
@@ -179,14 +179,29 @@ export const awardContentFn = createServerFn({ method: "POST" })
 			const [post] = await db
 				.select({ authorId: submissions.authorId })
 				.from(submissions)
-				.where(eq(submissions.id, data.submissionId as number))
+				.where(
+					and(
+						eq(submissions.id, data.submissionId as number),
+						eq(submissions.private, false),
+						eq(submissions.stateMod, "VISIBLE"),
+						isNull(submissions.stateUserDeletedUtc),
+					),
+				)
 				.limit(1);
 			authorId = post?.authorId;
 		} else {
 			const [comment] = await db
 				.select({ authorId: comments.authorId })
 				.from(comments)
-				.where(eq(comments.id, data.commentId as number))
+				.innerJoin(submissions, eq(comments.parentSubmission, submissions.id))
+				.where(
+					and(
+						eq(comments.id, data.commentId as number),
+						eq(submissions.private, false),
+						eq(submissions.stateMod, "VISIBLE"),
+						isNull(submissions.stateUserDeletedUtc),
+					),
+				)
 				.limit(1);
 			authorId = comment?.authorId;
 		}

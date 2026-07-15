@@ -76,6 +76,7 @@ describe("voteOnSubmission", () => {
 		const insertChain = createInsertChain();
 		const counterUpdate = createUpdateChain();
 		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectLimitChain([{ id: 42 }]) as never)
 			.mockReturnValueOnce(createSelectLimitChain([]) as never)
 			.mockReturnValueOnce(
 				createSelectLimitChain([{ upvotes: 5, downvotes: 2 }]) as never,
@@ -103,6 +104,7 @@ describe("voteOnSubmission", () => {
 		const deleteChain = createDeleteChain();
 		const counterUpdate = createUpdateChain();
 		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectLimitChain([{ id: 42 }]) as never)
 			.mockReturnValueOnce(createSelectLimitChain([{ voteType: 1 }]) as never)
 			.mockReturnValueOnce(
 				createSelectLimitChain([{ upvotes: 4, downvotes: 2 }]) as never,
@@ -125,6 +127,7 @@ describe("voteOnSubmission", () => {
 		const voteUpdate = createUpdateChain();
 		const counterUpdate = createUpdateChain();
 		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectLimitChain([{ id: 42 }]) as never)
 			.mockReturnValueOnce(createSelectLimitChain([{ voteType: 1 }]) as never)
 			.mockReturnValueOnce(
 				createSelectLimitChain([{ upvotes: 4, downvotes: 3 }]) as never,
@@ -148,6 +151,7 @@ describe("voteOnSubmission", () => {
 	it("removing a nonexistent vote skips counter updates", async () => {
 		const deleteChain = createDeleteChain();
 		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectLimitChain([{ id: 42 }]) as never)
 			.mockReturnValueOnce(createSelectLimitChain([]) as never)
 			.mockReturnValueOnce(
 				createSelectLimitChain([{ upvotes: 0, downvotes: 0 }]) as never,
@@ -174,6 +178,22 @@ describe("voteOnSubmission", () => {
 			userVote: 0,
 			error: "connection refused",
 		});
+	});
+
+	it("rejects votes on drafts without writing vote or score state", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectLimitChain([]) as never,
+		);
+
+		await expect(voteOnSubmission(11, 42, 1)).resolves.toEqual({
+			success: false,
+			newScore: 0,
+			userVote: 0,
+			error: "This post is not available for voting",
+		});
+		expect(db.insert).not.toHaveBeenCalled();
+		expect(db.update).not.toHaveBeenCalled();
+		expect(db.delete).not.toHaveBeenCalled();
 	});
 });
 

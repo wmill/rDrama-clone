@@ -125,7 +125,11 @@ function createUpdateChain(returningResult?: unknown) {
 	return { set, where, returning };
 }
 
-function createTx(insertedCommentId: number, duplicateRows: unknown[] = []) {
+function createTx(
+	insertedCommentId: number,
+	duplicateRows: unknown[] = [],
+	submissionRows: unknown[] = [{ id: 42 }],
+) {
 	const commentInsert = {
 		values: vi.fn(() => ({
 			returning: vi.fn().mockResolvedValue([{ id: insertedCommentId }]),
@@ -134,7 +138,10 @@ function createTx(insertedCommentId: number, duplicateRows: unknown[] = []) {
 	const voteInsert = { values: vi.fn().mockResolvedValue(undefined) };
 	const updateChains: ReturnType<typeof createUpdateChain>[] = [];
 	const tx = {
-		select: vi.fn(() => createCommentRowChain(duplicateRows)),
+		select: vi
+			.fn()
+			.mockReturnValueOnce(createCommentRowChain(submissionRows))
+			.mockReturnValueOnce(createCommentRowChain(duplicateRows)),
 		insert: vi
 			.fn()
 			.mockReturnValueOnce(commentInsert)
@@ -302,6 +309,21 @@ describe("createComment", () => {
 		).rejects.toThrow("identical active comment");
 		expect(tx.execute).toHaveBeenCalledTimes(1);
 		expect(tx.insert).not.toHaveBeenCalled();
+	});
+
+	it("rejects comments on drafts before creating counters or notifications", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(authorChain() as never);
+		const { tx } = createTx(62, [], []);
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(
+			createComment({ authorId: 7, body: "hidden", parentSubmissionId: 42 }),
+		).rejects.toThrow("not available for comments");
+		expect(tx.insert).not.toHaveBeenCalled();
+		expect(tx.update).not.toHaveBeenCalled();
+		expect(createNotificationsForComment).not.toHaveBeenCalled();
 	});
 });
 

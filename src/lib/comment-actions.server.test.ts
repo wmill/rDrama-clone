@@ -24,10 +24,15 @@ vi.mock("@/lib/comments.server", () => ({
 
 vi.mock("@/lib/lifecycle.server", () => ({
 	authorRestoreComment: vi.fn(),
+	setCommentOpPinnedState: vi.fn(),
+	setCommentNsfwState: vi.fn(),
 	setCommentSavedState: vi.fn(),
 }));
 
 vi.mock("@/lib/search.server", () => ({ indexCommentBestEffort: vi.fn() }));
+vi.mock("@/lib/notifications.server", () => ({
+	createSimpleNotification: vi.fn(),
+}));
 
 vi.mock("@/lib/site-settings.server", () => ({
 	isSiteReadOnly: vi.fn().mockResolvedValue(false),
@@ -40,8 +45,10 @@ import {
 	createCommentFn,
 	deleteCommentFn,
 	getCommentsSinceFn,
+	pinCommentAsOpFn,
 	restoreCommentFn,
 	saveCommentFn,
+	setOwnCommentNsfwFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
 import {
@@ -53,8 +60,11 @@ import {
 } from "@/lib/comments.server";
 import {
 	authorRestoreComment,
+	setCommentNsfwState,
+	setCommentOpPinnedState,
 	setCommentSavedState,
 } from "@/lib/lifecycle.server";
+import { createSimpleNotification } from "@/lib/notifications.server";
 import { indexCommentBestEffort } from "@/lib/search.server";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { isSiteReadOnly } from "@/lib/site-settings.server";
@@ -98,6 +108,40 @@ describe("comment-actions.server", () => {
 		});
 		expect(authorRestoreComment).toHaveBeenCalledWith(4, 11);
 		expect(indexCommentBestEffort).toHaveBeenCalledWith(4);
+	});
+
+	it("notifies a comment author only when an OP pin changes", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		vi.mocked(setCommentOpPinnedState).mockResolvedValue({
+			ok: true,
+			commentAuthorId: 4,
+			changed: true,
+		});
+		await expect(
+			pinCommentAsOpFn({ data: { id: 9, pinned: true } }),
+		).resolves.toEqual({ success: true, changed: true });
+		expect(createSimpleNotification).toHaveBeenCalledWith({
+			userId: 4,
+			actorId: 11,
+			type: "pin",
+			body: "pinned your comment as the post author",
+			url: "/comment/9",
+		});
+	});
+
+	it("lets only the comment author toggle NSFW and reindexes", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		vi.mocked(setCommentNsfwState).mockResolvedValue(true);
+		await expect(
+			setOwnCommentNsfwFn({ data: { id: 9, nsfw: true } }),
+		).resolves.toEqual({ success: true });
+		expect(setCommentNsfwState).toHaveBeenCalledWith({
+			commentId: 9,
+			actorId: 11,
+			nsfw: true,
+			moderator: false,
+		});
+		expect(indexCommentBestEffort).toHaveBeenCalledWith(9);
 	});
 
 	it("rejects comment creation while the site is read-only", async () => {

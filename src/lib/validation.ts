@@ -7,6 +7,15 @@ import { CommentSortTypes, SortTypes, TimeFilters } from "@/lib/constants";
 // without importing route modules.
 
 export const idSchema = z.number().int().positive();
+export const usernameSchema = z
+	.string()
+	.trim()
+	.min(3, "Username must be at least 3 characters")
+	.max(25, "Username must be at most 25 characters")
+	.regex(
+		/^[a-zA-Z0-9_]+$/,
+		"Username can only contain letters, numbers, and underscores",
+	);
 export const pageSchema = z.number().int().min(1);
 export const voteTypeSchema = z.union([
 	z.literal(1),

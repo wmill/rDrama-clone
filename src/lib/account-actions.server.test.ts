@@ -27,6 +27,8 @@ import { db } from "@/db";
 import {
 	changePasswordFn,
 	changePasswordInputSchema,
+	changeUsernameFn,
+	changeUsernameInputSchema,
 } from "@/lib/account-actions.server";
 import { hashPassword, verifyPassword } from "@/lib/auth.server";
 import { invalidatePasswordResetTokens } from "@/lib/password-reset.server";
@@ -134,6 +136,104 @@ describe("changePasswordInputSchema", () => {
 			changePasswordInputSchema.safeParse({
 				...validInput,
 				confirmPassword: "different",
+			}).success,
+		).toBe(false);
+	});
+});
+
+describe("changeUsernameFn", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(getCurrentUser).mockResolvedValue(makeSafeUser({ id: 7 }));
+		vi.mocked(enforceRateLimit).mockResolvedValue({ allowed: true });
+	});
+
+	it("requires the current password without writing", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createQueryChain([
+				{ username: "Alice", originalUsername: null, passhash: "hash" },
+			]) as never,
+		);
+		vi.mocked(verifyPassword).mockResolvedValue(false);
+		await expect(
+			changeUsernameFn({
+				data: { username: "NewAlice", currentPassword: "wrong" },
+			}),
+		).resolves.toEqual({
+			success: false,
+			error: "Current password is incorrect",
+		});
+		expect(db.update).not.toHaveBeenCalled();
+	});
+
+	it("rejects names reserved as another account's current or original name", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createQueryChain([
+				{ username: "Alice", originalUsername: null, passhash: "hash" },
+			]) as never,
+		);
+		vi.mocked(verifyPassword).mockResolvedValue(true);
+		const tx = {
+			execute: vi.fn().mockResolvedValue(undefined),
+			select: vi.fn(() => createQueryChain([{ id: 12 }])),
+			update: vi.fn(),
+		};
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+		await expect(
+			changeUsernameFn({
+				data: { username: "ReservedName", currentPassword: "password" },
+			}),
+		).resolves.toEqual({ success: false, error: "Username is already in use" });
+		expect(tx.update).not.toHaveBeenCalled();
+	});
+
+	it("allows case-only renames and preserves the first original username", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createQueryChain([
+				{
+					username: "Alice",
+					originalUsername: "FirstAlice",
+					passhash: "hash",
+				},
+			]) as never,
+		);
+		vi.mocked(verifyPassword).mockResolvedValue(true);
+		const update = createQueryChain();
+		const tx = {
+			execute: vi.fn().mockResolvedValue(undefined),
+			select: vi.fn(() => createQueryChain([])),
+			update: vi.fn(() => update),
+		};
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+		await expect(
+			changeUsernameFn({
+				data: { username: "ALICE", currentPassword: "password" },
+			}),
+		).resolves.toEqual({ success: true, username: "ALICE" });
+		expect(update.set).toHaveBeenCalledWith({
+			username: "ALICE",
+			originalUsername: "FirstAlice",
+		});
+		expect(tx.execute).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("changeUsernameInputSchema", () => {
+	it("uses signup username rules", () => {
+		expect(
+			changeUsernameInputSchema.safeParse({
+				username: "valid_name",
+				currentPassword: "password",
+			}).success,
+		).toBe(true);
+		expect(
+			changeUsernameInputSchema.safeParse({
+				username: "not valid!",
+				currentPassword: "password",
 			}).success,
 		).toBe(false);
 	});

@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
 	changePasswordFn,
 	changePasswordInputSchema,
+	changeUsernameFn,
+	changeUsernameInputSchema,
 } from "@/lib/account-actions.server";
 import {
 	type CommentFeedSortType,
@@ -31,6 +33,11 @@ import {
 	logoutOtherSessionsFn,
 } from "@/lib/session-actions.server";
 import { getCurrentUser } from "@/lib/sessions.server";
+import {
+	type BlockedUsersPage,
+	getBlockedUsersPage,
+} from "@/lib/social.server";
+import { setBlockStateFn } from "@/lib/social-actions.server";
 import {
 	getUserSettingsById,
 	type UserSettings,
@@ -104,6 +111,20 @@ const updateSettingsFn = createServerFn({ method: "POST" })
 			throw new Error("You must be logged in");
 		}
 
+		const currentSettings = await getUserSettingsById(user.id);
+		if (!currentSettings) {
+			return { success: false as const, error: "User not found" };
+		}
+		if (
+			currentSettings.titleLocked &&
+			data.customTitlePlain.trim() !== currentSettings.customTitlePlain
+		) {
+			return {
+				success: false as const,
+				error: "Your custom title is locked by a moderator",
+			};
+		}
+
 		const bioHtmlLength = data.bio
 			? (await import("@/lib/markdown")).renderCommentMarkdown(data.bio).length
 			: 0;
@@ -127,32 +148,49 @@ const updateSettingsFn = createServerFn({ method: "POST" })
 			};
 		}
 
-		await updateUserSettings(user.id, {
-			...data,
-			nameColor: data.nameColor.toLowerCase(),
-			titleColor: data.titleColor.toLowerCase(),
-			themeColor: data.themeColor.toLowerCase(),
-		});
+		await updateUserSettings(
+			user.id,
+			{
+				...data,
+				nameColor: data.nameColor.toLowerCase(),
+				titleColor: data.titleColor.toLowerCase(),
+				themeColor: data.themeColor.toLowerCase(),
+			},
+			{ preserveCustomTitle: currentSettings.titleLocked },
+		);
 
 		return { success: true as const };
 	});
 
 export const Route = createFileRoute("/me")({
 	component: MePage,
-	loader: async () => {
+	validateSearch: (search: Record<string, unknown>) => ({
+		blockedPage: z.coerce
+			.number()
+			.int()
+			.positive()
+			.catch(1)
+			.parse(search.blockedPage),
+	}),
+	loaderDeps: ({ search }) => ({ blockedPage: search.blockedPage }),
+	loader: async ({ deps }) => {
 		const user = await getCurrentUserFn();
 		const settings = await getCurrentUserSettingsFn();
 		const sessionsResult = await listSessionsFn();
+		const blockedUsers = user
+			? await getBlockedUsersPage({ userId: user.id, page: deps.blockedPage })
+			: null;
 		return {
 			user,
 			settings,
 			sessions: sessionsResult.success ? sessionsResult.sessions : [],
+			blockedUsers,
 		};
 	},
 });
 
 function MePage() {
-	const { user, settings, sessions } = Route.useLoaderData();
+	const { user, settings, sessions, blockedUsers } = Route.useLoaderData();
 
 	if (!user || !settings) {
 		return (
@@ -169,16 +207,25 @@ function MePage() {
 			</div>
 		);
 	}
+	if (!blockedUsers) return null;
 
-	return <SettingsForm settings={settings} sessions={sessions} />;
+	return (
+		<SettingsForm
+			settings={settings}
+			sessions={sessions}
+			blockedUsers={blockedUsers}
+		/>
+	);
 }
 
 function SettingsForm({
 	settings,
 	sessions,
+	blockedUsers,
 }: {
 	settings: UserSettings;
 	sessions: ClientSessionInfo[];
+	blockedUsers: BlockedUsersPage;
 }) {
 	const router = useRouter();
 	const [form, setForm] = useState<SettingsInput>({
@@ -353,21 +400,13 @@ function SettingsForm({
 								Profile
 							</h3>
 
-							<div className="space-y-2">
-								<Label htmlFor={customTitleId} className="text-slate-300">
-									Custom title
-								</Label>
-								<Input
-									id={customTitleId}
-									value={form.customTitlePlain}
-									onChange={(event) =>
-										updateField("customTitlePlain", event.target.value)
-									}
-									maxLength={100}
-									className="border-slate-700 bg-slate-800 text-white"
-								/>
-								<FieldError error={fieldErrors.customTitlePlain} />
-							</div>
+							<CustomTitleField
+								id={customTitleId}
+								value={form.customTitlePlain}
+								locked={settings.titleLocked}
+								error={fieldErrors.customTitlePlain}
+								onChange={(value) => updateField("customTitlePlain", value)}
+							/>
 
 							<div className="space-y-2">
 								<Label htmlFor={bioId} className="text-slate-300">
@@ -574,9 +613,221 @@ function SettingsForm({
 
 				<EmailCard email={settings.email} isActivated={settings.isActivated} />
 				<PasswordCard />
+				<UsernameCard currentUsername={settings.username} />
 				<SessionsCard sessions={sessions} />
+				<BlockedUsersCard page={blockedUsers} />
 			</div>
 		</div>
+	);
+}
+
+function BlockedUsersCard({ page }: { page: BlockedUsersPage }) {
+	const router = useRouter();
+	const [pendingId, setPendingId] = useState<number | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	const unblock = async (targetUserId: number) => {
+		setPendingId(targetUserId);
+		setError(null);
+		try {
+			const result = await setBlockStateFn({
+				data: { targetUserId, blocked: false },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			await router.invalidate();
+		} finally {
+			setPendingId(null);
+		}
+	};
+
+	return (
+		<section className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+			<h2 className="text-xl font-semibold text-white">Blocked users</h2>
+			<p className="mt-1 text-sm text-slate-400">
+				Review and unblock accounts you have blocked.
+			</p>
+			{error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+			{page.items.length === 0 ? (
+				<p className="mt-4 text-sm text-slate-400">No blocked users found.</p>
+			) : (
+				<ul className="mt-4 divide-y divide-slate-800">
+					{page.items.map((user) => (
+						<li
+							key={user.id}
+							className="flex items-center justify-between py-3"
+						>
+							{user.username ? (
+								<Link
+									to="/u/$username"
+									params={{ username: user.username }}
+									search={{ sort: "new", t: "all", page: 1 }}
+									className="text-cyan-400 hover:underline"
+								>
+									@{user.username}
+								</Link>
+							) : (
+								<span className="text-slate-400">Private account</span>
+							)}
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								disabled={pendingId === user.id}
+								onClick={() => unblock(user.id)}
+							>
+								{pendingId === user.id ? "Unblocking..." : "Unblock"}
+							</Button>
+						</li>
+					))}
+				</ul>
+			)}
+			<div className="mt-4 flex items-center justify-center gap-3 text-sm">
+				<Button
+					variant="outline"
+					size="sm"
+					asChild={page.page > 1}
+					disabled={page.page <= 1}
+				>
+					{page.page > 1 ? (
+						<Link to="/me" search={{ blockedPage: page.page - 1 }}>
+							Previous
+						</Link>
+					) : (
+						<span>Previous</span>
+					)}
+				</Button>
+				<span className="text-slate-400">Page {page.page}</span>
+				<Button
+					variant="outline"
+					size="sm"
+					asChild={page.hasNextPage}
+					disabled={!page.hasNextPage}
+				>
+					{page.hasNextPage ? (
+						<Link to="/me" search={{ blockedPage: page.page + 1 }}>
+							Next
+						</Link>
+					) : (
+						<span>Next</span>
+					)}
+				</Button>
+			</div>
+		</section>
+	);
+}
+
+export function CustomTitleField({
+	id,
+	value,
+	locked,
+	error,
+	onChange,
+}: {
+	id: string;
+	value: string;
+	locked: boolean;
+	error?: string;
+	onChange: (value: string) => void;
+}) {
+	return (
+		<div className="space-y-2">
+			<Label htmlFor={id} className="text-slate-300">
+				Custom title
+			</Label>
+			<Input
+				id={id}
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				maxLength={100}
+				disabled={locked}
+				className="border-slate-700 bg-slate-800 text-white"
+			/>
+			{locked && (
+				<p className="text-xs text-amber-300">
+					A moderator has locked this title. You can edit it again after a
+					moderator unlocks it.
+				</p>
+			)}
+			<FieldError error={error} />
+		</div>
+	);
+}
+
+function UsernameCard({ currentUsername }: { currentUsername: string }) {
+	const router = useRouter();
+	const [username, setUsername] = useState(currentUsername);
+	const [currentPassword, setCurrentPassword] = useState("");
+	const [message, setMessage] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [isWorking, setIsWorking] = useState(false);
+	const usernameId = useId();
+	const passwordId = useId();
+
+	const submit = async (event: React.FormEvent) => {
+		event.preventDefault();
+		setMessage(null);
+		setError(null);
+		const parsed = changeUsernameInputSchema.safeParse({
+			username,
+			currentPassword,
+		});
+		if (!parsed.success) {
+			setError(parsed.error.issues[0]?.message ?? "Invalid username");
+			return;
+		}
+		setIsWorking(true);
+		try {
+			const result = await changeUsernameFn({ data: parsed.data });
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			setUsername(result.username);
+			setCurrentPassword("");
+			setMessage(`Username changed to @${result.username}.`);
+			await router.invalidate();
+		} finally {
+			setIsWorking(false);
+		}
+	};
+
+	return (
+		<section className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+			<h2 className="text-xl font-semibold text-white">Change username</h2>
+			<p className="mt-1 text-sm text-slate-400">
+				Your old profile URL will redirect to the new username.
+			</p>
+			<form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-2">
+				<div className="space-y-2">
+					<Label htmlFor={usernameId}>New username</Label>
+					<Input
+						id={usernameId}
+						value={username}
+						onChange={(event) => setUsername(event.target.value)}
+						maxLength={25}
+					/>
+				</div>
+				<div className="space-y-2">
+					<Label htmlFor={passwordId}>Current password</Label>
+					<Input
+						id={passwordId}
+						type="password"
+						value={currentPassword}
+						onChange={(event) => setCurrentPassword(event.target.value)}
+					/>
+				</div>
+				<div className="md:col-span-2">
+					<Button type="submit" disabled={isWorking}>
+						{isWorking ? "Changing..." : "Change username"}
+					</Button>
+				</div>
+			</form>
+			{error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+			{message && <p className="mt-3 text-sm text-emerald-300">{message}</p>}
+		</section>
 	);
 }
 

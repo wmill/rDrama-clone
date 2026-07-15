@@ -26,9 +26,14 @@ import {
 	getCommentsBySubmissionFlat,
 } from "@/lib/comments.server";
 import { AWARD_OPTIONS } from "@/lib/constants";
-import { replaceSlursInHtml } from "@/lib/content-preferences";
+import {
+	replaceSlursInHtml,
+	resolvePreferenceDefault,
+} from "@/lib/content-preferences";
 import {
 	deleteSubmissionFn,
+	pinSubmissionToProfileFn,
+	publishSubmissionFn,
 	restoreSubmissionFn,
 	saveSubmissionFn,
 	setSubmissionSubscriptionFn,
@@ -81,7 +86,7 @@ const getPostFn = createServerFn({ method: "GET" })
 export const Route = createFileRoute("/post/$id")({
 	component: PostPage,
 	validateSearch: (search: Record<string, unknown>) => ({
-		sort: (search.sort as CommentSortType) || "top",
+		sort: search.sort as CommentSortType | undefined,
 	}),
 	loader: async ({ params }) => {
 		const id = Number.parseInt(params.id, 10);
@@ -121,7 +126,12 @@ export const Route = createFileRoute("/post/$id")({
 
 function PostPage() {
 	const { post, comments, commentsLastFetchedAt, user } = Route.useLoaderData();
-	const { sort } = Route.useSearch();
+	const { sort: explicitSort } = Route.useSearch();
+	const sort = resolvePreferenceDefault(
+		explicitSort,
+		user?.defaultSortingComments as CommentSortType | undefined,
+		"top",
+	);
 	const [displayCommentCount, setDisplayCommentCount] = useState(
 		post.commentCount,
 	);
@@ -141,18 +151,27 @@ function PostPage() {
 					userVote={post.userVote}
 				/>
 
-				<div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-					<CommentThread
-						submissionId={post.id}
-						comments={comments}
-						commentCount={post.commentCount}
-						commentsLastFetchedAt={commentsLastFetchedAt}
-						currentUserId={user?.id}
-						currentUserAdminLevel={user?.adminLevel ?? 0}
-						initialSort={sort}
-						onCommentCountChange={setDisplayCommentCount}
-					/>
-				</div>
+				{post.isDraft ? (
+					<div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+						Comments are unavailable until this draft is published.
+					</div>
+				) : (
+					<div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+						<CommentThread
+							submissionId={post.id}
+							submissionAuthorId={post.authorId}
+							comments={comments}
+							commentCount={post.commentCount}
+							commentsLastFetchedAt={commentsLastFetchedAt}
+							currentUserId={user?.id}
+							currentUserAdminLevel={user?.adminLevel ?? 0}
+							initialSort={sort}
+							highlightComments={user?.highlightComments ?? false}
+							highlightSince={commentsLastFetchedAt}
+							onCommentCountChange={setDisplayCommentCount}
+						/>
+					</div>
+				)}
 			</div>
 		</div>
 	);
@@ -185,6 +204,7 @@ function PostContent({
 		post.url ? "link" : "text",
 	);
 	const [isSaving, setIsSaving] = useState(false);
+	const [isPublishing, setIsPublishing] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [isRestoring, setIsRestoring] = useState(false);
 	const [isReporting, setIsReporting] = useState(false);
@@ -199,6 +219,7 @@ function PostContent({
 	const [isSaved, setIsSaved] = useState(post.isSaved);
 	const [stateMod, setStateMod] = useState(post.stateMod);
 	const [isStickied, setIsStickied] = useState(post.isStickied);
+	const [isProfilePinned, setIsProfilePinned] = useState(post.isPinned);
 	const [visibilityMessage, setVisibilityMessage] = useState(
 		post.visibilityMessage,
 	);
@@ -212,6 +233,7 @@ function PostContent({
 	const [isUpdatingModerationState, setIsUpdatingModerationState] =
 		useState(false);
 	const [isTogglingSticky, setIsTogglingSticky] = useState(false);
+	const [isTogglingProfilePin, setIsTogglingProfilePin] = useState(false);
 	const [isSavingModerationDetails, setIsSavingModerationDetails] =
 		useState(false);
 	const titleId = useId();
@@ -224,6 +246,24 @@ function PostContent({
 	const canDistinguish =
 		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
 	const canModerate = currentUserAdminLevel >= 2;
+	const canPublish = post.isDraft && (isAuthor || canModerate);
+
+	const handlePublish = async () => {
+		setError(null);
+		setIsPublishing(true);
+		try {
+			const result = await publishSubmissionFn({ data: { id: post.id } });
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			await router.invalidate();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to publish draft");
+		} finally {
+			setIsPublishing(false);
+		}
+	};
 	const isRemoved = stateMod === "REMOVED";
 	const isFiltered = stateMod === "FILTERED";
 	const isLifecycleHidden = post.isDeleted || isRemoved;
@@ -405,6 +445,25 @@ function PostContent({
 		}
 	};
 
+	const handleToggleProfilePin = async () => {
+		setIsTogglingProfilePin(true);
+		setError(null);
+		try {
+			const nextPinned = !isProfilePinned;
+			const result = await pinSubmissionToProfileFn({
+				data: { id: post.id, pinned: nextPinned },
+			});
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			setIsProfilePinned(nextPinned);
+			await router.invalidate();
+		} finally {
+			setIsTogglingProfilePin(false);
+		}
+	};
+
 	const handleReport = async () => {
 		let reason: string;
 		try {
@@ -565,6 +624,16 @@ function PostContent({
 							Stickied
 						</span>
 					)}
+					{isProfilePinned && (
+						<span className="rounded bg-violet-500/20 px-2 py-0.5 text-xs font-medium text-violet-300">
+							Pinned on profile
+						</span>
+					)}
+					{post.isDraft && (
+						<span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-200">
+							Draft
+						</span>
+					)}
 					<AwardChips awards={post.awards} />
 				</div>
 			</div>
@@ -579,7 +648,7 @@ function PostContent({
 						score={post.score}
 						userVote={userVote}
 						size="lg"
-						disabled={!currentUserId}
+						disabled={!currentUserId || post.isDraft}
 					/>
 				</div>
 
@@ -817,15 +886,17 @@ function PostContent({
 					<span>{post.views} views</span>
 				</div>
 
-				<button
-					type="button"
-					className="flex items-center gap-1 rounded px-2 py-1 text-slate-400 hover:bg-slate-800"
-				>
-					<Share2 className="h-4 w-4" />
-					<span>Share</span>
-				</button>
+				{!post.isDraft && (
+					<button
+						type="button"
+						className="flex items-center gap-1 rounded px-2 py-1 text-slate-400 hover:bg-slate-800"
+					>
+						<Share2 className="h-4 w-4" />
+						<span>Share</span>
+					</button>
+				)}
 
-				{currentUserId && (
+				{currentUserId && !post.isDraft && (
 					<button
 						type="button"
 						disabled={isSavingPost}
@@ -836,7 +907,7 @@ function PostContent({
 					</button>
 				)}
 
-				{currentUserId && (
+				{currentUserId && !post.isDraft && (
 					<button
 						type="button"
 						disabled={isTogglingSubscription}
@@ -851,7 +922,7 @@ function PostContent({
 					</button>
 				)}
 
-				{currentUserId && !isLifecycleHidden && (
+				{currentUserId && !post.isDraft && !isLifecycleHidden && (
 					<button
 						type="button"
 						disabled={isReporting}
@@ -862,7 +933,7 @@ function PostContent({
 					</button>
 				)}
 
-				{currentUserId && !isLifecycleHidden && (
+				{currentUserId && !post.isDraft && !isLifecycleHidden && (
 					<button
 						type="button"
 						disabled={isAwarding}
@@ -952,8 +1023,47 @@ function PostContent({
 					</>
 				)}
 
+				{canPublish && !isAuthor && (
+					<div className="ml-auto flex gap-2">
+						<Button
+							size="sm"
+							disabled={isPublishing}
+							onClick={() => void handlePublish()}
+						>
+							{isPublishing ? "Publishing..." : "Publish draft"}
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setIsEditing((value) => !value)}
+						>
+							Edit draft
+						</Button>
+					</div>
+				)}
 				{isAuthor && !isLifecycleHidden && (
 					<div className="ml-auto flex gap-2">
+						{canPublish && (
+							<Button
+								size="sm"
+								disabled={isPublishing}
+								onClick={() => void handlePublish()}
+							>
+								{isPublishing ? "Publishing..." : "Publish"}
+							</Button>
+						)}
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={isTogglingProfilePin}
+							onClick={handleToggleProfilePin}
+						>
+							{isTogglingProfilePin
+								? "Updating..."
+								: isProfilePinned
+									? "Unpin from profile"
+									: "Pin to profile"}
+						</Button>
 						<Button
 							variant="outline"
 							size="sm"

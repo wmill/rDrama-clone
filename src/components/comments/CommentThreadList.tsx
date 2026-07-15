@@ -14,23 +14,29 @@ const COMMENTS_PAGE_SIZE =
 type CommentThreadListProps = {
 	comments: CommentWithReplies[];
 	submissionId: number;
+	submissionAuthorId: number;
 	currentUserId?: number;
 	currentUserAdminLevel?: number;
 	onReplyAdded: (comment?: CommentFlat) => void;
 	visibleLimit: number;
 	onVisibleLimitChange: Dispatch<SetStateAction<number>>;
 	isLoading?: boolean;
+	highlightComments?: boolean;
+	highlightSince?: number;
 };
 
 export function CommentThreadList({
 	comments,
 	submissionId,
+	submissionAuthorId,
 	currentUserId,
 	currentUserAdminLevel = 0,
 	onReplyAdded,
 	visibleLimit,
 	onVisibleLimitChange,
 	isLoading,
+	highlightComments = false,
+	highlightSince = Number.POSITIVE_INFINITY,
 }: CommentThreadListProps) {
 	const { visibleIds, totalCount } = useMemo(
 		() => getVisibleCommentIds(comments, visibleLimit),
@@ -68,9 +74,12 @@ export function CommentThreadList({
 					key={comment.id}
 					comment={comment}
 					submissionId={submissionId}
+					submissionAuthorId={submissionAuthorId}
 					currentUserId={currentUserId}
 					currentUserAdminLevel={currentUserAdminLevel}
 					onReplyAdded={onReplyAdded}
+					highlightComments={highlightComments}
+					highlightSince={highlightSince}
 				/>
 			))}
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { fail, requireUser } from "@/lib/auth-guards.server";
 import {
 	authorRestoreSubmission,
+	setSubmissionProfilePinnedState,
 	setSubmissionSavedState,
 } from "@/lib/lifecycle.server";
 import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
@@ -10,6 +11,7 @@ import { indexSubmissionBestEffort } from "@/lib/search.server";
 import {
 	BannedDomainError,
 	deleteSubmission,
+	publishSubmission,
 	updateSubmission,
 } from "@/lib/submissions.server";
 import { idInputSchema, idSchema } from "@/lib/validation";
@@ -52,12 +54,17 @@ export const updateSubmissionFn = createServerFn({ method: "POST" })
 
 		let updated: boolean;
 		try {
-			updated = await updateSubmission(data.id, user.id, {
-				title: data.title,
-				url: data.url || undefined,
-				body: data.body || undefined,
-				isNsfw: data.isNsfw,
-			});
+			updated = await updateSubmission(
+				data.id,
+				user.id,
+				{
+					title: data.title,
+					url: data.url || undefined,
+					body: data.body || undefined,
+					isNsfw: data.isNsfw,
+				},
+				user.adminLevel >= 2,
+			);
 		} catch (err) {
 			if (err instanceof BannedDomainError) {
 				return fail(err.message);
@@ -72,6 +79,20 @@ export const updateSubmissionFn = createServerFn({ method: "POST" })
 		return { success: true as const };
 	});
 
+export const publishSubmissionFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number }) => idInputSchema.parse(data))
+	.handler(async ({ data }) => {
+		const guard = await requireUser();
+		if (!guard.ok) return guard.failure;
+		const result = await publishSubmission({
+			id: data.id,
+			userId: guard.user.id,
+			canModerate: guard.user.adminLevel >= 2,
+		});
+		if (result === "forbidden") return fail("You cannot publish this draft");
+		return { success: true as const, published: result === "published" };
+	});
+
 export const saveSubmissionInputSchema = z.object({
 	id: idSchema,
 	saved: z.boolean(),
@@ -79,6 +100,10 @@ export const saveSubmissionInputSchema = z.object({
 export const submissionSubscriptionInputSchema = z.object({
 	id: idSchema,
 	subscribed: z.boolean(),
+});
+export const profilePinSubmissionInputSchema = z.object({
+	id: idSchema,
+	pinned: z.boolean(),
 });
 
 export const deleteSubmissionFn = createServerFn({ method: "POST" })
@@ -126,6 +151,22 @@ export const saveSubmissionFn = createServerFn({ method: "POST" })
 			saved: data.saved,
 		});
 
+		return { success: true as const };
+	});
+
+export const pinSubmissionToProfileFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; pinned: boolean }) =>
+		profilePinSubmissionInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireUser();
+		if (!guard.ok) return guard.failure;
+		const updated = await setSubmissionProfilePinnedState({
+			submissionId: data.id,
+			authorId: guard.user.id,
+			pinned: data.pinned,
+		});
+		if (!updated) return fail("You cannot pin this post to your profile");
 		return { success: true as const };
 	});
 

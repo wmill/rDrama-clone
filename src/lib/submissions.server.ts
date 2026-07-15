@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -60,6 +60,7 @@ export type SubmissionSummary = {
 	userVote: VoteType;
 	stateMod: ModerationState;
 	stateModSetBy?: string | null;
+	isDraft?: boolean;
 	awards?: AwardCount[];
 };
 
@@ -98,6 +99,7 @@ type SubmissionRow = {
 	stateUserDeletedUtc: Date | null;
 	stateMod: ModerationState;
 	stateModSetBy?: string | null;
+	private: boolean;
 	userVoteType: number | null;
 	savedSubmissionId: number | null;
 	subscribedSubmissionId?: number | null;
@@ -174,6 +176,7 @@ function mapSubmissionRow<T extends SubmissionRow>(
 		isBlockedAuthor,
 		stateMod: row.stateMod,
 		stateModSetBy: row.stateModSetBy ?? null,
+		isDraft: row.private,
 	};
 }
 
@@ -289,6 +292,7 @@ export async function getSubmissions(options: {
 	userId?: number;
 	viewerOver18?: boolean;
 	slurReplacer?: boolean;
+	hideVotedOn?: boolean;
 }): Promise<SubmissionSummary[]> {
 	const {
 		sort = "hot",
@@ -305,6 +309,7 @@ export async function getSubmissions(options: {
 	const conditions = [
 		eq(submissions.stateMod, "VISIBLE"),
 		isNull(submissions.stateUserDeletedUtc),
+		eq(submissions.private, false),
 	];
 
 	if (timeFilter !== null) {
@@ -313,6 +318,9 @@ export async function getSubmissions(options: {
 
 	if (authorId !== undefined) {
 		conditions.push(eq(submissions.authorId, authorId));
+	}
+	if (options.hideVotedOn && userId) {
+		conditions.push(isNull(votes.userId));
 	}
 
 	let orderBy: SQL[];
@@ -397,6 +405,7 @@ export async function getSubmissions(options: {
 			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
 			stateMod: submissions.stateMod,
 			stateModSetBy: submissions.stateModSetBy,
+			private: submissions.private,
 			savedSubmissionId: saveRelationship.submissionId,
 			blockedTargetId: userBlocks.targetId,
 		})
@@ -460,6 +469,7 @@ export async function getSubmissionsPage(options: {
 	userId?: number;
 	viewerOver18?: boolean;
 	slurReplacer?: boolean;
+	hideVotedOn?: boolean;
 }): Promise<SubmissionFeedPage> {
 	const safePage = Math.max(1, Math.floor(options.page ?? 1));
 
@@ -469,6 +479,7 @@ export async function getSubmissionsPage(options: {
 		userId: options.userId,
 		viewerOver18: options.viewerOver18,
 		slurReplacer: options.slurReplacer,
+		hideVotedOn: options.hideVotedOn,
 		limit: HOME_FEED_PER_PAGE + 1,
 		offset: (safePage - 1) * HOME_FEED_PER_PAGE,
 	});
@@ -512,6 +523,7 @@ export async function getSubmissionById(
 			stateUserDeletedUtc: submissions.stateUserDeletedUtc,
 			stateMod: submissions.stateMod,
 			stateModSetBy: submissions.stateModSetBy,
+			private: submissions.private,
 			userVoteType: votes.voteType,
 			savedSubmissionId: saveRelationship.submissionId,
 			subscribedSubmissionId: subscriptions.submissionId,
@@ -552,10 +564,24 @@ export async function getSubmissionById(
 					)
 				: sql`false`,
 		)
-		.where(eq(submissions.id, id))
+		.where(
+			and(
+				eq(submissions.id, id),
+				viewerCanModerate
+					? sql`true`
+					: userId
+						? sql`(${submissions.private} = false OR ${submissions.authorId} = ${userId})`
+						: eq(submissions.private, false),
+			),
+		)
 		.limit(1);
 
-	if (!result) return null;
+	if (
+		!result ||
+		(result.private && !viewerCanModerate && result.authorId !== userId)
+	) {
+		return null;
+	}
 
 	const awardsById = await getSubmissionAwardCounts([result.id]);
 	const mapped = mapSubmissionRow(result, {
@@ -581,6 +607,7 @@ export async function createSubmission(data: {
 	body?: string;
 	isNsfw?: boolean;
 	allowRepost?: boolean;
+	draft?: boolean;
 }): Promise<number> {
 	const createdUtc = Math.floor(Date.now() / 1000);
 	const title = normalizeRequiredText(data.title);
@@ -595,7 +622,9 @@ export async function createSubmission(data: {
 		.limit(1);
 	if (!author) throw new Error("Author not found");
 	const stateMod =
-		author.adminLevel === 0 && (await getSiteSetting("filter_new_posts"))
+		!data.draft &&
+		author.adminLevel === 0 &&
+		(await getSiteSetting("filter_new_posts"))
 			? "FILTERED"
 			: "VISIBLE";
 
@@ -654,10 +683,13 @@ export async function createSubmission(data: {
 				bodyHtml: body ? renderPostBodyMarkdown(body) : null,
 				createdUtc,
 				over18: data.isNsfw ?? false,
+				private: data.draft ?? false,
 				stateMod,
 				stateReport: "UNREPORTED",
 			})
 			.returning({ id: submissions.id });
+
+		if (data.draft) return createdSubmission;
 
 		await tx.insert(votes).values({
 			userId: data.authorId,
@@ -681,7 +713,7 @@ export async function createSubmission(data: {
 		return createdSubmission;
 	});
 
-	void indexSubmissionBestEffort(result.id);
+	if (!data.draft) void indexSubmissionBestEffort(result.id);
 	return result.id;
 }
 
@@ -694,6 +726,7 @@ export async function updateSubmission(
 		body?: string;
 		isNsfw?: boolean;
 	},
+	canModerate = false,
 ): Promise<boolean> {
 	const editedUtc = Math.floor(Date.now() / 1000);
 	const title = normalizeRequiredText(data.title);
@@ -713,14 +746,102 @@ export async function updateSubmission(
 			over18: data.isNsfw,
 			editedUtc,
 		})
-		.where(and(eq(submissions.id, id), eq(submissions.authorId, authorId)))
+		.where(
+			and(
+				eq(submissions.id, id),
+				canModerate
+					? or(
+							eq(submissions.authorId, authorId),
+							eq(submissions.private, true),
+						)
+					: eq(submissions.authorId, authorId),
+			),
+		)
 		.returning({ id: submissions.id });
 
-	if (result.length > 0) {
-		void indexSubmissionBestEffort(id);
-	}
+	if (result.length > 0) void indexSubmissionBestEffort(id);
 
 	return result.length > 0;
+}
+
+export type PublishSubmissionResult =
+	| "published"
+	| "already_published"
+	| "forbidden";
+
+export async function publishSubmission(options: {
+	id: number;
+	userId: number;
+	canModerate?: boolean;
+}): Promise<PublishSubmissionResult> {
+	const createdUtc = Math.floor(Date.now() / 1000);
+	const filterNewPosts = await getSiteSetting("filter_new_posts");
+	const result = await db.transaction(async (tx) => {
+		const permission = options.canModerate
+			? sql`true`
+			: eq(submissions.authorId, options.userId);
+		const [published] = await tx
+			.update(submissions)
+			.set({
+				private: false,
+				createdUtc,
+				editedUtc: 0,
+				stateMod: filterNewPosts
+					? sql`CASE WHEN EXISTS (
+						SELECT 1 FROM ${users}
+						WHERE ${users.id} = ${submissions.authorId}
+						AND ${users.adminLevel} > 0
+					) THEN 'VISIBLE' ELSE 'FILTERED' END`
+					: "VISIBLE",
+			})
+			.where(
+				and(
+					eq(submissions.id, options.id),
+					eq(submissions.private, true),
+					permission,
+				),
+			)
+			.returning({ id: submissions.id, authorId: submissions.authorId });
+
+		if (!published) {
+			const [existing] = await tx
+				.select({
+					authorId: submissions.authorId,
+					private: submissions.private,
+				})
+				.from(submissions)
+				.where(eq(submissions.id, options.id))
+				.limit(1);
+			if (
+				existing &&
+				!existing.private &&
+				(options.canModerate || existing.authorId === options.userId)
+			)
+				return "already_published" as const;
+			return "forbidden" as const;
+		}
+
+		await tx.insert(votes).values({
+			userId: published.authorId,
+			submissionId: published.id,
+			voteType: 1,
+			createdDatetimez: new Date(),
+		});
+		await setSubmissionSubscriptionState({
+			userId: published.authorId,
+			submissionId: published.id,
+			subscribed: true,
+			tx,
+		});
+		await tx
+			.update(users)
+			.set({ postCount: sql`${users.postCount} + 1` })
+			.where(eq(users.id, published.authorId));
+		return "published" as const;
+	});
+
+	if (result === "published") void indexSubmissionBestEffort(options.id);
+	return result;
 }
 
 export async function deleteSubmission(
@@ -738,6 +859,7 @@ export async function getRandomSubmissionId(): Promise<number | null> {
 			and(
 				eq(submissions.stateMod, "VISIBLE"),
 				isNull(submissions.stateUserDeletedUtc),
+				eq(submissions.private, false),
 			),
 		)
 		.orderBy(sql`RANDOM()`)

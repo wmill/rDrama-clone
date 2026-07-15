@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { type AppDbExecutor, db } from "@/db";
@@ -13,7 +13,12 @@ async function getUserByUsernameCanonical(username: string) {
 	const [user] = await db
 		.select()
 		.from(users)
-		.where(sql`lower(${users.username}) = ${normalized}`)
+		.where(
+			or(
+				sql`lower(${users.username}) = ${normalized}`,
+				sql`lower(${users.originalUsername}) = ${normalized}`,
+			),
+		)
 		.limit(1);
 
 	return user ?? null;
@@ -53,6 +58,18 @@ export type SocialListPage = {
 	isPrivateRestricted: boolean;
 	isBlockingProfile: boolean;
 	items: SocialListItem[];
+	hasNextPage: boolean;
+};
+
+export type BlockedUsersPage = {
+	items: Array<{
+		id: number;
+		username: string | null;
+		profileUrl: string | null;
+		isPrivate: boolean;
+	}>;
+	page: number;
+	pageSize: number;
 	hasNextPage: boolean;
 };
 
@@ -225,6 +242,48 @@ export async function setBlockState(input: {
 				eq(userBlocks.targetId, input.targetUserId),
 			),
 		);
+}
+
+export async function removeFollower(input: {
+	ownerId: number;
+	followerId: number;
+}): Promise<void> {
+	await setFollowState({
+		userId: input.followerId,
+		targetUserId: input.ownerId,
+		following: false,
+	});
+}
+
+export async function getBlockedUsersPage(options: {
+	userId: number;
+	page: number;
+	pageSize?: number;
+}): Promise<BlockedUsersPage> {
+	const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+	const rows = await db
+		.select({
+			id: users.id,
+			username: users.username,
+			profileUrl: users.profileUrl,
+			isPrivate: users.isPrivate,
+		})
+		.from(userBlocks)
+		.innerJoin(users, eq(users.id, userBlocks.targetId))
+		.where(eq(userBlocks.userId, options.userId))
+		.limit(pageSize + 1)
+		.offset((options.page - 1) * pageSize);
+
+	return {
+		items: rows
+			.slice(0, pageSize)
+			.map((row) =>
+				row.isPrivate ? { ...row, username: null, profileUrl: null } : row,
+			),
+		page: options.page,
+		pageSize,
+		hasNextPage: rows.length > pageSize,
+	};
 }
 
 async function getSocialListPage(options: {

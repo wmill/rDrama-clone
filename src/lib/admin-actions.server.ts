@@ -16,6 +16,7 @@ import { fail, requireAdmin } from "@/lib/auth-guards.server";
 import {
 	type ModerationState,
 	setCommentModerationState,
+	setCommentNsfwState,
 	setCommentPinnedState,
 	setCommentRemovedState,
 	setSubmissionModerationState,
@@ -48,6 +49,10 @@ export const pinnedInputSchema = z.object({
 	id: idSchema,
 	pinned: z.boolean(),
 });
+export const commentNsfwInputSchema = z.object({
+	id: idSchema,
+	nsfw: z.boolean(),
+});
 export const moderationDetailsInputSchema = z.object({
 	id: idSchema,
 	title: z.string().max(500),
@@ -63,6 +68,7 @@ export const moderationProfileInputSchema = z.object({
 	verified: z.string().max(100).nullish(),
 	verifiedColor: z.string().max(10).nullish(),
 	customTitlePlain: z.string().max(200).nullish(),
+	titleLocked: z.boolean(),
 });
 export const userNoteInputSchema = z.object({
 	userId: idSchema,
@@ -399,6 +405,27 @@ export const pinCommentFn = createServerFn({ method: "POST" })
 		return success ? { success: true as const } : fail("Comment not found");
 	});
 
+export const setCommentNsfwFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; nsfw: boolean }) =>
+		commentNsfwInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireAdmin();
+		if (!guard.ok) return guard.failure;
+		const success = await setCommentNsfwState({
+			commentId: data.id,
+			actorId: guard.user.id,
+			nsfw: data.nsfw,
+			moderator: true,
+		});
+		if (success) {
+			void import("@/lib/search.server").then(({ indexCommentBestEffort }) =>
+				indexCommentBestEffort(data.id),
+			);
+		}
+		return success ? { success: true as const } : fail("Comment not found");
+	});
+
 export const banUserFn = createServerFn({ method: "POST" })
 	.inputValidator(
 		(data: { userId: number; reason: string; durationDays?: number }) =>
@@ -589,6 +616,7 @@ export const updateUserModerationProfileFn = createServerFn({
 			verified?: string | null;
 			verifiedColor?: string | null;
 			customTitlePlain?: string | null;
+			titleLocked: boolean;
 		}) => moderationProfileInputSchema.parse(data),
 	)
 	.handler(async ({ data }) => {
@@ -614,6 +642,7 @@ export const updateUserModerationProfileFn = createServerFn({
 				verifiedColor,
 				customTitlePlain,
 				customTitle,
+				flairChanged: data.titleLocked ? 2 ** 31 - 1 : null,
 			})
 			.where(eq(users.id, data.userId))
 			.returning({
@@ -622,6 +651,7 @@ export const updateUserModerationProfileFn = createServerFn({
 				verifiedColor: users.verifiedColor,
 				customTitlePlain: users.customTitlePlain,
 				customTitle: users.customTitle,
+				flairChanged: users.flairChanged,
 			});
 
 		const updated = updatedRows[0];
@@ -640,7 +670,7 @@ export const updateUserModerationProfileFn = createServerFn({
 		await db.insert(modActions).values({
 			userId: user.id,
 			targetUserId: data.userId,
-			kind: customTitlePlain ? "set_custom_title" : "clear_custom_title",
+			kind: data.titleLocked ? "set_flair_locked" : "set_flair_unlocked",
 			note: customTitlePlain ? `"${customTitlePlain}"` : "(cleared)",
 		});
 
@@ -650,6 +680,7 @@ export const updateUserModerationProfileFn = createServerFn({
 			verifiedColor: updated.verifiedColor,
 			customTitlePlain: updated.customTitlePlain,
 			customTitle: updated.customTitle,
+			titleLocked: updated.flairChanged !== null,
 		};
 	});
 

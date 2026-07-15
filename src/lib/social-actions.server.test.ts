@@ -15,14 +15,23 @@ vi.mock("@/lib/sessions.server", () => ({
 }));
 
 vi.mock("@/lib/social.server", () => ({
+	removeFollower: vi.fn(),
 	setBlockState: vi.fn(),
 	setFollowState: vi.fn(),
 }));
 
 import type { SafeUser } from "@/lib/auth.server";
 import { getCurrentUser } from "@/lib/sessions.server";
-import { setBlockState, setFollowState } from "@/lib/social.server";
-import { setBlockStateFn, setFollowStateFn } from "@/lib/social-actions.server";
+import {
+	removeFollower,
+	setBlockState,
+	setFollowState,
+} from "@/lib/social.server";
+import {
+	removeFollowerFn,
+	setBlockStateFn,
+	setFollowStateFn,
+} from "@/lib/social-actions.server";
 
 const mockUser: SafeUser = {
 	id: 5,
@@ -89,6 +98,14 @@ describe("social-actions.server", () => {
 			targetUserId: 9,
 			blocked: true,
 		});
+	});
+
+	it("removes a follower from the authenticated owner's account", async () => {
+		vi.mocked(getCurrentUser).mockResolvedValue(mockUser);
+		await expect(
+			removeFollowerFn({ data: { followerId: 12 } }),
+		).resolves.toEqual({ success: true });
+		expect(removeFollower).toHaveBeenCalledWith({ ownerId: 5, followerId: 12 });
 	});
 
 	it("returns helper errors to the caller", async () => {

@@ -1,6 +1,6 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
-import { db } from "@/db";
+import { type AppDbExecutor, db } from "@/db";
 import {
 	commentSaveRelationship,
 	comments,
@@ -15,7 +15,7 @@ export const REMOVED_BY_MODERATOR_MESSAGE = "Removed by moderator";
 
 export type ModerationState = "VISIBLE" | "FILTERED" | "REMOVED";
 
-type DbLike = typeof db;
+type DbLike = AppDbExecutor;
 
 async function logModAction(
 	tx: DbLike,
@@ -249,6 +249,25 @@ export async function setSubmissionSavedState(
 		);
 }
 
+export async function setSubmissionProfilePinnedState(input: {
+	submissionId: number;
+	authorId: number;
+	pinned: boolean;
+}): Promise<boolean> {
+	const result = await db
+		.update(submissions)
+		.set({ isPinned: input.pinned })
+		.where(
+			and(
+				eq(submissions.id, input.submissionId),
+				eq(submissions.authorId, input.authorId),
+			),
+		)
+		.returning({ id: submissions.id });
+
+	return result.length > 0;
+}
+
 export async function authorDeleteComment(
 	commentId: number,
 	authorId: number,
@@ -395,6 +414,108 @@ export async function setCommentPinnedState(
 	});
 
 	return true;
+}
+
+export type OpCommentPinResult =
+	| { ok: true; commentAuthorId: number; changed: boolean }
+	| { ok: false; reason: "not_found" | "not_post_author" | "moderator_pin" };
+
+export async function setCommentOpPinnedState(input: {
+	commentId: number;
+	postAuthorId: number;
+	pinned: boolean;
+}): Promise<OpCommentPinResult> {
+	return db.transaction(async (tx) => {
+		const [current] = await tx
+			.select({
+				commentAuthorId: comments.authorId,
+				postAuthorId: submissions.authorId,
+				pinnedBy: comments.pinnedBy,
+			})
+			.from(comments)
+			.innerJoin(submissions, eq(comments.parentSubmission, submissions.id))
+			.where(eq(comments.id, input.commentId))
+			.limit(1);
+
+		if (!current) return { ok: false, reason: "not_found" };
+		if (current.postAuthorId !== input.postAuthorId) {
+			return { ok: false, reason: "not_post_author" };
+		}
+		if (current.pinnedBy !== null && current.pinnedBy !== "(OP)") {
+			return { ok: false, reason: "moderator_pin" };
+		}
+
+		const alreadyInState = input.pinned
+			? current.pinnedBy === "(OP)"
+			: current.pinnedBy === null;
+		if (alreadyInState) {
+			return {
+				ok: true,
+				commentAuthorId: current.commentAuthorId,
+				changed: false,
+			};
+		}
+
+		const result = await tx
+			.update(comments)
+			.set({
+				pinnedBy: input.pinned ? "(OP)" : null,
+				isPinnedUtc: input.pinned ? Math.floor(Date.now() / 1000) : null,
+			})
+			.where(
+				and(
+					eq(comments.id, input.commentId),
+					input.pinned
+						? current.pinnedBy === null
+							? isNull(comments.pinnedBy)
+							: eq(comments.pinnedBy, current.pinnedBy)
+						: eq(comments.pinnedBy, "(OP)"),
+				),
+			)
+			.returning({ id: comments.id });
+
+		if (result.length === 0) {
+			return { ok: false, reason: "moderator_pin" };
+		}
+		return {
+			ok: true,
+			commentAuthorId: current.commentAuthorId,
+			changed: true,
+		};
+	});
+}
+
+export async function setCommentNsfwState(input: {
+	commentId: number;
+	actorId: number;
+	nsfw: boolean;
+	moderator: boolean;
+}): Promise<boolean> {
+	const apply = async (tx: DbLike) => {
+		const result = await tx
+			.update(comments)
+			.set({ over18: input.nsfw })
+			.where(
+				input.moderator
+					? eq(comments.id, input.commentId)
+					: and(
+							eq(comments.id, input.commentId),
+							eq(comments.authorId, input.actorId),
+						),
+			)
+			.returning({ id: comments.id });
+		if (result.length === 0) return false;
+		if (input.moderator) {
+			await logModAction(tx, {
+				userId: input.actorId,
+				targetCommentId: input.commentId,
+				kind: input.nsfw ? "mark_comment_nsfw" : "unmark_comment_nsfw",
+			});
+		}
+		return true;
+	};
+
+	return input.moderator ? db.transaction(apply) : apply(db);
 }
 
 export async function setCommentSavedState(

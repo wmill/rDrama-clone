@@ -220,6 +220,7 @@ function CommentPage() {
 					<Comment
 						comment={comment}
 						submissionId={submission.id}
+						submissionAuthorId={submission.authorId}
 						currentUserId={user?.id}
 						depth={0}
 						maxDepth={10}

@@ -58,6 +58,24 @@ function makeRow(overrides: Partial<RawCommentRow>): RawCommentRow {
 }
 
 describe("comment visibility", () => {
+	it("hides NSFW bodies without removing thread structure", () => {
+		const input = {
+			authorId: 2,
+			authorName: "alice",
+			distinguishLevel: 0,
+			stateMod: "VISIBLE",
+			stateUserDeletedUtc: null,
+			authorShadowBanned: null,
+			isBlocking: false,
+			isNsfw: true,
+		};
+		expect(
+			getCommentVisibility(input, { ...baseViewer, over18: false }),
+		).toMatchObject({ isVisible: true, bodyHidden: true });
+		expect(
+			getCommentVisibility(input, { ...baseViewer, over18: true }),
+		).toEqual({ isVisible: true, message: null });
+	});
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});

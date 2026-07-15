@@ -35,6 +35,7 @@ const submitSchema = z
 			.optional(),
 		isNsfw: z.boolean().default(false),
 		allowRepost: z.boolean().default(false),
+		draft: z.boolean().default(false),
 	})
 	.refine((data) => data.url || data.body, {
 		message: "Either a URL or body text is required",
@@ -75,6 +76,7 @@ const submitAction = createServerFn({ method: "POST" })
 				body: data.body || undefined,
 				isNsfw: data.isNsfw,
 				allowRepost: data.allowRepost,
+				draft: data.draft,
 			});
 
 			return { success: true as const, postId };
@@ -113,6 +115,7 @@ function SubmitPage() {
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [isLoading, setIsLoading] = useState(false);
 	const [repost, setRepost] = useState<ExistingRepostSummary | null>(null);
+	const [repostDraft, setRepostDraft] = useState(false);
 	const [submitType, setSubmitType] = useState<"link" | "text">("link");
 
 	const titleId = useId();
@@ -138,9 +141,10 @@ function SubmitPage() {
 		);
 	}
 
-	const submit = async (allowRepost: boolean) => {
+	const submit = async (allowRepost: boolean, draft = false) => {
 		setError(null);
 		setRepost(null);
+		setRepostDraft(false);
 		setFieldErrors({});
 		setIsLoading(true);
 
@@ -151,6 +155,7 @@ function SubmitPage() {
 				body: submitType === "text" ? body : undefined,
 				isNsfw,
 				allowRepost,
+				draft,
 			};
 
 			const validation = submitSchema.safeParse(submitData);
@@ -170,8 +175,10 @@ function SubmitPage() {
 			const result = await submitAction({ data: submitData });
 
 			if (!result.success) {
-				if ("repost" in result && result.repost) setRepost(result.repost);
-				else setError(result.error);
+				if ("repost" in result && result.repost) {
+					setRepost(result.repost);
+					setRepostDraft(draft);
+				} else setError(result.error);
 				return;
 			}
 
@@ -246,9 +253,9 @@ function SubmitPage() {
 									variant="outline"
 									className="mt-3"
 									disabled={isLoading}
-									onClick={() => void submit(true)}
+									onClick={() => void submit(true, repostDraft)}
 								>
-									Post it again
+									{repostDraft ? "Save draft anyway" : "Post it again"}
 								</Button>
 							</div>
 						)}
@@ -363,6 +370,14 @@ function SubmitPage() {
 								className="bg-cyan-500 hover:bg-cyan-600"
 							>
 								{isLoading ? "Submitting..." : "Submit Post"}
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								disabled={isLoading}
+								onClick={() => void submit(false, true)}
+							>
+								Save Draft
 							</Button>
 							<Button type="button" variant="outline" asChild>
 								<Link to="/" search={{ sort: "hot", t: "all" }}>

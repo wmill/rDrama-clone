@@ -8,21 +8,28 @@ import {
 	type ProfileRelationshipSearch,
 } from "@/lib/profile-route";
 import type { SocialListItem, SocialListPage } from "@/lib/social.server";
-import { setBlockStateFn, setFollowStateFn } from "@/lib/social-actions.server";
+import {
+	removeFollowerFn,
+	setBlockStateFn,
+	setFollowStateFn,
+} from "@/lib/social-actions.server";
 import { formatRelativeTime } from "@/lib/utils";
 
 function RelationshipRow({
 	item,
 	disabled,
+	canRemoveFollower,
 }: {
 	item: SocialListItem;
 	disabled: boolean;
+	canRemoveFollower: boolean;
 }) {
 	const router = useRouter();
 	const [isFollowing, setIsFollowing] = useState(item.isFollowing);
 	const [isBlocking, setIsBlocking] = useState(item.isBlocking);
 	const [isFollowPending, setIsFollowPending] = useState(false);
 	const [isBlockPending, setIsBlockPending] = useState(false);
+	const [isRemovePending, setIsRemovePending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -85,6 +92,21 @@ function RelationshipRow({
 			);
 		} finally {
 			setIsBlockPending(false);
+		}
+	};
+
+	const handleRemoveFollower = async () => {
+		setIsRemovePending(true);
+		setError(null);
+		try {
+			const result = await removeFollowerFn({ data: { followerId: item.id } });
+			if (!result.success) {
+				setError(result.error);
+				return;
+			}
+			await router.invalidate();
+		} finally {
+			setIsRemovePending(false);
 		}
 	};
 
@@ -183,6 +205,17 @@ function RelationshipRow({
 						</Button>
 					</div>
 				)}
+				{canRemoveFollower && (
+					<Button
+						type="button"
+						size="sm"
+						variant="destructive"
+						disabled={isRemovePending}
+						onClick={handleRemoveFollower}
+					>
+						{isRemovePending ? "Removing..." : "Remove follower"}
+					</Button>
+				)}
 			</div>
 		</article>
 	);
@@ -263,6 +296,7 @@ export function UserRelationshipPage({
 									key={item.id}
 									item={item}
 									disabled={!data.viewer || item.id === data.viewer.id}
+									canRemoveFollower={data.isOwner && data.kind === "followers"}
 								/>
 							))}
 						</div>

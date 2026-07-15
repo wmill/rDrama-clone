@@ -8,8 +8,10 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import Header from "../components/Header";
+import { LinkPreferenceController } from "../components/link-preference-controller";
 import { Modals } from "../components/Modals";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { normalizeThemeColor } from "../lib/content-preferences";
 import { getUnreadNotificationCount } from "../lib/notifications.server";
 import { getCurrentUser } from "../lib/sessions.server";
 import appCss from "../styles.css?url";
@@ -57,13 +59,22 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	const { user, unreadNotificationCount } = Route.useLoaderData();
+	const themeColor = normalizeThemeColor(user?.themeColor);
 
 	return (
-		<html lang="en" data-theme={user?.theme === "light" ? "light" : "dark"}>
+		<html
+			lang="en"
+			data-theme={user?.theme === "light" ? "light" : "dark"}
+			style={{ "--theme-color": themeColor } as React.CSSProperties}
+		>
 			<head>
 				<HeadContent />
 			</head>
 			<body className="min-h-screen bg-slate-950">
+				<LinkPreferenceController
+					newTab={user?.newTab ?? false}
+					newTabExternal={user?.newTabExternal ?? false}
+				/>
 				<Header user={user} unreadNotificationCount={unreadNotificationCount} />
 				{children}
 				<Modals />

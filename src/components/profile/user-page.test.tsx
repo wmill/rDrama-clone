@@ -149,6 +149,30 @@ describe("UserPage", () => {
 		expect(screen.getByTitle("Was here first")).not.toBeNull();
 	});
 
+	it("renders saved username and title colors", () => {
+		render(
+			<UserPage
+				data={createProfileData({
+					profileUser: {
+						...createProfileData().profileUser,
+						nameColor: "ff0000",
+						titleColor: "00ff00",
+						customTitle: "<p>Colored title</p>",
+					} as never,
+				})}
+				onSortChange={vi.fn()}
+				onTimeChange={vi.fn()}
+				onPageChange={vi.fn()}
+			/>,
+		);
+		expect(screen.getByRole("heading", { name: "@target" }).style.color).toBe(
+			"rgb(255, 0, 0)",
+		);
+		expect(screen.getByText("Colored title").parentElement?.style.color).toBe(
+			"rgb(0, 255, 0)",
+		);
+	});
+
 	it("shows presentation controls only to admins viewing another user", () => {
 		render(
 			<UserPage
@@ -182,6 +206,11 @@ describe("UserPage", () => {
 		expect(screen.getByText("Presentation")).not.toBeNull();
 		expect(
 			screen.getByRole("button", { name: "Save Presentation" }),
+		).not.toBeNull();
+		expect(
+			screen.getByRole("checkbox", {
+				name: "Lock custom title against user edits",
+			}),
 		).not.toBeNull();
 	});
 });

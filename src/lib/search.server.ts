@@ -1,5 +1,3 @@
-import "@/lib/env.server";
-
 import { Client } from "@elastic/elasticsearch";
 import * as Sentry from "@sentry/tanstackstart-react";
 import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
@@ -52,6 +50,7 @@ type SearchCommentDocument = {
 	parentSubmissionId: number | null;
 	createdUtc: number;
 	updatedUtc: number;
+	over18: boolean;
 };
 
 type SubmissionSearchRow = {
@@ -105,6 +104,7 @@ type CommentSearchRow = {
 	parentSubmissionPrivate: boolean;
 	parentSubmissionDeletedUtc: Date | null;
 	parentSubmissionStateMod: string;
+	isNsfw?: boolean;
 };
 
 type SubmissionSearchViewerContext = {
@@ -136,6 +136,7 @@ export function buildContentSearchQuery(input: {
 	documentType: SearchDocumentType;
 	from: number;
 	size: number;
+	allowNsfw?: boolean;
 }) {
 	const fields =
 		input.documentType === "submission"
@@ -149,7 +150,12 @@ export function buildContentSearchQuery(input: {
 		_source: false,
 		query: {
 			bool: {
-				filter: [{ term: { documentType: input.documentType } }],
+				filter: [
+					{ term: { documentType: input.documentType } },
+					...(input.documentType === "comment" && input.allowNsfw === false
+						? [{ bool: { must_not: [{ term: { over18: true } }] } }]
+						: []),
+				],
 				must: [
 					{
 						simple_query_string: {
@@ -201,6 +207,7 @@ export async function ensureContentSearchIndex(): Promise<boolean> {
 							url: { type: "text" },
 							body: { type: "text" },
 							parentSubmissionId: { type: "integer" },
+							over18: { type: "boolean" },
 							createdUtc: { type: "date", format: "epoch_second" },
 							updatedUtc: { type: "date", format: "epoch_second" },
 						},
@@ -290,7 +297,7 @@ function mapVisibleSubmissionRow(row: SubmissionSearchRow): SubmissionSummary {
 		thumbUrl: row.thumbUrl,
 		flair: row.flair,
 		isPinned: row.isPinned,
-		isNsfw: row.isNsfw,
+		isNsfw: row.isNsfw ?? false,
 		stickied: row.stickied,
 		isStickied: row.stickied !== null,
 		isDeleted: false,
@@ -328,6 +335,7 @@ function mapVisibleCommentRow(row: CommentSearchRow): CommentFeedItem {
 		userVote: (row.userVoteType as VoteType) ?? 0,
 		stateMod: "VISIBLE",
 		stateModSetBy: null,
+		isNsfw: row.isNsfw ?? false,
 	};
 }
 
@@ -336,6 +344,7 @@ async function searchCandidateIds(input: {
 	documentType: SearchDocumentType;
 	from: number;
 	size: number;
+	allowNsfw?: boolean;
 }): Promise<{ ids: number[]; isAvailable: boolean }> {
 	const client = getSearchClient();
 	if (!client) {
@@ -458,6 +467,7 @@ async function getCommentSearchRowsByIds(
 			parentSubmissionPrivate: submissions.private,
 			parentSubmissionDeletedUtc: submissions.stateUserDeletedUtc,
 			parentSubmissionStateMod: submissions.stateMod,
+			isNsfw: comments.over18,
 		})
 		.from(comments)
 		.innerJoin(users, eq(comments.authorId, users.id))
@@ -515,6 +525,7 @@ export async function filterVisibleSearchCommentRows(
 	return orderedIds
 		.map((id) => rowsById.get(id))
 		.filter((row): row is CommentSearchRow => row !== undefined)
+		.filter((row) => !row.isNsfw || Boolean(viewer.over18))
 		.filter((row) =>
 			shouldIncludeCommentInFeed(
 				{
@@ -597,6 +608,7 @@ export async function searchPublicComments(input: {
 	page: number;
 	userId?: number;
 }): Promise<PublicSearchResults<CommentFeedItem>> {
+	const viewer = await getCommentViewerContext(input.userId);
 	const start = (input.page - 1) * PUBLIC_SEARCH_PAGE_SIZE;
 	const requiredVisibleCount = start + PUBLIC_SEARCH_PAGE_SIZE + 1;
 	const visibleResults: CommentFeedItem[] = [];
@@ -613,6 +625,7 @@ export async function searchPublicComments(input: {
 			documentType: "comment",
 			from,
 			size: SEARCH_BATCH_SIZE,
+			allowNsfw: Boolean(viewer.over18),
 		});
 		isAvailable = batch.isAvailable;
 		if (!batch.isAvailable || batch.ids.length === 0) {
@@ -690,7 +703,7 @@ async function getSubmissionDocumentById(
 		})
 		.from(submissions)
 		.innerJoin(users, eq(submissions.authorId, users.id))
-		.where(eq(submissions.id, id))
+		.where(and(eq(submissions.id, id), eq(submissions.private, false)))
 		.limit(1);
 
 	if (!row) {
@@ -719,6 +732,7 @@ async function getCommentDocumentById(
 			authorId: comments.authorId,
 			authorUsername: users.username,
 			body: comments.body,
+			over18: comments.over18,
 			parentSubmissionId: comments.parentSubmission,
 			createdUtc: comments.createdUtc,
 			editedUtc: comments.editedUtc,
@@ -738,6 +752,7 @@ async function getCommentDocumentById(
 		authorId: row.authorId,
 		authorUsername: row.authorUsername,
 		body: row.body,
+		over18: row.over18,
 		parentSubmissionId: row.parentSubmissionId,
 		createdUtc: row.createdUtc,
 		updatedUtc: row.editedUtc || row.createdUtc,
@@ -856,6 +871,7 @@ async function getCommentBatch(
 			authorId: comments.authorId,
 			authorUsername: users.username,
 			body: comments.body,
+			over18: comments.over18,
 			parentSubmissionId: comments.parentSubmission,
 			createdUtc: comments.createdUtc,
 			editedUtc: comments.editedUtc,
@@ -872,6 +888,7 @@ async function getCommentBatch(
 		authorId: row.authorId,
 		authorUsername: row.authorUsername,
 		body: row.body,
+		over18: row.over18,
 		parentSubmissionId: row.parentSubmissionId,
 		createdUtc: row.createdUtc,
 		updatedUtc: row.editedUtc || row.createdUtc,

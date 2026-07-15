@@ -47,6 +47,7 @@ describe("CommentThreadList", () => {
 			<CommentThreadList
 				comments={[]}
 				submissionId={42}
+				submissionAuthorId={7}
 				onReplyAdded={() => {}}
 				visibleLimit={50}
 				onVisibleLimitChange={vi.fn()}
@@ -70,6 +71,7 @@ describe("CommentThreadList", () => {
 			<CommentThreadList
 				comments={comments}
 				submissionId={42}
+				submissionAuthorId={7}
 				onReplyAdded={() => {}}
 				visibleLimit={visibleLimit}
 				onVisibleLimitChange={setVisibleLimit}

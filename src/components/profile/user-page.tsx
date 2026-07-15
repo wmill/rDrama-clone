@@ -190,7 +190,10 @@ export function UserPage({
 								)}
 								<div>
 									<div className="flex flex-wrap items-center gap-2">
-										<h1 className="text-2xl font-bold text-white md:text-3xl">
+										<h1
+											className="text-2xl font-bold text-white md:text-3xl"
+											style={{ color: `#${user.nameColor}` }}
+										>
 											@{user.username}
 										</h1>
 										{user.verified && (
@@ -239,6 +242,7 @@ export function UserPage({
 									{user.customTitle && (
 										<div
 											className="mt-2 text-sm text-slate-300"
+											style={{ color: `#${user.titleColor}` }}
 											// biome-ignore lint/security/noDangerouslySetInnerHtml: Stored HTML is sanitized in legacy-compatible schema flow
 											dangerouslySetInnerHTML={{ __html: user.customTitle }}
 										/>
@@ -366,6 +370,7 @@ export function UserPage({
 						initialVerified={user.verified}
 						initialVerifiedColor={user.verifiedColor}
 						initialCustomTitlePlain={user.customTitlePlain}
+						initialTitleLocked={user.flairChanged !== null}
 						notes={adminDetails.notes}
 					/>
 				)}
@@ -503,6 +508,11 @@ export function UserPage({
 												>
 													{post.title}
 												</Link>
+												{post.isDraft && (
+													<span className="ml-2 rounded bg-amber-500/20 px-2 py-0.5 text-xs text-amber-200">
+														Draft
+													</span>
+												)}
 												<div className="mt-1 text-xs text-slate-400">
 													{formatRelativeTime(post.createdUtc)} • {post.score}{" "}
 													points • {post.commentCount} comments
@@ -591,6 +601,7 @@ function AdminControls({
 	initialVerified,
 	initialVerifiedColor,
 	initialCustomTitlePlain,
+	initialTitleLocked,
 	notes: initialNotes,
 }: {
 	userId: number;
@@ -599,6 +610,7 @@ function AdminControls({
 	initialVerified: string | null;
 	initialVerifiedColor: string | null;
 	initialCustomTitlePlain: string | null;
+	initialTitleLocked: boolean;
 	notes: UserAdminDetails["notes"];
 }) {
 	const [isBanned, setIsBanned] = useState(initialIsBanned > 0);
@@ -612,6 +624,7 @@ function AdminControls({
 	const [customTitlePlain, setCustomTitlePlain] = useState(
 		initialCustomTitlePlain ?? "",
 	);
+	const [titleLocked, setTitleLocked] = useState(initialTitleLocked);
 	const [notes, setNotes] = useState(initialNotes);
 	const [noteText, setNoteText] = useState("");
 	const [noteTag, setNoteTag] = useState<string>("Warning");
@@ -716,6 +729,7 @@ function AdminControls({
 					verified,
 					verifiedColor,
 					customTitlePlain,
+					titleLocked,
 				},
 			});
 			if (!res.success) {
@@ -726,6 +740,7 @@ function AdminControls({
 			setVerified(res.verified ?? "");
 			setVerifiedColor(res.verifiedColor ?? "");
 			setCustomTitlePlain(res.customTitlePlain ?? "");
+			setTitleLocked(res.titleLocked);
 		} finally {
 			setIsPending(false);
 		}
@@ -851,6 +866,15 @@ function AdminControls({
 							className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
 						/>
 					</div>
+					<label className="flex items-center gap-2 text-sm text-slate-300">
+						<input
+							type="checkbox"
+							checked={titleLocked}
+							onChange={(e) => setTitleLocked(e.target.checked)}
+							className="h-4 w-4 rounded border-slate-600 bg-slate-800"
+						/>
+						Lock custom title against user edits
+					</label>
 					<Button
 						type="submit"
 						disabled={isPending}

@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { comments, commentVotes, submissions, votes } from "@/db/schema";
@@ -50,6 +50,27 @@ export async function voteOnSubmission(
 	voteType: VoteType,
 ): Promise<VoteResult> {
 	try {
+		const [availableSubmission] = await db
+			.select({ id: submissions.id })
+			.from(submissions)
+			.where(
+				and(
+					eq(submissions.id, submissionId),
+					eq(submissions.private, false),
+					eq(submissions.stateMod, "VISIBLE"),
+					isNull(submissions.stateUserDeletedUtc),
+				),
+			)
+			.limit(1);
+		if (!availableSubmission) {
+			return {
+				success: false,
+				newScore: 0,
+				userVote: 0,
+				error: "This post is not available for voting",
+			};
+		}
+
 		// Get current vote
 		const currentVote = await getSubmissionVoteInternal(userId, submissionId);
 

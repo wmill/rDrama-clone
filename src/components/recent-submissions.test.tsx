@@ -90,6 +90,19 @@ describe("RecentSubmissions", () => {
 		);
 	});
 
+	it("switches to the observable card presentation", () => {
+		render(
+			<RecentSubmissions
+				submissions={[baseSubmission]}
+				cardView
+				showSortControls={false}
+			/>,
+		);
+		expect(
+			screen.getByText("Test submission").closest("li")?.dataset.view,
+		).toBe("card");
+	});
+
 	it("renders award chips with counts on awarded submissions", () => {
 		render(
 			<RecentSubmissions

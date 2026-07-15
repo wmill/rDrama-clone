@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/db", () => ({
-	db: { transaction: vi.fn() },
+	db: { transaction: vi.fn(), update: vi.fn(), insert: vi.fn() },
 }));
 
 import { db } from "@/db";
@@ -11,10 +11,13 @@ import {
 	authorRestoreComment,
 	authorRestoreSubmission,
 	setCommentModerationState,
+	setCommentNsfwState,
+	setCommentOpPinnedState,
 	setCommentPinnedState,
 	setCommentRemovedState,
 	setCommentSavedState,
 	setSubmissionModerationState,
+	setSubmissionProfilePinnedState,
 	setSubmissionRemovedState,
 	setSubmissionSavedState,
 	setSubmissionStickyState,
@@ -40,6 +43,7 @@ function createInsertChain() {
 function createSelectChain<T>(result: T) {
 	return {
 		from: vi.fn().mockReturnThis(),
+		innerJoin: vi.fn().mockReturnThis(),
 		where: vi.fn().mockReturnThis(),
 		limit: vi.fn().mockResolvedValue(result),
 	};
@@ -301,5 +305,92 @@ describe("lifecycle helpers", () => {
 			userId: 4,
 		});
 		expect(saveDeleteChain.where).toHaveBeenCalled();
+	});
+
+	it("lets only an author toggle their own profile-post pin", async () => {
+		const update = createUpdateChain();
+		vi.mocked(db.update).mockReturnValueOnce(update as never);
+
+		await expect(
+			setSubmissionProfilePinnedState({
+				submissionId: 8,
+				authorId: 7,
+				pinned: true,
+			}),
+		).resolves.toBe(true);
+		expect(update.set).toHaveBeenCalledWith({ isPinned: true });
+		expect(update.where).toHaveBeenCalled();
+	});
+
+	it("uses the OP marker and refuses to overwrite moderator comment pins", async () => {
+		const opUpdate = createUpdateChain();
+		const opTx = {
+			select: vi.fn(() =>
+				createSelectChain([
+					{ commentAuthorId: 4, postAuthorId: 7, pinnedBy: null },
+				]),
+			),
+			update: vi.fn(() => opUpdate),
+		};
+		const moderatorTx = {
+			select: vi.fn(() =>
+				createSelectChain([
+					{ commentAuthorId: 4, postAuthorId: 7, pinnedBy: "moderator" },
+				]),
+			),
+			update: vi.fn(),
+		};
+		vi.mocked(db.transaction)
+			.mockImplementationOnce(async (fn) => fn(opTx as never) as never)
+			.mockImplementationOnce(async (fn) => fn(moderatorTx as never) as never);
+
+		await expect(
+			setCommentOpPinnedState({ commentId: 3, postAuthorId: 7, pinned: true }),
+		).resolves.toEqual({ ok: true, commentAuthorId: 4, changed: true });
+		expect(opUpdate.set).toHaveBeenCalledWith({
+			pinnedBy: "(OP)",
+			isPinnedUtc: expect.any(Number),
+		});
+		await expect(
+			setCommentOpPinnedState({ commentId: 3, postAuthorId: 7, pinned: false }),
+		).resolves.toEqual({ ok: false, reason: "moderator_pin" });
+		expect(moderatorTx.update).not.toHaveBeenCalled();
+	});
+
+	it("enforces author ownership and logs moderator NSFW changes", async () => {
+		const authorUpdate = createUpdateChain([]);
+		const moderatorUpdate = createUpdateChain();
+		const logInsert = createInsertChain();
+		vi.mocked(db.update).mockReturnValueOnce(authorUpdate as never);
+		const moderatorTx = {
+			update: vi.fn(() => moderatorUpdate),
+			insert: vi.fn(() => logInsert),
+		};
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(moderatorTx as never) as never,
+		);
+
+		await expect(
+			setCommentNsfwState({
+				commentId: 4,
+				actorId: 99,
+				nsfw: true,
+				moderator: false,
+			}),
+		).resolves.toBe(false);
+		await expect(
+			setCommentNsfwState({
+				commentId: 4,
+				actorId: 2,
+				nsfw: true,
+				moderator: true,
+			}),
+		).resolves.toBe(true);
+		expect(moderatorUpdate.set).toHaveBeenCalledWith({ over18: true });
+		expect(logInsert.values).toHaveBeenCalledWith({
+			userId: 2,
+			targetCommentId: 4,
+			kind: "mark_comment_nsfw",
+		});
 	});
 });

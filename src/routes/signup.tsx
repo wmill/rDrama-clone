@@ -14,17 +14,11 @@ import {
 	getRequestInfo,
 	setSessionCookie,
 } from "@/lib/sessions.server";
+import { usernameSchema } from "@/lib/validation";
 
 const signupSchema = z
 	.object({
-		username: z
-			.string()
-			.min(3, "Username must be at least 3 characters")
-			.max(25, "Username must be at most 25 characters")
-			.regex(
-				/^[a-zA-Z0-9_]+$/,
-				"Username can only contain letters, numbers, and underscores",
-			),
+		username: usernameSchema,
 		email: z.string().email("Please enter a valid email address"),
 		password: z.string().min(8, "Password must be at least 8 characters"),
 		confirmPassword: z.string(),

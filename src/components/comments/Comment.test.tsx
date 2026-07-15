@@ -31,17 +31,24 @@ vi.mock("@/stores/modals", () => ({
 vi.mock("@/lib/comment-actions.server", () => ({
 	createCommentFn: vi.fn(),
 	deleteCommentFn: vi.fn(),
+	pinCommentAsOpFn: vi.fn(),
 	restoreCommentFn: vi.fn(),
 	saveCommentFn: vi.fn(),
+	setOwnCommentNsfwFn: vi.fn(),
 	updateCommentFn: vi.fn(),
 }));
 
-import { restoreCommentFn } from "@/lib/comment-actions.server";
+import {
+	pinCommentAsOpFn,
+	restoreCommentFn,
+	setOwnCommentNsfwFn,
+} from "@/lib/comment-actions.server";
 
 vi.mock("@/lib/admin-actions.server", () => ({
 	distinguishCommentFn: vi.fn(),
 	pinCommentFn: vi.fn(),
 	setCommentModerationStateFn: vi.fn(),
+	setCommentNsfwFn: vi.fn(),
 }));
 
 vi.mock("@/lib/reporting-actions.server", () => ({
@@ -88,10 +95,124 @@ describe("Comment awards", () => {
 			awards: [{ kind: "silver", count: 3 }],
 		};
 
-		render(<Comment comment={comment} submissionId={42} />);
+		render(
+			<Comment comment={comment} submissionId={42} submissionAuthorId={99} />,
+		);
 
 		expect(screen.getByTitle("Silver x3")).toBeDefined();
 		expect(screen.getByTitle("Silver x3").textContent).toContain("3");
+	});
+});
+
+describe("Comment pin labels and permissions", () => {
+	it("labels OP and moderator pins distinctly", () => {
+		const { rerender } = render(
+			<Comment
+				comment={{ ...makeComment(), pinnedBy: "(OP)", isPinned: true }}
+				submissionId={42}
+				submissionAuthorId={99}
+			/>,
+		);
+		expect(screen.getByText("Pinned by OP")).not.toBeNull();
+
+		rerender(
+			<Comment
+				key="moderator-pin"
+				comment={{ ...makeComment(), pinnedBy: "moderator", isPinned: true }}
+				submissionId={42}
+				submissionAuthorId={99}
+			/>,
+		);
+		expect(screen.getByText("Pinned by moderator")).not.toBeNull();
+	});
+
+	it("lets the post author toggle an OP pin", async () => {
+		vi.mocked(pinCommentAsOpFn).mockResolvedValue({
+			success: true,
+			changed: true,
+		});
+		render(
+			<Comment
+				comment={makeComment()}
+				submissionId={42}
+				submissionAuthorId={99}
+				currentUserId={99}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Pin as OP" }));
+		await waitFor(() =>
+			expect(pinCommentAsOpFn).toHaveBeenCalledWith({
+				data: { id: 1, pinned: true },
+			}),
+		);
+		expect(screen.getByText("Pinned by OP")).not.toBeNull();
+	});
+
+	it("does not offer an OP unpin for a moderator pin", () => {
+		render(
+			<Comment
+				comment={{ ...makeComment(), pinnedBy: "moderator", isPinned: true }}
+				submissionId={42}
+				submissionAuthorId={99}
+				currentUserId={99}
+			/>,
+		);
+		expect(screen.queryByRole("button", { name: /pin as OP/i })).toBeNull();
+	});
+});
+
+describe("Comment NSFW behavior", () => {
+	it("renders the NSFW gate while retaining the comment", () => {
+		render(
+			<Comment
+				comment={{
+					...makeComment(),
+					isNsfw: true,
+					isNsfwHidden: true,
+					bodyHtml:
+						"<p>Enable NSFW content in settings to view this comment</p>",
+				}}
+				submissionId={42}
+				submissionAuthorId={99}
+			/>,
+		);
+		expect(screen.getByText("NSFW")).not.toBeNull();
+		expect(screen.getByText(/Enable NSFW content/i)).not.toBeNull();
+	});
+
+	it("lets the author toggle the NSFW flag", async () => {
+		vi.mocked(setOwnCommentNsfwFn).mockResolvedValue({ success: true });
+		render(
+			<Comment
+				comment={makeComment()}
+				submissionId={42}
+				submissionAuthorId={99}
+				currentUserId={7}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Mark NSFW" }));
+		await waitFor(() =>
+			expect(setOwnCommentNsfwFn).toHaveBeenCalledWith({
+				data: { id: 1, nsfw: true },
+			}),
+		);
+		expect(screen.getByText("NSFW")).not.toBeNull();
+	});
+});
+
+describe("Comment highlighting", () => {
+	it("marks comments newer than the supplied highlight threshold", () => {
+		const { container } = render(
+			<Comment
+				comment={{ ...makeComment(), createdUtc: 200 }}
+				submissionId={42}
+				submissionAuthorId={99}
+				highlightComments
+				highlightSince={150}
+			/>,
+		);
+		expect(container.querySelector('[data-highlighted="true"]')).not.toBeNull();
 	});
 });
 
@@ -111,7 +232,12 @@ describe("Comment editing", () => {
 		});
 
 		const { container } = render(
-			<Comment comment={comment} submissionId={42} currentUserId={7} />,
+			<Comment
+				comment={comment}
+				submissionId={42}
+				submissionAuthorId={99}
+				currentUserId={7}
+			/>,
 		);
 
 		fireEvent.click(screen.getByRole("button", { name: /Edit/i }));
@@ -139,7 +265,12 @@ describe("Comment restore", () => {
 		vi.mocked(restoreCommentFn).mockResolvedValue({ success: true });
 		const comment = { ...makeComment(), isDeleted: true };
 		const { container } = render(
-			<Comment comment={comment} submissionId={42} currentUserId={7} />,
+			<Comment
+				comment={comment}
+				submissionId={42}
+				submissionAuthorId={99}
+				currentUserId={7}
+			/>,
 		);
 
 		fireEvent.click(screen.getByRole("button", { name: "Restore" }));

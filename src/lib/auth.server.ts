@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import { eq, sql } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
@@ -55,6 +55,17 @@ export type SafeUser = {
 	theme?: string;
 	over18?: boolean;
 	slurReplacer?: boolean;
+	defaultSorting?: string;
+	defaultSortingComments?: string;
+	defaultTime?: string;
+	hideVotedOn?: boolean;
+	cardView?: boolean;
+	highlightComments?: boolean;
+	newTab?: boolean;
+	newTabExternal?: boolean;
+	nameColor?: string;
+	titleColor?: string;
+	themeColor?: string;
 };
 
 export function sanitizeUser(user: typeof users.$inferSelect): SafeUser {
@@ -78,6 +89,17 @@ export function sanitizeUser(user: typeof users.$inferSelect): SafeUser {
 		theme: user.theme,
 		over18: user.over18,
 		slurReplacer: user.slurReplacer,
+		defaultSorting: user.defaultSorting,
+		defaultSortingComments: user.defaultSortingComments,
+		defaultTime: user.defaultTime,
+		hideVotedOn: user.hideVotedOn,
+		cardView: user.cardView,
+		highlightComments: user.highlightComments,
+		newTab: user.newTab,
+		newTabExternal: user.newTabExternal,
+		nameColor: user.nameColor,
+		titleColor: user.titleColor,
+		themeColor: user.themeColor,
 	};
 }
 
@@ -91,7 +113,12 @@ export async function getUserByUsername(username: string) {
 	const [user] = await db
 		.select()
 		.from(users)
-		.where(sql`lower(${users.username}) = ${normalizedUsername.toLowerCase()}`)
+		.where(
+			or(
+				sql`lower(${users.username}) = ${normalizedUsername.toLowerCase()}`,
+				sql`lower(${users.originalUsername}) = ${normalizedUsername.toLowerCase()}`,
+			),
+		)
 		.limit(1);
 	return user ?? null;
 }

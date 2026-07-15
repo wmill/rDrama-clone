@@ -21,6 +21,7 @@ type RecentSubmissionsProps = {
 	onSortChange?: (sort: SortType) => void;
 	onTimeChange?: (time: TimeFilter) => void;
 	showSortControls?: boolean;
+	cardView?: boolean;
 };
 
 const sortOptions: { value: SortType; label: string }[] = [
@@ -52,6 +53,7 @@ export function RecentSubmissions({
 	onSortChange,
 	onTimeChange,
 	showSortControls = true,
+	cardView = false,
 }: RecentSubmissionsProps) {
 	const showTimeFilter = sort === "top" || sort === "controversial";
 
@@ -127,13 +129,14 @@ export function RecentSubmissions({
 				)}
 			</div>
 
-			<ul className="grid gap-3">
+			<ul className={`grid gap-3 ${cardView ? "md:grid-cols-2" : ""}`}>
 				{submissions.length > 0 ? (
 					submissions.map((submission) => (
 						<SubmissionListItem
 							key={submission.id}
 							submission={submission}
 							currentUserId={currentUserId}
+							cardView={cardView}
 						/>
 					))
 				) : (
@@ -149,15 +152,20 @@ export function RecentSubmissions({
 export function SubmissionListItem({
 	submission,
 	currentUserId,
+	cardView = false,
 }: {
 	submission: SubmissionSummary;
 	currentUserId?: number;
+	cardView?: boolean;
 }) {
 	const [isSaved, setIsSaved] = useState(submission.isSaved);
 	const [isSaving, setIsSaving] = useState(false);
 
 	return (
-		<li className="group relative overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/80 transition-all duration-200 hover:-translate-y-[1px] hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/10">
+		<li
+			data-view={cardView ? "card" : "list"}
+			className={`group relative overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/80 transition-all duration-200 hover:-translate-y-[1px] hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/10 ${cardView ? "h-full" : ""}`}
+		>
 			<div className="flex">
 				<div className="flex w-12 flex-col items-center justify-center bg-slate-800/50 py-3">
 					<VoteButtons

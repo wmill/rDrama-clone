@@ -9,13 +9,14 @@ import {
 	type TimeFilter,
 	TimeFilters,
 } from "@/lib/constants";
+import { resolvePreferenceDefault } from "@/lib/content-preferences";
 import { getCurrentUser } from "@/lib/sessions.server";
 import { getSubmissionsPage } from "@/lib/submissions.server";
 import { feedInputSchema } from "@/lib/validation";
 
 const searchSchema = z.object({
-	sort: z.enum(SortTypes).default("hot"),
-	t: z.enum(TimeFilters).default("all"),
+	sort: z.enum(SortTypes).optional(),
+	t: z.enum(TimeFilters).optional(),
 	page: z.number().int().min(1).default(1),
 });
 
@@ -32,19 +33,33 @@ const loadSubmissions = createServerFn({ method: "GET" })
 		}) => {
 			try {
 				const user = await getCurrentUser();
+				const sort = resolvePreferenceDefault(
+					data.sort,
+					user?.defaultSorting as SortType | undefined,
+					"hot",
+				);
+				const time = resolvePreferenceDefault(
+					data.time,
+					user?.defaultTime as TimeFilter | undefined,
+					"all",
+				);
 				const result = await getSubmissionsPage({
-					sort: data.sort ?? "hot",
-					time: data.time ?? "all",
+					sort,
+					time,
 					page: data.page ?? 1,
 					userId: user?.id,
 					viewerOver18: user?.over18,
 					slurReplacer: user?.slurReplacer,
+					hideVotedOn: user?.hideVotedOn,
 				});
 				return {
 					submissions: result.submissions,
 					page: result.page,
 					hasMore: result.hasMore,
 					currentUserId: user?.id,
+					sort,
+					time,
+					cardView: user?.cardView ?? false,
 				};
 			} catch (error) {
 				console.error("[loadSubmissions Error]", error);
@@ -70,8 +85,8 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
 	const router = useRouter();
-	const { submissions, page, hasMore, currentUserId } = Route.useLoaderData();
-	const { sort, t: time } = Route.useSearch();
+	const { submissions, page, hasMore, currentUserId, sort, time, cardView } =
+		Route.useLoaderData();
 	const [isLoading, setIsLoading] = useState(false);
 
 	const navigateFeed = async (search: {
@@ -105,6 +120,7 @@ function HomePage() {
 						onSortChange={handleSortChange}
 						onTimeChange={handleTimeChange}
 						showSortControls={true}
+						cardView={cardView}
 					/>
 
 					<div className="mt-6 flex items-center justify-center gap-4">

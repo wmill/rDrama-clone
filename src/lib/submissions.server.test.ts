@@ -34,9 +34,11 @@ vi.mock("@/lib/awards.server", () => ({
 }));
 
 import { db } from "@/db";
+import { votes } from "@/db/schema";
 import { getSubmissionAwardCounts } from "@/lib/awards.server";
 import { authorDeleteSubmission } from "@/lib/lifecycle.server";
 import { renderPostBodyMarkdown, renderPostTitleHtml } from "@/lib/markdown";
+import { setSubmissionSubscriptionState } from "@/lib/notifications.server";
 import { indexSubmissionBestEffort } from "@/lib/search.server";
 import { getSiteSetting } from "@/lib/site-settings.server";
 import {
@@ -49,6 +51,7 @@ import {
 	getSubmissionsPage,
 	HOME_FEED_PER_PAGE,
 	normalizePostUrl,
+	publishSubmission,
 	RepostConfirmationRequiredError,
 	updateSubmission,
 } from "@/lib/submissions.server";
@@ -100,6 +103,19 @@ function createSubmissionTx(id = 70, selectResults: unknown[] = [[]]) {
 	return { tx, submissionInsert };
 }
 
+function containsReference(
+	value: unknown,
+	target: object,
+	seen = new WeakSet<object>(),
+): boolean {
+	if (value === target) return true;
+	if (!value || typeof value !== "object" || seen.has(value)) return false;
+	seen.add(value);
+	return Object.values(value).some((child) =>
+		containsReference(child, target, seen),
+	);
+}
+
 describe("submissions.server", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -128,6 +144,161 @@ describe("submissions.server", () => {
 			);
 		},
 	);
+
+	it("stores drafts without public side effects", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createSelectLimitChain([{ adminLevel: 0 }]) as never,
+		);
+		const { tx, submissionInsert } = createSubmissionTx();
+		vi.mocked(getSiteSetting).mockResolvedValue(true as never);
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(
+			createSubmission({
+				authorId: 3,
+				title: "Unfinished",
+				body: "Work in progress",
+				draft: true,
+			}),
+		).resolves.toBe(70);
+
+		expect(submissionInsert.values).toHaveBeenCalledWith(
+			expect.objectContaining({ private: true, stateMod: "VISIBLE" }),
+		);
+		expect(tx.insert).toHaveBeenCalledTimes(1);
+		expect(tx.update).not.toHaveBeenCalled();
+		expect(indexSubmissionBestEffort).not.toHaveBeenCalled();
+	});
+
+	it("publishes a draft exactly once across repeated requests", async () => {
+		const publishedUpdate = {
+			set: vi.fn(() => ({
+				where: vi.fn(() => ({
+					returning: vi.fn().mockResolvedValue([{ id: 70, authorId: 3 }]),
+				})),
+			})),
+		};
+		const countUpdate = {
+			set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+		};
+		const firstTx = {
+			update: vi
+				.fn()
+				.mockReturnValueOnce(publishedUpdate)
+				.mockReturnValueOnce(countUpdate),
+			insert: vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) })),
+		};
+		const alreadyPublicUpdate = {
+			set: vi.fn(() => ({
+				where: vi.fn(() => ({ returning: vi.fn().mockResolvedValue([]) })),
+			})),
+		};
+		const secondTx = {
+			update: vi.fn(() => alreadyPublicUpdate),
+			select: vi.fn(() =>
+				createSelectLimitChain([{ authorId: 3, private: false }]),
+			),
+			insert: vi.fn(),
+		};
+		vi.mocked(db.transaction)
+			.mockImplementationOnce(async (fn) => fn(firstTx as never) as never)
+			.mockImplementationOnce(async (fn) => fn(secondTx as never) as never);
+
+		await expect(publishSubmission({ id: 70, userId: 3 })).resolves.toBe(
+			"published",
+		);
+		await expect(publishSubmission({ id: 70, userId: 3 })).resolves.toBe(
+			"already_published",
+		);
+
+		expect(firstTx.insert).toHaveBeenCalledTimes(1);
+		expect(publishedUpdate.set).toHaveBeenCalledWith(
+			expect.objectContaining({
+				private: false,
+				createdUtc: expect.any(Number),
+				stateMod: "VISIBLE",
+			}),
+		);
+		expect(setSubmissionSubscriptionState).toHaveBeenCalledTimes(1);
+		expect(firstTx.update).toHaveBeenCalledTimes(2);
+		expect(secondTx.insert).not.toHaveBeenCalled();
+		expect(indexSubmissionBestEffort).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not run publish side effects for a forbidden draft", async () => {
+		const update = {
+			set: vi.fn(() => ({
+				where: vi.fn(() => ({ returning: vi.fn().mockResolvedValue([]) })),
+			})),
+		};
+		const tx = {
+			update: vi.fn(() => update),
+			select: vi.fn(() =>
+				createSelectLimitChain([{ authorId: 3, private: true }]),
+			),
+			insert: vi.fn(),
+		};
+		vi.mocked(db.transaction).mockImplementationOnce(
+			async (fn) => fn(tx as never) as never,
+		);
+
+		await expect(publishSubmission({ id: 70, userId: 99 })).resolves.toBe(
+			"forbidden",
+		);
+		expect(tx.insert).not.toHaveBeenCalled();
+		expect(setSubmissionSubscriptionState).not.toHaveBeenCalled();
+		expect(indexSubmissionBestEffort).not.toHaveBeenCalled();
+	});
+
+	it("allows only the draft owner or a moderator to view a private post", async () => {
+		const draftRow = {
+			id: 70,
+			title: "Draft",
+			titleHtml: "Draft",
+			createdUtc: 1,
+			authorId: 3,
+			authorName: "author",
+			url: null,
+			body: "secret",
+			bodyHtml: "<p>secret</p>",
+			upvotes: 1,
+			downvotes: 0,
+			commentCount: 0,
+			thumbUrl: null,
+			flair: null,
+			isPinned: false,
+			isNsfw: false,
+			stickied: null,
+			embedUrl: null,
+			editedUtc: 0,
+			views: 0,
+			distinguishLevel: 0,
+			stateUserDeletedUtc: null,
+			stateMod: "VISIBLE" as const,
+			stateModSetBy: null,
+			private: true,
+			userVoteType: null,
+			savedSubmissionId: null,
+			subscribedSubmissionId: null,
+			blockedTargetId: null,
+		};
+		vi.mocked(db.select)
+			.mockReturnValueOnce(createSelectLimitChain([draftRow]) as never)
+			.mockReturnValueOnce(createSelectLimitChain([draftRow]) as never)
+			.mockReturnValueOnce(createSelectLimitChain([draftRow]) as never);
+
+		await expect(getSubmissionById(70, 99, false)).resolves.toBeNull();
+		await expect(getSubmissionById(70, 3, false)).resolves.toMatchObject({
+			id: 70,
+			isDraft: true,
+		});
+		await expect(getSubmissionById(70, 99, true)).resolves.toMatchObject({
+			id: 70,
+			isDraft: true,
+		});
+	});
 
 	it("normalizes URL casing, default ports, roots, and fragments consistently", () => {
 		expect(normalizePostUrl(" HTTPS://Example.COM:443/#fragment ")).toBe(
@@ -321,6 +492,16 @@ describe("submissions.server", () => {
 		expect(result.page).toBe(1);
 		expect(result.submissions).toEqual([]);
 		expect(result.hasMore).toBe(false);
+	});
+
+	it("adds the viewer vote exclusion to feed queries when requested", async () => {
+		const chain = createSelectOrderChain([]);
+		vi.mocked(db.select).mockReturnValueOnce(chain as never);
+
+		await getSubmissions({ userId: 9, hideVotedOn: true });
+
+		const condition = (chain.where.mock.calls as unknown[][])[0]?.[0];
+		expect(containsReference(condition, votes.userId)).toBe(true);
 	});
 
 	it("attaches batched award counts to feed submissions", async () => {

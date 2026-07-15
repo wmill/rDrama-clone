@@ -2,7 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { fail, requireUser } from "@/lib/auth-guards.server";
-import { setBlockState, setFollowState } from "@/lib/social.server";
+import {
+	removeFollower,
+	setBlockState,
+	setFollowState,
+} from "@/lib/social.server";
 import { idSchema } from "@/lib/validation";
 
 export const followInputSchema = z.object({
@@ -13,6 +17,7 @@ export const blockInputSchema = z.object({
 	targetUserId: idSchema,
 	blocked: z.boolean(),
 });
+export const removeFollowerInputSchema = z.object({ followerId: idSchema });
 
 export const setFollowStateFn = createServerFn({ method: "POST" })
 	.inputValidator((data: { targetUserId: number; following: boolean }) =>
@@ -65,5 +70,25 @@ export const setBlockStateFn = createServerFn({ method: "POST" })
 			);
 		}
 
+		return { success: true as const };
+	});
+
+export const removeFollowerFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { followerId: number }) =>
+		removeFollowerInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireUser();
+		if (!guard.ok) return guard.failure;
+		try {
+			await removeFollower({
+				ownerId: guard.user.id,
+				followerId: data.followerId,
+			});
+		} catch (error) {
+			return fail(
+				error instanceof Error ? error.message : "Failed to remove follower",
+			);
+		}
 		return { success: true as const };
 	});

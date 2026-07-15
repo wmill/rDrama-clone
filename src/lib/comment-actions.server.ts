@@ -10,8 +10,11 @@ import {
 } from "@/lib/comments.server";
 import {
 	authorRestoreComment,
+	setCommentNsfwState,
+	setCommentOpPinnedState,
 	setCommentSavedState,
 } from "@/lib/lifecycle.server";
+import { createSimpleNotification } from "@/lib/notifications.server";
 import { enforceRateLimit } from "@/lib/rate-limit.server";
 import { indexCommentBestEffort } from "@/lib/search.server";
 import { getCurrentUser } from "@/lib/sessions.server";
@@ -31,6 +34,14 @@ export const updateCommentInputSchema = z.object({
 export const saveCommentInputSchema = z.object({
 	id: idSchema,
 	saved: z.boolean(),
+});
+export const opPinCommentInputSchema = z.object({
+	id: idSchema,
+	pinned: z.boolean(),
+});
+export const commentNsfwInputSchema = z.object({
+	id: idSchema,
+	nsfw: z.boolean(),
 });
 export const commentsSinceInputSchema = z.object({
 	submissionId: idSchema,
@@ -142,6 +153,57 @@ export const saveCommentFn = createServerFn({ method: "POST" })
 			saved: data.saved,
 		});
 
+		return { success: true as const };
+	});
+
+export const pinCommentAsOpFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; pinned: boolean }) =>
+		opPinCommentInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireUser();
+		if (!guard.ok) return guard.failure;
+		const result = await setCommentOpPinnedState({
+			commentId: data.id,
+			postAuthorId: guard.user.id,
+			pinned: data.pinned,
+		});
+		if (!result.ok) {
+			return fail(
+				result.reason === "moderator_pin"
+					? "A moderator pin cannot be changed by the post author"
+					: "Only the post author can pin this comment",
+			);
+		}
+		if (result.changed) {
+			await createSimpleNotification({
+				userId: result.commentAuthorId,
+				actorId: guard.user.id,
+				type: "pin",
+				body: data.pinned
+					? "pinned your comment as the post author"
+					: "unpinned your comment as the post author",
+				url: `/comment/${data.id}`,
+			});
+		}
+		return { success: true as const, changed: result.changed };
+	});
+
+export const setOwnCommentNsfwFn = createServerFn({ method: "POST" })
+	.inputValidator((data: { id: number; nsfw: boolean }) =>
+		commentNsfwInputSchema.parse(data),
+	)
+	.handler(async ({ data }) => {
+		const guard = await requireUser();
+		if (!guard.ok) return guard.failure;
+		const updated = await setCommentNsfwState({
+			commentId: data.id,
+			actorId: guard.user.id,
+			nsfw: data.nsfw,
+			moderator: false,
+		});
+		if (!updated) return fail("You cannot change this comment's NSFW status");
+		void indexCommentBestEffort(data.id);
 		return { success: true as const };
 	});
 

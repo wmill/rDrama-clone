@@ -27,6 +27,7 @@ type NotificationQueryRow = {
 	commentAuthorShadowBanned: string | null;
 	commentBody: string | null;
 	commentBodyHtml: string;
+	commentIsNsfw: boolean;
 	commentCreatedUtc: number;
 	commentStateMod: string | null;
 	commentStateUserDeletedUtc: Date | null;
@@ -40,7 +41,7 @@ type NotificationQueryRow = {
 	submissionStateUserDeletedUtc: Date | null;
 };
 
-export type NotificationType = "comment" | "follow" | "award";
+export type NotificationType = "comment" | "follow" | "award" | "pin";
 
 export type NotificationListItem = {
 	id: number;
@@ -120,7 +121,13 @@ function getNotificationLabel(
 	return "new activity";
 }
 
-function getNotificationSnippet(row: NotificationQueryRow): string {
+function getNotificationSnippet(
+	row: NotificationQueryRow,
+	viewer: Awaited<ReturnType<typeof getCommentViewerContext>>,
+): string {
+	if (row.commentIsNsfw && !viewer.over18) {
+		return "[NSFW comment hidden]";
+	}
 	if (row.commentStateUserDeletedUtc !== null) {
 		return COMMENT_DELETED_PLACEHOLDER;
 	}
@@ -200,6 +207,7 @@ async function loadNotificationRows(
 			commentAuthorShadowBanned: users.shadowBanned,
 			commentBody: comments.body,
 			commentBodyHtml: comments.bodyHtml,
+			commentIsNsfw: comments.over18,
 			commentCreatedUtc: comments.createdUtc,
 			commentStateMod: comments.stateMod,
 			commentStateUserDeletedUtc: comments.stateUserDeletedUtc,
@@ -301,7 +309,10 @@ function mapSimpleNotificationRow(
 	const actorUsername = row.actorName ?? "[deleted]";
 	return {
 		id: row.notificationId,
-		type: row.type === "follow" || row.type === "award" ? row.type : "follow",
+		type:
+			row.type === "follow" || row.type === "award" || row.type === "pin"
+				? row.type
+				: "follow",
 		commentId: null,
 		read: row.read,
 		createdUtc: Math.floor(row.notificationCreatedAt.getTime() / 1000),
@@ -499,7 +510,7 @@ export async function getNotificationsPage(options: {
 				actorUsername: row.commentAuthorName,
 				label: getNotificationLabel(row, trigger),
 				postTitle: row.submissionTitle,
-				commentSnippet: getNotificationSnippet(row),
+				commentSnippet: getNotificationSnippet(row, viewer),
 				href: `/comment/${row.commentId}`,
 			};
 		});

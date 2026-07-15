@@ -13,12 +13,15 @@ import {
 	distinguishCommentFn,
 	pinCommentFn,
 	setCommentModerationStateFn,
+	setCommentNsfwFn,
 } from "@/lib/admin-actions.server";
 import {
 	createCommentFn,
 	deleteCommentFn,
+	pinCommentAsOpFn,
 	restoreCommentFn,
 	saveCommentFn,
+	setOwnCommentNsfwFn,
 	updateCommentFn,
 } from "@/lib/comment-actions.server";
 import type { CommentFlat, CommentWithReplies } from "@/lib/comments.server";
@@ -31,21 +34,27 @@ import { VoteButtons } from "./VoteButtons";
 type CommentProps = {
 	comment: CommentWithReplies;
 	submissionId: number;
+	submissionAuthorId: number;
 	currentUserId?: number;
 	currentUserAdminLevel?: number;
 	depth?: number;
 	maxDepth?: number;
 	onReplyAdded?: (comment?: CommentFlat) => void;
+	highlightComments?: boolean;
+	highlightSince?: number;
 };
 
 export const Comment = memo(function Comment({
 	comment,
 	submissionId,
+	submissionAuthorId,
 	currentUserId,
 	currentUserAdminLevel = 0,
 	depth = 0,
 	maxDepth = 10,
 	onReplyAdded,
+	highlightComments = false,
+	highlightSince = Number.POSITIVE_INFINITY,
 }: CommentProps) {
 	const router = useRouter();
 	const [isCollapsed, setIsCollapsed] = useState(false);
@@ -62,12 +71,17 @@ export const Comment = memo(function Comment({
 	const [isDistinguishing, setIsDistinguishing] = useState(false);
 	const [isSaved, setIsSaved] = useState(comment.isSaved);
 	const [stateMod, setStateMod] = useState(comment.stateMod);
-	const [isPinned, setIsPinned] = useState(comment.isPinned);
+	const [pinnedBy, setPinnedBy] = useState(comment.pinnedBy);
+	const [isNsfw, setIsNsfw] = useState(comment.isNsfw ?? false);
+	const [isTogglingNsfw, setIsTogglingNsfw] = useState(false);
 	const [isSavingComment, setIsSavingComment] = useState(false);
 	const [isUpdatingModerationState, setIsUpdatingModerationState] =
 		useState(false);
 	const [isPinning, setIsPinning] = useState(false);
 	const isAuthor = currentUserId === comment.authorId;
+	const isPostAuthor = currentUserId === submissionAuthorId;
+	const isPinned = pinnedBy !== null;
+	const isOpPinned = pinnedBy === "(OP)";
 	const userVote = comment.userVote;
 	const canDistinguish =
 		currentUserAdminLevel >= 2 || (currentUserAdminLevel >= 1 && isAuthor);
@@ -186,10 +200,48 @@ export const Comment = memo(function Comment({
 				data: { id: comment.id, pinned: nextPinned },
 			});
 			if (result.success) {
-				setIsPinned(nextPinned);
+				setPinnedBy(nextPinned ? "Moderator" : null);
 			}
 		} finally {
 			setIsPinning(false);
+		}
+	};
+
+	const handleToggleOpPinned = async () => {
+		setIsPinning(true);
+		setReportMessage(null);
+		try {
+			const nextPinned = !isOpPinned;
+			const result = await pinCommentAsOpFn({
+				data: { id: comment.id, pinned: nextPinned },
+			});
+			if (result.success) {
+				setPinnedBy(nextPinned ? "(OP)" : null);
+				await router.invalidate();
+			} else {
+				setReportMessage(result.error);
+			}
+		} finally {
+			setIsPinning(false);
+		}
+	};
+
+	const handleToggleNsfw = async () => {
+		setIsTogglingNsfw(true);
+		setReportMessage(null);
+		try {
+			const nsfw = !isNsfw;
+			const result = canModerate
+				? await setCommentNsfwFn({ data: { id: comment.id, nsfw } })
+				: await setOwnCommentNsfwFn({ data: { id: comment.id, nsfw } });
+			if (result.success) {
+				setIsNsfw(nsfw);
+				await router.invalidate();
+			} else {
+				setReportMessage(result.error);
+			}
+		} finally {
+			setIsTogglingNsfw(false);
 		}
 	};
 
@@ -218,7 +270,12 @@ export const Comment = memo(function Comment({
 
 	return (
 		<div
-			className={`${depth > 0 ? `ml-4 border-l-2 ${borderColor} pl-3` : ""}`}
+			data-highlighted={
+				highlightComments && comment.createdUtc > highlightSince
+					? "true"
+					: undefined
+			}
+			className={`${depth > 0 ? `ml-4 border-l-2 ${borderColor} pl-3` : ""} ${highlightComments && comment.createdUtc > highlightSince ? "bg-cyan-500/10 ring-1 ring-cyan-400/30" : ""}`}
 		>
 			<div className="py-2">
 				{/* Comment header */}
@@ -261,7 +318,12 @@ export const Comment = memo(function Comment({
 					)}
 					{isPinned && (
 						<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-							Pinned
+							{isOpPinned ? "Pinned by OP" : "Pinned by moderator"}
+						</span>
+					)}
+					{isNsfw && (
+						<span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-medium text-red-300">
+							NSFW
 						</span>
 					)}
 					{isFiltered && (
@@ -502,6 +564,36 @@ export const Comment = memo(function Comment({
 												</button>
 											</>
 										)}
+										{isPostAuthor &&
+											!canModerate &&
+											(!isPinned || isOpPinned) && (
+												<button
+													type="button"
+													onClick={handleToggleOpPinned}
+													disabled={isPinning}
+													className="text-slate-500 hover:text-violet-300 disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													{isPinning
+														? "Updating..."
+														: isOpPinned
+															? "Unpin as OP"
+															: "Pin as OP"}
+												</button>
+											)}
+										{(isAuthor || canModerate) && (
+											<button
+												type="button"
+												onClick={handleToggleNsfw}
+												disabled={isTogglingNsfw}
+												className="text-slate-500 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{isTogglingNsfw
+													? "Updating..."
+													: isNsfw
+														? "Unmark NSFW"
+														: "Mark NSFW"}
+											</button>
+										)}
 									</div>
 								)}
 
@@ -544,11 +636,14 @@ export const Comment = memo(function Comment({
 										key={reply.id}
 										comment={reply}
 										submissionId={submissionId}
+										submissionAuthorId={submissionAuthorId}
 										currentUserId={currentUserId}
 										currentUserAdminLevel={currentUserAdminLevel}
 										depth={depth + 1}
 										maxDepth={maxDepth}
 										onReplyAdded={onReplyAdded}
+										highlightComments={highlightComments}
+										highlightSince={highlightSince}
 									/>
 								))}
 							</div>

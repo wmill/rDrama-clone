@@ -89,6 +89,15 @@ describe("getUserByUsernameCanonical", () => {
 		await expect(getUserByUsernameCanonical("  ALICE ")).resolves.toBe(user);
 	});
 
+	it("returns an original-name match for canonical profile redirects", async () => {
+		const user = makeProfileUser({
+			username: "NewAlice",
+			originalUsername: "Alice",
+		});
+		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([user]) as never);
+		await expect(getUserByUsernameCanonical("alice")).resolves.toBe(user);
+	});
+
 	it("returns null when no user matches", async () => {
 		vi.mocked(db.select).mockReturnValueOnce(createQueryChain([]) as never);
 
@@ -121,6 +130,7 @@ describe("getUserSettingsById", () => {
 					proCoins: 0,
 					bio: null,
 					customTitlePlain: null,
+					flairChanged: 123,
 					profileUrl: null,
 					bannerUrl: null,
 					defaultSorting: "hot",
@@ -143,6 +153,7 @@ describe("getUserSettingsById", () => {
 			id: 7,
 			bio: "",
 			customTitlePlain: "",
+			titleLocked: true,
 			profileUrl: "",
 			bannerUrl: "",
 			nameColor: "ff0000",
@@ -209,6 +220,24 @@ describe("updateUserSettings", () => {
 				theme: "light",
 				over18: true,
 				slurReplacer: false,
+			}),
+		);
+	});
+
+	it("preserves a moderator-locked custom title while saving other settings", async () => {
+		const chain = createQueryChain();
+		vi.mocked(db.update).mockReturnValueOnce(chain as never);
+
+		await updateUserSettings(
+			7,
+			makeSettingsInput({ customTitlePlain: "Attempted replacement" }),
+			{ preserveCustomTitle: true },
+		);
+
+		expect(chain.set).toHaveBeenCalledWith(
+			expect.not.objectContaining({
+				customTitlePlain: expect.anything(),
+				customTitle: expect.anything(),
 			}),
 		);
 	});
@@ -356,5 +385,42 @@ describe("getProfilePageData", () => {
 			posts: [],
 		});
 		expect(db.select).toHaveBeenCalledTimes(3);
+	});
+
+	it("orders profile posts with pinned posts first", async () => {
+		const postsChain = createQueryChain([
+			{
+				id: 1,
+				title: "Pinned",
+				titleHtml: "Pinned",
+				bodyHtml: null,
+				url: null,
+				createdUtc: 100,
+				upvotes: 1,
+				downvotes: 0,
+				commentCount: 0,
+				isDraft: false,
+			},
+		]);
+		vi.mocked(db.select)
+			.mockReturnValueOnce(createQueryChain([makeProfileUser()]) as never)
+			.mockReturnValueOnce(createQueryChain([{ count: 0 }]) as never)
+			.mockReturnValueOnce(postsChain as never)
+			.mockReturnValueOnce(createQueryChain([]) as never);
+
+		await getProfilePageData({
+			username: "alice",
+			tab: "posts",
+			sort: "new",
+			t: "all",
+			page: 1,
+			viewer: null,
+		});
+
+		// The first ordering expression is isPinned; the second is the selected sort.
+		expect(postsChain.orderBy).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.anything(),
+		);
 	});
 });

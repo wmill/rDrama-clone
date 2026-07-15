@@ -17,11 +17,26 @@ vi.mock("@/lib/notifications.server", () => ({
 import { db } from "@/db";
 import { createSimpleNotification } from "@/lib/notifications.server";
 import {
+	getBlockedUsersPage,
 	getSocialViewerContext,
 	getUserRelationship,
 	setBlockState,
 	setFollowState,
 } from "@/lib/social.server";
+
+function createBlockedPageChain(result: unknown) {
+	return {
+		from: vi.fn(() => ({
+			innerJoin: vi.fn(() => ({
+				where: vi.fn(() => ({
+					limit: vi.fn(() => ({
+						offset: vi.fn().mockResolvedValue(result),
+					})),
+				})),
+			})),
+		})),
+	};
+}
 
 function createSelectLimitChain(result: unknown) {
 	return {
@@ -99,6 +114,41 @@ describe("social.server", () => {
 		await expect(getSocialViewerContext(9)).resolves.toEqual({
 			viewerId: 9,
 			blockedUserIds: new Set([3, 7]),
+		});
+	});
+
+	it("paginates the owner's public blocked-user list", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createBlockedPageChain([
+				{ id: 3, username: "three", profileUrl: null, isPrivate: false },
+				{ id: 7, username: "seven", profileUrl: null, isPrivate: false },
+			]) as never,
+		);
+		await expect(
+			getBlockedUsersPage({ userId: 9, page: 2, pageSize: 1 }),
+		).resolves.toEqual({
+			items: [{ id: 3, username: "three", profileUrl: null, isPrivate: false }],
+			page: 2,
+			pageSize: 1,
+			hasNextPage: true,
+		});
+	});
+
+	it("keeps private blocks removable without exposing profile details", async () => {
+		vi.mocked(db.select).mockReturnValueOnce(
+			createBlockedPageChain([
+				{
+					id: 3,
+					username: "secret-renamed-user",
+					profileUrl: "secret.png",
+					isPrivate: true,
+				},
+			]) as never,
+		);
+		await expect(
+			getBlockedUsersPage({ userId: 9, page: 1 }),
+		).resolves.toMatchObject({
+			items: [{ id: 3, username: null, profileUrl: null, isPrivate: true }],
 		});
 	});
 
